@@ -42,3 +42,9 @@ next-env.d.ts
 
 # env
 .env*
+
+# shadcn UI setting
+components.json
+
+# backup files
+src/_backup/
