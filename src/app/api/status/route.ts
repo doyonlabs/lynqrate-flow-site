@@ -1,14 +1,19 @@
-// app/api/status/route.ts
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic"; // 빌드 시 정적 최적화 방지
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function getDb() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Supabase env missing");
+  return createClient(url, key);
+}
 
 export async function GET(req: NextRequest) {
+  const db = getDb(); // 여기서만 환경변수 읽기
+
   const { searchParams } = new URL(req.url);
   const sid = searchParams.get("sid") || "";
 
