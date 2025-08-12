@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex,nofollow">
+    <title>처리 중…</title>
+</head>
+<body>처리 중…
+<script>
+    const sid = new URLSearchParams(location.search).get('sid') || '';
+    if (!sid) location.replace('/fail');
+
+    async function poll() {
+        try {
+            const r = await fetch(`/api/status?sid=${encodeURIComponent(sid)}`, { cache: 'no-store' });
+            const { status, emotion_entry_id } = await r.json();
+
+        if (status === 'ready' && entry_id) {
+            location.replace(`/feedback?emotion_entry_id=${emotion_entry_id}`);
+        } else if (status === 'fail' || status === 'error') {
+            location.replace('/fail');
+        } else {
+            setTimeout(poll, 1200); // pending
+        }
+        } catch {
+            // 네트워크 이슈 등: 잠시 후 재시도
+            setTimeout(poll, 1500);
+        }
+    }
+    poll();
+</script>
+</body>
+</html>
