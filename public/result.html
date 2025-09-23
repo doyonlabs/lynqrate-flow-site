@@ -15,7 +15,7 @@
             const r = await fetch(`/api/status?sid=${encodeURIComponent(sid)}`, { cache: 'no-store' });
             const { status, emotion_entry_id } = await r.json();
 
-        if (status === 'ready' && entry_id) {
+        if (status === 'ready' && emotion_entry_id) {
             location.replace(`/feedback?emotion_entry_id=${emotion_entry_id}`);
         } else if (status === 'fail' || status === 'error') {
             location.replace('/fail');
