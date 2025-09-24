@@ -67,22 +67,46 @@ async function getMany<T = any>(path: string): Promise<T[]> {
 
 export async function GET(req: NextRequest) {
   try {
-    const entryId = req.nextUrl.searchParams.get("emotion_entry_id");
+    const sp = req.nextUrl.searchParams;
+
+    // ✅ 0) entryId 우선, 없으면 user_id로 최신 entry 찾아서 대체
+    const userId = sp.get("user_id");
+    let entryId = sp.get("emotion_entry_id");
+
+    if (!entryId && userId) {
+      const latest = await getOne<{ id: string }>(
+        `/rest/v1/emotion_entries` +
+          `?select=id` +
+          `&user_id=eq.${encodeURIComponent(userId)}` +
+          `&order=created_at.desc` +
+          `&limit=1`
+      );
+      entryId = latest?.id ?? null;
+      if (!entryId) {
+        return NextResponse.json(
+          { ok: false, error: "USER_HAS_NO_ENTRIES" },
+          { status: 404 }
+        );
+      }
+    }
+
     if (!entryId) {
+      // 여전히 entryId가 없으면 에러
       return NextResponse.json(
         { ok: false, error: "MISSING_ENTRY_ID" },
         { status: 400 }
       );
     }
 
-    // 1) emotion_entries
-    // emotion_entries
+    // 1) 오늘(현재) emotion_entry 조회
     type EntryWithSE = {
       id: string;
       user_pass_id: string | null;
       created_at: string;
       situation_summary_text: string | null;
       journal_summary_text: string | null;
+      situation_raw_text?: string | null;
+      journal_raw_text?: string | null;
       standard_emotion: {
         name: string;
         color_code: string | null;
@@ -92,26 +116,40 @@ export async function GET(req: NextRequest) {
 
     const entry = await getOne<EntryWithSE>(
       `/rest/v1/emotion_entries` +
-      `?select=` +
-        `id,user_pass_id,created_at,` +
-        `situation_summary_text,journal_summary_text,` +
-        `standard_emotion:standard_emotions(name,color_code,description)` +
-      `&id=eq.${encodeURIComponent(entryId)}` +
-      `&limit=1`
+        `?select=` +
+        [
+          `id`,
+          `user_pass_id`,
+          `created_at`,
+          `situation_summary_text`,
+          `journal_summary_text`,
+          `situation_raw_text`,
+          `journal_raw_text`,
+          `standard_emotion:standard_emotions(name,color_code,description)`,
+        ].join(",") +
+        `&id=eq.${encodeURIComponent(entryId)}` +
+        `&limit=1`
     );
 
     if (!entry) {
-      return NextResponse.json({ ok: false, error: "ENTRY_NOT_FOUND" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "ENTRY_NOT_FOUND" },
+        { status: 404 }
+      );
     }
 
-    //차트용 누적 N건에도 색상 넣기
-    let entries_for_stats: { entry_datetime: string; standard_emotion: string; color_code?: string | null }[] = [];
-    if (entry?.user_pass_id) {
+    // 2) 차트용 누적 N건(색상 포함)
+    let entries_for_stats: {
+      entry_datetime: string;
+      standard_emotion: string;
+      color_code?: string | null;
+    }[] = [];
+    if (entry.user_pass_id) {
       const rows = await getMany<any>(
         `/rest/v1/emotion_entries` +
-        `?select=created_at,standard_emotion:standard_emotions(name,color_code)` +
-        `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
-        `&order=created_at.desc&limit=200`
+          `?select=created_at,standard_emotion:standard_emotions(name,color_code)` +
+          `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
+          `&order=created_at.desc&limit=200`
       );
       entries_for_stats = rows.map((r: any) => ({
         entry_datetime: r.created_at,
@@ -120,76 +158,187 @@ export async function GET(req: NextRequest) {
       }));
     }
 
-    // 2) 표준감정명
-    // 표준감정: 조인된 필드에서 바로 꺼냄 (EntryWithSE 사용 시)
-    const standardEmotionName  = entry?.standard_emotion?.name ?? "—";
-    const standardEmotionColor = entry?.standard_emotion?.color_code ?? null;
-    const standardEmotionDesc  = entry?.standard_emotion?.description ?? null;
+    // 3) 표준감정 메타
+    const standardEmotionName = entry.standard_emotion?.name ?? "—";
+    const standardEmotionColor = entry.standard_emotion?.color_code ?? null;
+    const standardEmotionDesc = entry.standard_emotion?.description ?? null;
 
-    // 3) user_passes + passes(name)
+    // 4) user_passes + passes(name,total_uses)
     let pass: UserPassWithName | null = null;
     if (entry.user_pass_id) {
       pass = await getOne<UserPassWithName>(
-        `/rest/v1/user_passes?select=uuid_code,remaining_uses,expires_at,prev_pass_id,is_active,pass:passes(name)&id=eq.${encodeURIComponent(entry.user_pass_id)}&limit=1`
+        `/rest/v1/user_passes` +
+          `?select=uuid_code,remaining_uses,expires_at,prev_pass_id,is_active,pass:passes(name,total_uses)` +
+          `&id=eq.${encodeURIComponent(entry.user_pass_id)}` +
+          `&limit=1`
       );
     }
 
-    // 4) pass_rollup_digests
-    // A) 최근 N개 롤업 (진행 중 회차 요약들)
-    let carryover_digests: Array<{ digest_text: string; entry_no: number | null; updated_at: string }> = [];
-    if (entry.user_pass_id) {
-      carryover_digests = await getMany(
-        `/rest/v1/pass_rollup_digests` +
-        `?select=digest_text,entry_no,updated_at` +
-        `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
-        `&order=entry_no.desc.nullslast,updated_at.desc` +
-        `&limit=5`
-      );
-    }
-
-    // B) 최종 carryover_digest (권종 단위 분석 완료본)
+    // 5) 직전 패스의 최종 carryover_digest (권종 완료본) + 메타
     let final_digest: string | null = null;
+    let carryover_meta: { pass_name: string | null; generated_at: string | null } | null = null;
+
     if (entry.user_pass_id) {
-      const ar = await getOne<{ stats_json?: { carryover_digest?: string } }>(
-        `/rest/v1/analysis_requests` +
-        `?select=stats_json` +
-        `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
-        `&scope=eq.pass&status=eq.done` +
-        `&order=created_at.desc&limit=1`
+      const up = await getOne<{ prev_pass_id: string | null }>(
+        `/rest/v1/user_passes?select=prev_pass_id&id=eq.${encodeURIComponent(entry.user_pass_id)}&limit=1`
       );
-      final_digest = ar?.stats_json?.carryover_digest ?? null;
+
+      const prevId = up?.prev_pass_id;
+      if (prevId) {
+        const ar = await getOne<{ stats_json?: { carryover_digest?: string }; created_at: string }>(
+          `/rest/v1/analysis_requests` +
+            `?select=stats_json,created_at` +
+            `&user_pass_id=eq.${encodeURIComponent(prevId)}` +
+            `&scope=eq.pass&status=eq.done` +
+            `&order=created_at.desc&limit=1`
+        );
+
+        final_digest = ar?.stats_json?.carryover_digest ?? null;
+
+        const prevPass = await getOne<{ pass: { name: string | null } }>(
+          `/rest/v1/user_passes?select=pass:passes(name)&id=eq.${encodeURIComponent(prevId)}&limit=1`
+        );
+
+        carryover_meta = {
+          pass_name: prevPass?.pass?.name ?? null,
+          generated_at: ar?.created_at ?? null,
+        };
+      }
     }
 
-    // 5) 최근 피드백
+    // 6) 최근 피드백(현재 entry 기준)
     const rFeedbacks = await supa(
-      `/rest/v1/emotion_feedbacks?select=id,feedback_text,created_at&emotion_entry_id=eq.${encodeURIComponent(entryId ?? "")}&order=created_at.desc&limit=3`
+      `/rest/v1/emotion_feedbacks` +
+        `?select=id,feedback_text,created_at` +
+        `&emotion_entry_id=eq.${encodeURIComponent(entryId)}` +
+        `&order=created_at.desc&limit=3`
     );
-    const feedbacks: EmotionFeedback[] = rFeedbacks.ok ? await rFeedbacks.json() : [];
+    const feedbacks: EmotionFeedback[] = rFeedbacks.ok
+      ? await rFeedbacks.json()
+      : [];
 
-    // 6) 응답
+    // 7) 최근 기록(사용자가 쓴 것) — 오늘 + 과거 4건
+    type RecentRow = {
+      id: string;
+      created_at: string;
+      situation_summary_text: string | null;
+      journal_summary_text: string | null;
+      situation_raw_text?: string | null;
+      journal_raw_text?: string | null;
+      standard_emotion: { name?: string | null; color_code?: string | null } | null;
+    };
+
+    let recent_entries: Array<{
+      entry_id: string;
+      entry_datetime: string;
+      standard_emotion: string;
+      standard_emotion_color: string | null;
+      situation_text: string;
+      journal_text: string;
+      feedback_text?: string | null;
+    }> = [];
+
+    // 오늘(현재) 기록 먼저
+    const todaySituation =
+      (entry.situation_summary_text ?? entry.situation_raw_text ?? "")?.trim();
+    const todayJournal =
+      (entry.journal_summary_text ?? entry.journal_raw_text ?? "")?.trim();
+    recent_entries.push({
+      entry_id: entry.id,
+      entry_datetime: entry.created_at,
+      standard_emotion: standardEmotionName,
+      standard_emotion_color: standardEmotionColor,
+      situation_text: todaySituation || "(상황 없음)",
+      journal_text: todayJournal || "",
+      feedback_text: feedbacks?.[0]?.feedback_text ?? null,
+    });
+
+    // 같은 pass에서 오늘 제외한 최근 4건
+    if (entry.user_pass_id) {
+      const rows = await getMany<RecentRow>(
+        `/rest/v1/emotion_entries` +
+          `?select=` +
+          [
+            `id`,
+            `created_at`,
+            `situation_summary_text`,
+            `journal_summary_text`,
+            `situation_raw_text`,
+            `journal_raw_text`,
+            `standard_emotion:standard_emotions(name,color_code)`,
+          ].join(",") +
+          `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
+          `&id=neq.${encodeURIComponent(entry.id)}` +
+          `&order=created_at.desc` +
+          `&limit=4`
+      );
+
+      let latestByEntry = new Map<string, string>();
+      if (rows.length) {
+        const ids = rows.map(r => r.id);
+        const rf = await supa(
+          `/rest/v1/emotion_feedbacks` +
+            `?select=emotion_entry_id,feedback_text,created_at` +
+            `&emotion_entry_id=in.(${ids.map(encodeURIComponent).join(",")})` +
+            `&order=created_at.desc`
+        );
+        if (rf.ok) {
+          const list: Array<{emotion_entry_id:string;feedback_text:string;created_at:string}> = await rf.json();
+          for (const f of list) {
+            if (!latestByEntry.has(f.emotion_entry_id)) {
+              latestByEntry.set(f.emotion_entry_id, f.feedback_text);
+            }
+          }
+        }
+      }
+
+      rows.reverse().forEach((r) => {
+        const emo = r.standard_emotion?.name?.trim() || "—";
+        const emoColor = r.standard_emotion?.color_code ?? null;
+        const sit =
+          (r.situation_summary_text ?? r.situation_raw_text ?? "")?.trim();
+        const jour =
+          (r.journal_summary_text ?? r.journal_raw_text ?? "")?.trim();
+
+        recent_entries.push({
+          entry_id: r.id,
+          entry_datetime: r.created_at,
+          standard_emotion: emo,
+          standard_emotion_color: emoColor,
+          situation_text: sit || "(상황 없음)",
+          journal_text: jour || "",
+          feedback_text: latestByEntry.get(r.id) ?? null,
+        });
+      });
+    }
+
+    // 8) 응답
     const data: FeedbackApiResponse["data"] = {
       uuid_code: pass?.uuid_code ?? "—",
       remaining_uses: pass?.remaining_uses ?? 0,
+      total_uses: pass?.pass?.total_uses ?? 0,
       expires_at: pass?.expires_at ?? null,
       status_label: pass?.is_active === false ? "비활성" : "진행 중",
       prev_linked: !!pass?.prev_pass_id,
       pass_name: pass?.pass?.name ?? null,
 
-      entries: [{
-        entry_datetime: entry.created_at,
-        standard_emotion: entry.standard_emotion?.name ?? "—",
-        standard_emotion_color: entry.standard_emotion?.color_code ?? null,
-        standard_emotion_desc: entry.standard_emotion?.description ?? null,
-        situation_summary: entry.situation_summary_text ?? "(상황 없음)",
-        journal_summary: entry.journal_summary_text ?? null,
-        feedback_text: feedbacks?.[0]?.feedback_text ?? "(피드백 없음)",
-      }],
+      entries: [
+        {
+          entry_datetime: entry.created_at,
+          standard_emotion: standardEmotionName,
+          standard_emotion_color: standardEmotionColor,
+          standard_emotion_desc: standardEmotionDesc,
+          situation_summary: todaySituation || "(상황 없음)",
+          journal_summary: todayJournal || "",
+          feedback_text: feedbacks?.[0]?.feedback_text ?? "(피드백 없음)",
+        },
+      ],
 
       carryover_digest: final_digest ?? "",
-      carryover_digests,          // 배열이면 필드 존재, 없으면 생략 가능
-      entries_for_stats,          // 배열이면 필드 존재, 없으면 생략 가능
-
-      insights: [{ k: "최빈 감정", v: entry.standard_emotion?.name ?? "—" }],
+      carryover_meta,
+      recent_entries,
+      entries_for_stats,
+      insights: [{ k: "최빈 감정", v: standardEmotionName }],
     };
 
     return NextResponse.json<FeedbackApiResponse>(

@@ -17,7 +17,10 @@ export interface UserPassWithName {
   expires_at: string | null;
   prev_pass_id: string | null;
   is_active: boolean;
-  pass: { name: string } | null; // passes.name 조인
+  pass: {
+    name: string | null;
+    total_uses: number | null;
+  } | null;
 }
 
 /** 누적 요약 */
@@ -35,47 +38,64 @@ export interface EmotionFeedback {
 }
 
 /** 최종 응답 스키마 */
-// src/types/feedback.ts
 
+// 최근 5건(오늘+과거4건)용 타입
+export type RecentEntry = {
+  entry_datetime: string;
+  standard_emotion: string;
+  standard_emotion_color: string | null;
+  situation_text: string;
+  journal_text: string;
+};
+
+// 차트용 데이터(이미 있다면 재사용)
+export type EntryForStats = {
+  entry_datetime: string;
+  standard_emotion: string;
+  color_code?: string | null;
+};
+
+export type CarryoverMeta = {
+  pass_name: string | null;
+  generated_at: string | null;
+};
+
+// 기존 인터페이스에 필드 추가
 export interface FeedbackApiResponse {
   ok: boolean;
   data: {
-    // ─ Pass 메타 ─
     uuid_code: string;
     remaining_uses: number;
-    total_uses: number;                 // ← 누락돼 있으면 추가
+    total_uses: number;
     expires_at: string | null;
     status_label: string;
     prev_linked: boolean;
     pass_name: string | null;
 
-    // ─ 개별 피드백 카드용 ─
-    entries: {
+    // 오늘 기록 카드(기존)
+    entries: Array<{
       entry_datetime: string;
       standard_emotion: string;
-      standard_emotion_color?: string | null;  // DB color_code
-      standard_emotion_desc?: string | null;   // DB description
+      standard_emotion_color: string | null;
+      standard_emotion_desc: string | null;
       situation_summary: string;
-      journal_summary: string | null;
+      journal_summary: string;
       feedback_text: string;
-    }[];
+    }>;
 
-    // ─ 누적 리포트 ─
-    carryover_digest: string;  // 최종본(analysis_requests.stats_json.carryover_digest)
-    carryover_digests?: {      // 진행 중 최근 N건(pass_rollup_digests)
-      digest_text: string;
-      entry_no: number | null;
-      updated_at: string;
-    }[];
+    // 직전 패스 carryover(기존)
+    carryover_digest: string;
 
-    // ─ 차트용 누적 엔트리(옵션) ─
-    entries_for_stats?: {
-      entry_datetime: string;
-      standard_emotion: string;
-      color_code?: string | null;       // 차트 색 쓰려면
-    }[];
+    carryover_meta?: CarryoverMeta | null;
 
-    // ─ 인사이트 ─
-    insights: { k: string; v: string }[];
+    // ✅ 새로 추가 (UI에서 사용자 기록 보여주기)
+    recent_entries?: RecentEntry[];
+
+    // ✅ 차트용(이미 쓰고 있다면 타입 명시)
+    entries_for_stats?: EntryForStats[];
+
+    // 기존에 남겨둔 필드가 있으면 유지/정리
+    carryover_digests?: Array<{ digest_text: string; entry_no: number | null; updated_at: string }>;
+    insights?: Array<{ k: string; v: string }>;
   };
 }
