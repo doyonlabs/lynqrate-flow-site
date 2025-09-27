@@ -69,6 +69,9 @@ export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams;
 
+    // ✅ 기간 토글(7/30/90) 기본 7일
+    const rangeDays = Number(sp.get("range_days") ?? 7);
+
     // ✅ 0) entryId 우선, 없으면 user_id로 최신 entry 찾아서 대체
     const userId = sp.get("user_id");
     let entryId = sp.get("emotion_entry_id");
@@ -125,7 +128,8 @@ export async function GET(req: NextRequest) {
           `journal_summary_text`,
           `situation_raw_text`,
           `journal_raw_text`,
-          `standard_emotion:standard_emotions(name,color_code,description)`,
+          // ✅ id 추가 (색/키/집계용으로 고정키 필요)
+          `standard_emotion:standard_emotions(id,name,color_code,description)`,
         ].join(",") +
         `&id=eq.${encodeURIComponent(entryId)}` +
         `&limit=1`
@@ -138,25 +142,47 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 2) 차트용 누적 N건(색상 포함)
+    // 2) 차트용 원시행 (색상 포함)
     let entries_for_stats: {
       entry_datetime: string;
+      standard_emotion_id?: string | null;
       standard_emotion: string;
       color_code?: string | null;
     }[] = [];
     if (entry.user_pass_id) {
       const rows = await getMany<any>(
         `/rest/v1/emotion_entries` +
-          `?select=created_at,standard_emotion:standard_emotions(name,color_code)` +
+          `?select=created_at,standard_emotion:standard_emotions(id,name,color_code)` +
           `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
           `&order=created_at.desc&limit=200`
       );
       entries_for_stats = rows.map((r: any) => ({
         entry_datetime: r.created_at,
+        standard_emotion_id: r.standard_emotion?.id ?? null,
         standard_emotion: r.standard_emotion?.name ?? "미정",
         color_code: r.standard_emotion?.color_code ?? null,
       }));
     }
+
+    // 2-1) 표준감정 마스터(8개) 조회
+    type StdEmotion = { id: string; name: string; color_code: string | null; soft_order?: number | null };
+    const stdEmotions = await getMany<StdEmotion>(
+      `/rest/v1/standard_emotions?select=id,name,color_code,soft_order&order=soft_order.nullsfirst,name.asc`
+    );
+
+    // 2-2) 0건 포함 분포 집계 생성 (rangeDays 적용)
+    const cutoff = Date.now() - rangeDays * 24 * 60 * 60 * 1000;
+    const baseMap = new Map<string, { emotion_id: string; label: string; color: string | null; count: number }>(
+      stdEmotions.map(e => [e.id, { emotion_id: e.id, label: e.name, color: e.color_code, count: 0 }])
+    );
+    for (const r of entries_for_stats) {
+      if (!r.standard_emotion_id) continue;
+      const t = Date.parse(r.entry_datetime);
+      if (Number.isNaN(t) || t < cutoff) continue;
+      const b = baseMap.get(r.standard_emotion_id);
+      if (b) b.count += 1;
+    }
+    const emotion_distribution = Array.from(baseMap.values()).sort((a, b) => b.count - a.count);
 
     // 3) 표준감정 메타
     const standardEmotionName = entry.standard_emotion?.name ?? "—";
@@ -338,6 +364,8 @@ export async function GET(req: NextRequest) {
       carryover_meta,
       recent_entries,
       entries_for_stats,
+      // ✅ 파이/막대가 동일하게 사용할 집계 결과
+      emotion_distribution,
       insights: [{ k: "최빈 감정", v: standardEmotionName }],
     };
 

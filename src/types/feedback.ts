@@ -60,6 +60,13 @@ export type CarryoverMeta = {
   generated_at: string | null;
 };
 
+export interface EmotionDistributionItem {
+  emotion_id: string;
+  label: string;
+  color: string | null;
+  count: number;
+}
+
 // 기존 인터페이스에 필드 추가
 export interface FeedbackApiResponse {
   ok: boolean;
@@ -93,6 +100,8 @@ export interface FeedbackApiResponse {
 
     // ✅ 차트용(이미 쓰고 있다면 타입 명시)
     entries_for_stats?: EntryForStats[];
+
+    emotion_distribution: EmotionDistributionItem[];
 
     // 기존에 남겨둔 필드가 있으면 유지/정리
     carryover_digests?: Array<{ digest_text: string; entry_no: number | null; updated_at: string }>;

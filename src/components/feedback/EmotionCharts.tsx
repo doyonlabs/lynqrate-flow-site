@@ -11,7 +11,7 @@ export function EmotionPieChart({
 }:{ data: Array<{name:string; value:number; fill:string}> }) {
   return (
     <div className="chart" style={{ padding: 8, borderStyle: 'solid', borderColor: 'rgba(255,255,255,.12)' }}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={220}>
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} stroke="none">
             {data.map((d,i)=><Cell key={i} fill={d.fill}/>)}
@@ -73,9 +73,15 @@ export function WeeklyTrendChart({
     return Math.ceil(rawMax / 5) * 5;
   })();
 
+  const ROW = 36;
+  const PAD = 24;
+  const MIN_H = 220;
+  const MAX_H = 480;
+  const height = Math.max(MIN_H, Math.min(MAX_H, emotions.length * ROW + PAD));
+
   return (
-    <div className="chart" style={{ padding: 8, borderStyle: 'solid', borderColor: 'rgba(255,255,255,.12)' }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="chart" style={{ height, padding: 8, borderStyle: 'solid', borderColor: 'rgba(255,255,255,.12)' }}>
+      <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data} margin={{ left:8, right:8, top:12, bottom:8 }}>
           <CartesianGrid stroke="rgba(255,255,255,.06)" vertical={false}/>
           <XAxis
@@ -124,57 +130,6 @@ export function WeeklyTrendChart({
   );
 }
 
-export function StackedBarByDay({
-  data,                // [{ date, 기쁨:1, 슬픔:3, ... }, ...]
-  emotions,
-  colorsByEmotion = {},
-}: {
-  data: any[];
-  emotions: string[];
-  colorsByEmotion?: Record<string, string | null>;
-}) {
-  const normHex = (c?: string | null) => {
-    if (!c) return null;
-    const t = c.trim();
-    if (/^#[0-9A-Fa-f]{6}$/.test(t)) return t;
-    if (/^[0-9A-Fa-f]{6}$/.test(t)) return `#${t}`;
-    return null;
-  };
-  const colorFor = (emo: string) => normHex(colorsByEmotion[emo]) || '#9CA3AF';
-
-  return (
-    <div className="chart" style={{ padding: 8, borderStyle: 'solid', borderColor: 'rgba(255,255,255,.12)' }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ left:8, right:8, top:12, bottom:8 }} barGap={4}>
-          <CartesianGrid stroke="rgba(255,255,255,.06)" vertical={false}/>
-          <XAxis dataKey="date" tick={{ fill:'#a7aec2', fontSize:12 }}/>
-          <YAxis allowDecimals={false} tick={{ fill:'#a7aec2', fontSize:12 }}/>
-          <RTooltip
-            cursor={{ fill: 'rgba(255,255,255,.04)' }}    // hover 밴드 약하게(싫으면 false)
-            contentStyle={{
-              background:'#0f1422',
-              border:'1px solid rgba(255,255,255,.1)',
-            }}
-            itemStyle={{ color:'#e7e9ee' }}               // ✅ 항목 글자 색
-            labelStyle={{ color:'#a7aec2' }}              // (라벨 쓰면) 라벨 색
-            labelFormatter={() => ''}                     // 단일일자라 상단 라벨 숨김
-            separator=" : "                               // 구분자
-            formatter={(value: any, _name: any, info: any) => {
-              const emotion = info?.payload?.emotion ?? info?.name ?? '—'; // ✅ 감정명으로 교체
-              return [String(value), emotion];            // [표시값, 표시이름]
-            }}
-          />
-          {emotions.map((em) => (
-            <Bar key={em} dataKey={em} stackId="all" fill={colorFor(em)}>
-              <LabelList dataKey={em} position="top" fill="#a7aec2" formatter={(v: any)=> (v>0 ? v : '')}/>
-            </Bar>
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 export function SingleDayEmotionBars({
   row,               // { date, 기쁨:1, 슬픔:3, ... }
   emotions,
@@ -184,6 +139,13 @@ export function SingleDayEmotionBars({
   emotions: string[];
   colorsByEmotion?: Record<string, string | null>;
 }) {
+  // ✅ 감정 수만큼 높이를 확보 (라벨 누락 방지)
+  const ROW = 36;         // 감정 1개당 세로 공간(px)
+  const PAD = 24;         // 위/아래 여백
+  const MIN_H = 220;
+  const MAX_H = 480;
+  const height = Math.max(MIN_H, Math.min(MAX_H, emotions.length * ROW + PAD));
+
   const normHex = (c?: string | null) => {
     if (!c) return null;
     const t = c.trim();
@@ -206,7 +168,7 @@ export function SingleDayEmotionBars({
 
   return (
     <div className="chart" style={{ padding: 8, borderStyle: 'solid', borderColor: 'rgba(255,255,255,.12)' }}>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={height}>
         <BarChart
           layout="vertical"
           data={data}
@@ -226,7 +188,8 @@ export function SingleDayEmotionBars({
           <YAxis
             type="category"
             dataKey="emotion"
-            width={56}                            // y라벨 잘리지 않게
+            width={72}                            // y라벨 잘리지 않게
+            interval={0}
             tick={{ fill:'#a7aec2', fontSize:12 }}
           />
 

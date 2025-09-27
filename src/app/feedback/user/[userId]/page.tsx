@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { EmotionPieChart, WeeklyTrendChart, StackedBarByDay, SingleDayEmotionBars } from '@/components/feedback/EmotionCharts';
-import { groupByEmotion, last7DaysTrend, aggregateTrend } from '@/lib/feedback/metrics';
+import { EmotionPieChart, WeeklyTrendChart, SingleDayEmotionBars } from '@/components/feedback/EmotionCharts';
+import { groupByEmotion, aggregateTrend } from '@/lib/feedback/metrics';
 
 /* ================== 타입 ================== */
 type FeedbackEntry = {
@@ -44,6 +44,12 @@ type CarryoverMeta = {
   generated_at: string | null;
 };
 
+type EmotionDistributionItem = {
+    emotion_id: string;
+    label: string;
+    color: string | null;
+    count: number;};
+
 type ViewData = {
   uuid_code: string;
   remaining_uses: number;
@@ -64,6 +70,7 @@ type ViewData = {
   recent_entries?: RecentEntry[];
 
   insights?: InsightKV[];
+  emotion_distribution?: EmotionDistributionItem[];
 };
 
 /* ================== 페이지 ================== */
@@ -101,7 +108,7 @@ export default function FeedbackPage() {
       try {
         setLoading(true);
         // ✅ 2) user_id로 API 호출
-        const r = await fetch(`/api/feedback?user_id=${encodeURIComponent(String(userId))}`, { cache: 'no-store' });
+        const r = await fetch(`/api/feedback?user_id=${encodeURIComponent(String(userId))}&range_days=${periodDays}`, { cache: 'no-store' });
         const j = await r.json();
         if (!r.ok || !j?.ok) throw new Error(j?.error || 'API Failed');
         if (alive) { setData(j.data as ViewData); setErr(null); }
@@ -113,65 +120,112 @@ export default function FeedbackPage() {
     })();
 
     return () => { alive = false; };
-  }, [userId]);
+  }, [userId, periodDays]);
 
-  /* ===== 차트 입력 매핑 =====
-     entries_for_stats가 있으면 그걸 우선 사용, 없으면 entries로 대체 */
-  const entriesLite: StatsEntryLite[] = (
-    data?.entries_for_stats && data.entries_for_stats.length > 0
-      ? data.entries_for_stats
-      : (data?.entries ?? []).map((e: any) => ({
-          entry_datetime: e.entry_datetime,
-          standard_emotion: e.standard_emotion ?? '미정',
-          color_code: (e as any).standard_emotion_color ?? null,
-        }))
-  ).map(e => ({
-    entry_datetime: e.entry_datetime,
-    standard_emotion: e.standard_emotion || '미정',
-    color_code: e.color_code ?? null,
-  }));
+  /* ===== 차트 입력 매핑 ===== */
 
-  const piePack   = groupByEmotion(entriesLite);   // { data:[{name,value}], colorsByEmotion:{[emotion]:hex|null} }
-  
-  // 7/30/90일 + 자동 집계(day/week)
-  const trendPack = useMemo(() => aggregateTrend(entriesLite, periodDays, 'auto'), [entriesLite, periodDays]);
-
-  // 값 있는 날짜만 추리기
-  const activeRows = trendPack.data.filter(row =>
-    (trendPack.emotions || []).some(em => (row[em] ?? 0) > 0)
-  );
-
-  const singleRow = activeRows[0] ?? trendPack.data.at(-1);
-
-  // ✅ 라인이 겹쳐 보이는 상황 감지
-  const CROWD_DAYS = 2;
-  const isCrowdedOnUnitY = activeRows.length <= CROWD_DAYS ||
-    activeRows.some(r => (trendPack.emotions||[]).every(em => (r[em]??0) <= 1));
-
-  const isSparse = trendPack.activeDays <= 1;
-
-  // 헥사코드 정규화('#' 누락 보정만)
-  const normHex = (c?: string | null) => {
+  // 0) 공용 유틸은 먼저 선언(호이스팅되는 함수형으로 해도 OK)
+  function normHex(c?: string | null) {
     if (!c) return null;
     const t = c.trim();
     if (/^#[0-9A-Fa-f]{6}$/.test(t)) return t;
     if (/^[0-9A-Fa-f]{6}$/.test(t)) return `#${t}`;
     return null;
-  };
+  }
 
-  // DB 색만으로 파이차트 데이터 구성
-  const pieData = piePack.data.map((d) => {
-    const fill = normHex(piePack.colorsByEmotion?.[d.name]);
-    if (!fill) console.warn('[pie] color missing for emotion:', d.name, '→ DB에 color_code가 비어있음');
-    return { ...d, fill: fill ?? '#999999' };
-  });
+  // 1) entriesLite (문자열 트림 포함)
+  const entriesLite: StatsEntryLite[] = (
+    data?.entries_for_stats && data.entries_for_stats.length > 0
+      ? data.entries_for_stats
+      : (data?.entries ?? []).map((e: any) => ({
+          entry_datetime: e.entry_datetime,
+          standard_emotion: (e.standard_emotion ?? '미정').trim(),
+          color_code: (e as any).standard_emotion_color ?? null,
+        }))
+  ).map(e => ({
+    entry_datetime: e.entry_datetime,
+    standard_emotion: (e.standard_emotion || '미정').trim(),
+    color_code: e.color_code ?? null,
+  }));
+
+  // 2) 7/30/90일 자동 집계
+  const trendPack = useMemo(
+    () => aggregateTrend(entriesLite, periodDays, 'auto'),
+    [entriesLite, periodDays]
+  );
+
+  // 3) API가 내려준 8개 표준 분포(dist)
+  const dist = data?.emotion_distribution as
+    | Array<{ emotion_id:string; label:string; color:string|null; count:number }>
+    | undefined;
+
+  // 4) 8개 라벨 고정(최우선 dist 순서, 없으면 trendPack.emotions)
+  const allEmotions: string[] = dist?.map(d => d.label) ?? (trendPack.emotions || []);
+
+  // 5) 파이 데이터 = dist 그대로(없으면 기존 fallback)
+  const pieData = dist
+    ? dist.map(d => ({
+        name: d.label,
+        value: d.count,
+        fill: normHex(d.color) ?? '#999999',
+      }))
+    : (() => {
+        const p = groupByEmotion(entriesLite);
+        return p.data.map(d => ({
+          name: d.name,
+          value: d.value,
+          fill: normHex(p.colorsByEmotion?.[d.name]) ?? '#999999',
+        }));
+      })();
+
+  // 6) 활성 일자 수/혼잡 여부 계산(라벨은 allEmotions 기준)
+  const activeRows = useMemo(
+    () =>
+      trendPack.data.filter(row =>
+        (allEmotions || []).some(em => (row?.[em] ?? 0) > 0)
+      ),
+    [trendPack.data, allEmotions]
+  );
+
+  const CROWD_DAYS = 2;
+  const isCrowdedOnUnitY =
+    activeRows.length <= CROWD_DAYS ||
+    activeRows.some(r => (allEmotions || []).every(em => (r?.[em] ?? 0) <= 1));
+
+  const isSparse = trendPack.activeDays <= 1;
+
+  // 7) 기간 합계 row (파이와 동일 집계) – 혼잡 시 사용
+  const totalsRowFromDist = useMemo(() => {
+    if (!dist) return null;
+    const map = new Map(dist.map(d => [d.label, d.count]));
+    const row: any = {};
+    (allEmotions || []).forEach(label => { row[label] = map.get(label) ?? 0; });
+    row.date = '기간합계';
+    return row;
+  }, [dist, allEmotions]);
+
+  // 8) 가장 최근 active day (fallback)
+  const lastActiveRow =
+    [...trendPack.data].reverse().find(r =>
+      (allEmotions || []).some(em => (r?.[em] ?? 0) > 0)
+    ) ?? trendPack.data.at(-1);
+
+  // 9) 실제로 막대에 보낼 단일 row 선택:
+  //    혼잡이면 기간합계, 아니면 최근 active day
+  const baseRowForBars: any =
+    (isCrowdedOnUnitY && totalsRowFromDist) ? totalsRowFromDist : lastActiveRow;
+
+  // 10) 8개 감정 키를 모두 채워 넣은 singleRow 생성(항상 8개 보장)
+  const singleRow: any = Object.fromEntries(
+    (allEmotions || []).map(em => [em, baseRowForBars?.[em] ?? 0])
+  );
+  if (baseRowForBars?.date) singleRow.date = baseRowForBars.date;
 
   if (loading) return <div style={{ color:'#a7aec2', padding:24 }}>로딩 중…</div>;
   if (err || !data) return <div style={{ color:'#a7aec2', padding:24 }}>오류: {err || '데이터 없음'}</div>;
 
   // 디버그(원하면 잠깐 켜서 확인)
   console.log('[entriesLite]', entriesLite.slice(0,5));
-  console.log('[piePack]', piePack);
   console.log('[pieData]', pieData.slice(0,5));
   console.log('[trendPack]', { data: trendPack.data.slice(0,3), emotions: trendPack.emotions, colors: trendPack.colorsByEmotion });
 
@@ -307,13 +361,13 @@ export default function FeedbackPage() {
                 {isCrowdedOnUnitY ? (
                   <SingleDayEmotionBars
                     row={singleRow}
-                    emotions={trendPack.emotions}
+                    emotions={allEmotions}   // dist.map(d=>d.label)
                     colorsByEmotion={trendPack.colorsByEmotion}
                   />
                 ) : (
                   <WeeklyTrendChart
                     data={trendPack.data}
-                    emotions={trendPack.emotions}
+                    emotions={allEmotions}   // dist 기준으로 고정
                     colorsByEmotion={trendPack.colorsByEmotion}
                   />
                 )}
@@ -444,7 +498,8 @@ body{
 .card .ai{margin-top:8px; padding:10px; border-radius:10px; background:#0f1422; border:1px solid rgba(255,255,255,.06)}
 
 .chart{
-  height:220px; border-radius:12px; border:1px dashed rgba(255,255,255,.12);
+  /* height는 개별 컴포넌트에서 정함 */
+  border-radius:12px; border:1px dashed rgba(255,255,255,.12);
   background:repeating-linear-gradient(0deg, rgba(255,255,255,.04) 0 1px, transparent 1px 24px),
              linear-gradient(180deg, #111629, #0d1220);
   display:grid; place-items:center; color:var(--sub)
