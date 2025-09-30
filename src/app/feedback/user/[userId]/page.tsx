@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { EmotionPieChart, WeeklyTrendChart, SingleDayEmotionBars } from '@/components/feedback/EmotionCharts';
+import { EmotionPieChart, WeeklyTrendChart, SingleDayEmotionBars, StackedDailyBars } from '@/components/feedback/EmotionCharts';
 import { groupByEmotion, aggregateTrend } from '@/lib/feedback/metrics';
 
 /* ================== 타입 ================== */
@@ -109,14 +109,15 @@ export default function FeedbackPage() {
     }
   }, [periodDays]);
 
-  // 데이터 로드
+  // 데이터 로드: 90일 1회
   useEffect(() => {
     let alive = true;
+
     (async () => {
       try {
         setLoading(true);
         const r = await fetch(
-          `/api/feedback?user_id=${encodeURIComponent(String(userId))}&range_days=${periodDays}`,
+          `/api/feedback?user_id=${encodeURIComponent(String(userId))}&range_days=90`,
           { cache: 'no-store' }
         );
         const j = await r.json();
@@ -128,10 +129,11 @@ export default function FeedbackPage() {
         if (alive) setLoading(false);
       }
     })();
-    return () => { alive = false; };
-  }, [userId, periodDays]);
 
-  // ✅ 로딩 중에는 에러 문구를 절대 보여주지 않음
+    return () => { alive = false; };
+  }, [userId]); // ⬅️ periodDays 제거
+
+  // 로딩 중에는 에러 문구를 절대 보여주지 않음
   const hasError = !loading && (!!err || data == null);
 
   /* ===== 차트 입력 매핑 ===== */
@@ -144,6 +146,7 @@ export default function FeedbackPage() {
     return null;
   }
 
+  // 서버 전체(최대 90일) 엔트리
   const entriesLite: StatsEntryLite[] = (
     data?.entries_for_stats && data.entries_for_stats.length > 0
       ? data.entries_for_stats
@@ -158,35 +161,115 @@ export default function FeedbackPage() {
     color_code: e.color_code ?? null,
   }));
 
+  /* ====== [중요] 기간 필터: UTC 기준 N일 정확히 자르기 ====== */
+  // 오늘 00:00(UTC) 타임스탬프
+  const utcToday00 = useMemo(() => {
+    const t = new Date();
+    return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate());
+  }, []);
+  // 오늘 포함 N일 → (N-1)일 전 00:00(UTC)
+  const cutoffMs = useMemo(() => {
+    return utcToday00 - (periodDays - 1) * 86400000;
+  }, [utcToday00, periodDays]);
+
+  // 기간 내 엔트리만 사용
+  const entriesLiteInRange = useMemo(() => {
+    return entriesLite.filter(e => {
+      const ts = new Date(e.entry_datetime).getTime();
+      return ts >= cutoffMs;
+    });
+  }, [entriesLite, cutoffMs]);
+
+  // 트렌드/막대도 기간 필터 데이터로 집계
   const trendPack = useMemo(
-    () => aggregateTrend(entriesLite, periodDays, 'auto'),
-    [entriesLite, periodDays]
+    () => aggregateTrend(entriesLiteInRange, periodDays, 'auto'),
+    [entriesLiteInRange, periodDays]
   );
 
-  const dist = data?.emotion_distribution as
-    | Array<{ emotion_id:string; label:string; color:string|null; count:number }>
-    | undefined;
+  /* ====== 파이 분포/라벨도 기간 데이터로 집계 ====== */
+  const piePack = useMemo(() => groupByEmotion(entriesLiteInRange), [entriesLiteInRange]);
 
-  const allEmotions: string[] = dist?.map(d => d.label) ?? (trendPack.emotions || []);
+  // 등장 감정만
+  const allEmotions: string[] = useMemo(
+    () => (piePack?.data ?? []).map(d => d.name),
+    [piePack]
+  );
 
-  const pieData = dist
-    ? dist.map(d => ({
-        name: d.label, value: d.count, fill: normHex(d.color) ?? '#999999',
-      }))
-    : (() => {
-        const p = groupByEmotion(entriesLite);
-        return p.data.map(d => ({
-          name: d.name, value: d.value, fill: normHex(p.colorsByEmotion?.[d.name]) ?? '#999999',
-        }));
-      })();
+    // ✅ null/undefined를 기본색으로 치환해서 string-only 맵을 만든다
+    const colorsByEmotionSafe = useMemo<Record<string, string>>(() => {
+    const src = (trendPack.colorsByEmotion ?? {}) as Record<string, string | null | undefined>;
+    const out: Record<string, string> = {};
+    (allEmotions || []).forEach((em) => {
+        const hex = (src[em] && /^#?[0-9A-Fa-f]{6}$/.test(src[em]!))
+        ? (src[em]![0] === '#' ? src[em]! : `#${src[em]}`)
+        : '#999999';
+        out[em] = hex;
+    });
+    return out;
+    }, [trendPack.colorsByEmotion, allEmotions]);
 
+  // 파이 데이터
+  const pieData = useMemo(() => {
+    return (piePack?.data ?? []).map(d => {
+      const c = piePack?.colorsByEmotion?.[d.name];
+      const norm = (v?: string | null) => {
+        if (!v) return null;
+        const t = v.trim();
+        if (/^#[0-9A-Fa-f]{6}$/.test(t)) return t;
+        if (/^[0-9A-Fa-f]{6}$/.test(t)) return `#${t}`;
+        return null;
+      };
+      return {
+        name: d.name,
+        value: d.value,
+        fill: norm(c) ?? '#999999',
+      };
+    });
+  }, [piePack]);
+
+  // 막대 혼잡 시 쓰는 합계 row
+  const totalsRowFromDist = useMemo(() => {
+    const row: any = {};
+    (piePack?.data ?? []).forEach(d => { row[d.name] = d.value; });
+    row.date = '기간합계';
+    return row;
+  }, [piePack]);
+
+  // 활성 일자/혼잡 판단
   const activeRows = useMemo(
     () =>
       trendPack.data.filter(row =>
-        (allEmotions || []).some(em => (row as any)?.[em] ?? 0 > 0)
+        (allEmotions || []).some(em => ((row as any)?.[em] ?? 0) > 0)
       ),
     [trendPack.data, allEmotions]
   );
+
+    // 활성 날짜 수 (값>0 있는 날짜)
+    const activeRowCount = useMemo(
+        () => trendPack.data.filter(row =>
+            (allEmotions || []).some(em => Number((row as any)?.[em] ?? 0) > 0)
+        ).length,
+        [trendPack.data, allEmotions]
+    );
+
+    // 같은 날짜에 같은 값(>0)이 2개 이상인지 검사
+    const hasSameYCollision = useMemo(() => {
+    return trendPack.data.some(row => {
+        const vals = (allEmotions || [])
+            .map(em => Number((row as any)?.[em] ?? 0))
+            .filter(v => v > 0);
+        if (vals.length < 2) return false;
+        const counts: Record<number, number> = {};
+        for (const v of vals) counts[v] = (counts[v] ?? 0) + 1;
+        return Object.values(counts).some(c => c >= 2);
+    });
+    }, [trendPack.data, allEmotions]);
+
+    // 30일 고정 + 2일 이상이고 겹침 있으면 스택 막대, 아니면 꺾은선
+    const useStackedBars = activeRowCount >= 2 && hasSameYCollision;
+
+    // ✅ 2일 이상이면 꺾은선, 아니면 막대
+    const showLineChart = activeRowCount >= 2;
 
   const CROWD_DAYS = 2;
   const isCrowdedOnUnitY =
@@ -195,32 +278,25 @@ export default function FeedbackPage() {
 
   const isSparse = trendPack.activeDays <= 1;
 
-  const totalsRowFromDist = useMemo(() => {
-    if (!dist) return null;
-    const map = new Map(dist.map(d => [d.label, d.count]));
-    const row: any = {};
-    (allEmotions || []).forEach(label => { row[label] = map.get(label) ?? 0; });
-    row.date = '기간합계';
-    return row;
-  }, [dist, allEmotions]);
-
+  // 최근 active day (없으면 undefined)
   const lastActiveRow =
     [...trendPack.data].reverse().find(r =>
       (allEmotions || []).some(em => ((r as any)?.[em] ?? 0) > 0)
-    ) ?? trendPack.data.at(-1);
+    ) ?? undefined;
 
+  // 단일 row 선택
   const baseRowForBars: any =
-    (isCrowdedOnUnitY && totalsRowFromDist) ? totalsRowFromDist : lastActiveRow;
+    (isCrowdedOnUnitY && totalsRowFromDist) ? totalsRowFromDist : (lastActiveRow ?? {});
 
   const singleRow: any = Object.fromEntries(
-    (allEmotions || []).map(em => [em, baseRowForBars?.[em] ?? 0])
+    (allEmotions || []).map(em => [em, Number(baseRowForBars?.[em] ?? 0) || 0])
   );
   if ((baseRowForBars as any)?.date) singleRow.date = (baseRowForBars as any).date;
 
   const fmtKST = (iso: string) =>
     new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 
-  const onSavePDF = () => window.print();
+  //const onSavePDF = () => window.print();
   const recentList = (data?.recent_entries ?? []).slice(1);
 
   const progressPercent = useMemo(() => {
@@ -231,36 +307,36 @@ export default function FeedbackPage() {
 
   return (
     <>
-        {/* 로딩 오버레이 */}
-        {showLoader && !hasError && (
+      {/* 로딩 오버레이 */}
+      {showLoader && !hasError && (
         <FullScreenLoaderInline msg="기록을 정리하고 결과를 불러오고 있어요" />
-        )}
+      )}
 
-        {/* 에러는 로딩 끝난 뒤에만 */}
-        {!loading && hasError && (
+      {/* 에러는 로딩 끝난 뒤에만 */}
+      {!loading && hasError && (
         <div style={{ color:'#a7aec2', padding:24, textAlign:'center' }}>
-            {err ? '불러오기 실패' : '데이터가 없습니다'}
+          {err ? '불러오기 실패' : '데이터가 없습니다'}
         </div>
-        )}
+      )}
 
-        {/* ✅ 본문은 로딩이 끝났고 에러도 없고 data가 있을 때만 렌더 */}
-        {!loading && !hasError && data && (
+      {/* ✅ 본문은 로딩 끝 + 에러 없음 + data 존재 시에만 */}
+      {!loading && !hasError && data && (
         <>
           {/* 헤더 */}
           <header className="header">
             <div className="wrap kpis">
               <div className="badges">
-                <span className="badge">이용권 <strong>{data!.uuid_code}</strong></span>
-                {data!.pass_name && <span className="badge">권종 <strong>{data!.pass_name}</strong></span>}
-                <span className="badge">잔여/전체 <strong>{data!.remaining_uses}/{data!.total_uses}</strong></span>
-                <span className="badge">만료 <strong>{data!.expires_at ? fmtKST(data!.expires_at) : '—'}</strong></span>
-                <span className="badge">상태 <strong>{data!.status_label}</strong></span>
-                {data!.prev_linked && <span className="tag">이전 코드 연결됨</span>}
+                <span className="badge">이용권 <strong>{data.uuid_code}</strong></span>
+                {data.pass_name && <span className="badge">권종 <strong>{data.pass_name}</strong></span>}
+                <span className="badge">잔여/전체 <strong>{data.remaining_uses}/{data.total_uses}</strong></span>
+                <span className="badge">만료 <strong>{data.expires_at ? fmtKST(data.expires_at) : '—'}</strong></span>
+                <span className="badge">상태 <strong>{data.status_label}</strong></span>
+                {data.prev_linked && <span className="tag">이전 코드 연결됨</span>}
               </div>
-              <div className="cta">
+              {/* <div className="cta">
                 <button className="btn" onClick={onSavePDF}>PDF 저장</button>
                 <button className="btn primary" disabled>누적 리포트 생성</button>
-              </div>
+              </div> */}
             </div>
           </header>
 
@@ -272,29 +348,29 @@ export default function FeedbackPage() {
                 {/* 오늘 기록 */}
                 <div className="section">
                   <h2>오늘 기록</h2>
-                  {data!.entries[0] && (
-                    <article className="card" data-emotion={data!.entries[0].standard_emotion ?? ''}>
+                  {data.entries[0] && (
+                    <article className="card" data-emotion={data.entries[0].standard_emotion ?? ''}>
                       <div className="meta">
-                        <span>{fmtKST(data!.entries[0].entry_datetime)}</span>
-                        <span className="emotion-chip">표준감정: {data!.entries[0].standard_emotion ?? '—'}</span>
+                        <span>{fmtKST(data.entries[0].entry_datetime)}</span>
+                        <span className="emotion-chip">표준감정: {data.entries[0].standard_emotion ?? '—'}</span>
                       </div>
 
                       <div className="title" style={{ marginTop: 8 }}>
                         <b style={{ color:'#a7aec2' }}>상황</b>
-                        <div>“{data!.entries[0].situation_summary || '상황 없음'}”</div>
+                        <div>“{data.entries[0].situation_summary || '상황 없음'}”</div>
                       </div>
 
-                      {data!.entries[0].journal_summary && (
+                      {data.entries[0].journal_summary && (
                         <div className="ai" style={{ marginTop: 8 }}>
-                          <b style={{ color:'#a7aec2' }}>감정일기</b>
-                          <div style={{ marginTop: 4 }}>{data!.entries[0].journal_summary}</div>
+                          <b style={{ color:'#a7aec2' }}>감정 기록</b>
+                          <div style={{ marginTop: 4 }}>{data.entries[0].journal_summary}</div>
                         </div>
                       )}
 
                       <div className="ai" style={{ marginTop: 8 }}>
                         <b style={{ color:'#a7aec2' }}>피드백</b>
                         <div style={{ marginTop: 4 }}>
-                          {data!.entries[0].feedback_text?.trim() || '(피드백 없음)'}
+                          {data.entries[0].feedback_text?.trim() || '(피드백 없음)'}
                         </div>
                       </div>
                     </article>
@@ -324,7 +400,7 @@ export default function FeedbackPage() {
                               overflow:'hidden', marginTop:6
                             }}
                           >
-                            <b style={{ color:'#a7aec2' }}>감정일기</b>
+                            <b style={{ color:'#a7aec2' }}>감정 기록</b>
                             <div style={{ marginTop: 4 }}>{r.journal_text}</div>
                           </div>
                         )}
@@ -348,44 +424,57 @@ export default function FeedbackPage() {
                 <div className="section">
                   <h2>누적 통계</h2>
                   <div className="kicker" style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <span>최근 {periodDays}일·분포</span>
-                    <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
-                      {[7,30,90].map(p => (
+                    <span>최근 30일 분포</span>
+                    {/* <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                         <button
-                          key={p}
-                          className="btn"
-                          onClick={() => setPeriodDays(p as 7|30|90)}
-                          style={{ opacity: periodDays===p ? 1 : .55, borderColor: periodDays===p ? 'rgba(255,255,255,.24)' : undefined }}
+                            key={30}
+                            className="btn"
+                            onClick={() => setPeriodDays(30)}
+                            style={{
+                            opacity: periodDays === 30 ? 1 : 0.55,
+                            borderColor: periodDays === 30 ? 'rgba(255,255,255,.24)' : undefined,
+                            }}
                         >
-                          {p}일
+                            30일
                         </button>
-                      ))}
-                    </div>
+                    </div> */}
                   </div>
 
                   <div className="divider" />
 
-                  <EmotionPieChart data={pieData} />
+                  {/* 파이 차트 */}
+                  {pieData.length > 0
+                    ? <EmotionPieChart data={pieData} />
+                    : <div className="chart" style={{height:220}}>최근 {periodDays}일 데이터가 없어요</div>
+                  }
 
                   <div style={{ height: 12 }} />
 
-                  {isCrowdedOnUnitY ? (
-                    <SingleDayEmotionBars
-                      row={singleRow}
-                      emotions={allEmotions}
-                      colorsByEmotion={trendPack.colorsByEmotion}
+                  {/* 꺾은선 ↔ 단일일자 가로 막대 자동 전환 */}
+                  {/* 꺾은선 ↔ 단일일자 가로 막대 전환 */}
+                    {useStackedBars ? (
+                    <StackedDailyBars
+                        data={trendPack.data}
+                        emotions={allEmotions}
+                        colorsByEmotion={colorsByEmotionSafe}
                     />
-                  ) : (
+                    ) : showLineChart ? (
                     <WeeklyTrendChart
-                      data={trendPack.data}
-                      emotions={allEmotions}
-                      colorsByEmotion={trendPack.colorsByEmotion}
+                        data={trendPack.data}
+                        emotions={allEmotions}
+                        colorsByEmotion={colorsByEmotionSafe}
                     />
-                  )}
+                    ) : (
+                    <SingleDayEmotionBars
+                        row={singleRow}
+                        emotions={allEmotions}
+                        colorsByEmotion={colorsByEmotionSafe}
+                    />
+                    )}
 
                   {isSparse && (
                     <div className="small" style={{ marginTop: 6 }}>
-                      최근 {periodDays}일 중 기록일 {trendPack.activeDays}일 · 데이터가 적어 선이 짧게 보일 수 있어요
+                      최근 {periodDays}일 중 기록일 {trendPack.activeDays}일
                     </div>
                   )}
                 </div>
@@ -396,7 +485,7 @@ export default function FeedbackPage() {
                 <div className="section">
                   <h2>요약 인사이트</h2>
                   <div className="list">
-                    {(data!.insights?.length ? data!.insights : [{ k: '최빈 감정', v: '—' }]).map((it, idx) => (
+                    {(data.insights?.length ? data.insights : [{ k: '최빈 감정', v: '—' }]).map((it, idx) => (
                       <div className="item" key={idx}>
                         <b>{it.k}</b><span>{it.v}</span>
                       </div>
@@ -406,15 +495,15 @@ export default function FeedbackPage() {
 
                 <div className="section">
                   <h2>누적 리포트</h2>
-                  {data!.carryover_digest && data!.carryover_digest.trim() ? (
+                  {data.carryover_digest && data.carryover_digest.trim() ? (
                     <div className="card" style={{ whiteSpace: 'pre-line', maxHeight: 280, overflow: 'auto' }}>
-                      {data!.carryover_meta && (
+                      {data.carryover_meta && (
                         <div className="meta" style={{ marginBottom: 8 }}>
-                          <span>권종: {data!.carryover_meta.pass_name ?? '—'}</span>
-                          <span>생성: {data!.carryover_meta.generated_at ? fmtKST(data!.carryover_meta.generated_at) : '—'}</span>
+                          <span>권종: {data.carryover_meta.pass_name ?? '—'}</span>
+                          <span>생성: {data.carryover_meta.generated_at ? fmtKST(data.carryover_meta.generated_at) : '—'}</span>
                         </div>
                       )}
-                      {data!.carryover_digest}
+                      {data.carryover_digest}
                     </div>
                   ) : (
                     <div className="card">과거 요약기록이 없습니다.</div>
@@ -432,13 +521,13 @@ export default function FeedbackPage() {
                 <div className="progress"><i style={{ width: progressPercent + '%' }} /></div>
               </div>
               <div className="kicker">
-                {data!.prev_linked ? '이전 코드 연결됨 · ' : ''}
-                누적 {(data!.entries_for_stats?.length ?? data!.entries?.length ?? 0)}회
+                {data.prev_linked ? '이전 코드 연결됨 · ' : ''}
+                누적 {(data.entries_for_stats?.length ?? data.entries?.length ?? 0)}회
               </div>
-              <div className="cta">
+              {/* <div className="cta">
                 <button className="btn" disabled>이전 코드 변경 요청</button>
                 <button className="btn primary" disabled>다음 이용권 구매</button>
-              </div>
+              </div> */}
             </div>
           </footer>
         </>
