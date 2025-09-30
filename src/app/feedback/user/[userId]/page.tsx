@@ -96,8 +96,11 @@ export default function FeedbackPage() {
     }
   }, [loading]);
 
+    // ✅ 30일 고정
+    const periodDays = 30;
+
   // 기간 상태 (LS 연동)
-  const PERIOD_LS_KEY = 'fb_period_days';
+/*  const PERIOD_LS_KEY = 'fb_period_days';
   const [periodDays, setPeriodDays] = useState<7 | 30 | 90>(() => {
     if (typeof window === 'undefined') return 7;
     const s = window.localStorage.getItem(PERIOD_LS_KEY);
@@ -107,7 +110,7 @@ export default function FeedbackPage() {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(PERIOD_LS_KEY, String(periodDays));
     }
-  }, [periodDays]);
+  }, [periodDays]); */
 
   // 데이터 로드: 90일 1회
   useEffect(() => {
