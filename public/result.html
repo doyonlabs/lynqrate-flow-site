@@ -1,33 +1,46 @@
 <!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="utf-8">
-    <meta name="robots" content="noindex,nofollow">
-    <title>처리 중…</title>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>처리 중…</title>
+  <style>
+    html,body{height:100%;margin:0}
+    body{display:grid;place-items:center;font-family:system-ui,Apple SD Gothic Neo,sans-serif}
+    .wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+    .spinner{width:48px;height:48px;border:4px solid #ddd;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .sub{color:#666;font-size:14px;text-align:center}
+  </style>
 </head>
-<body>처리 중…
-<script>
+<body>
+  <div class="wrap">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="sub">분석을 준비하고 있어요… 잠시만 기다려주세요</div>
+  </div>
+
+  <script>
     const sid = new URLSearchParams(location.search).get('sid') || '';
     if (!sid) location.replace('/fail');
 
     async function poll() {
-        try {
-            const r = await fetch(`/api/status?sid=${encodeURIComponent(sid)}`, { cache: 'no-store' });
-            const { status, emotion_entry_id } = await r.json();
+      try {
+        const r = await fetch(`/api/status?sid=${encodeURIComponent(sid)}`, { cache: 'no-store' });
+        const { status, emotion_entry_id } = await r.json();
 
         if (status === 'ready' && emotion_entry_id) {
-            location.replace(`/feedback?emotion_entry_id=${emotion_entry_id}`);
+          location.replace(`/feedback?emotion_entry_id=${emotion_entry_id}`);
         } else if (status === 'fail' || status === 'error') {
-            location.replace('/fail');
+          location.replace('/fail');
         } else {
-            setTimeout(poll, 1200); // pending
+          setTimeout(poll, 1200); // pending이면 계속
         }
-        } catch {
-            // 네트워크 이슈 등: 잠시 후 재시도
-            setTimeout(poll, 1500);
-        }
+      } catch {
+        setTimeout(poll, 1500); // 네트워크 이슈 → 조금 있다 재시도
+      }
     }
     poll();
-</script>
+  </script>
 </body>
 </html>
