@@ -86,6 +86,21 @@ export async function GET(req: NextRequest) {
 
     const userPassId = sess.passId;
 
+    // 재방문 코드 가져오기 (REST)
+    type RevisitKey = { code: string | null; expires_at: string | null; revoked_at: string | null };
+
+    const rk = await getOne<RevisitKey>(
+      `/rest/v1/revisit_keys` +
+        `?select=code,expires_at,revoked_at` +
+        `&user_pass_id=eq.${encodeURIComponent(userPassId)}` +
+        `&limit=1`
+    );
+
+    const revisit_code =
+      rk && !rk.revoked_at ? rk.code : null;
+    const revisit_expires_at =
+      rk && !rk.revoked_at ? rk.expires_at : null;
+
     // ✨ 1) entryId 결정 (쿼리에 있으면 내 것인지 검증, 없으면 최신 1건)
     let entryId = sp.get('emotion_entry_id');
 
@@ -127,6 +142,7 @@ export async function GET(req: NextRequest) {
     type EntryWithSE = {
       id: string;
       user_pass_id: string | null;
+      user_id: string;
       created_at: string;
       situation_summary_text: string | null;
       journal_summary_text: string | null;
@@ -145,6 +161,7 @@ export async function GET(req: NextRequest) {
         [
           `id`,
           `user_pass_id`,
+          `user_id`,
           `created_at`,
           `situation_summary_text`,
           `journal_summary_text`,
@@ -336,7 +353,7 @@ export async function GET(req: NextRequest) {
             `journal_raw_text`,
             `standard_emotion:standard_emotions(name,color_code)`,
           ].join(",") +
-          `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
+          `&user_id=eq.${encodeURIComponent(entry.user_id)}` +
           `&id=neq.${encodeURIComponent(entry.id)}` +
           `&order=created_at.desc` +
           `&limit=5`
@@ -390,7 +407,8 @@ export async function GET(req: NextRequest) {
       status_label: pass?.is_active === false ? "비활성" : "진행 중",
       prev_linked: !!pass?.prev_pass_id,
       pass_name: pass?.pass?.name ?? null,
-
+      revisit_code,
+      revisit_expires_at,
       entries: [
         {
           entry_datetime: entry.created_at,

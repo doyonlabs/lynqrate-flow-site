@@ -79,6 +79,9 @@ export interface FeedbackApiResponse {
     prev_linked: boolean;
     pass_name: string | null;
 
+    revisit_code?: string | null;
+    revisit_expires_at?: string | null;
+
     // 오늘 기록 카드(기존)
     entries: Array<{
       entry_datetime: string;

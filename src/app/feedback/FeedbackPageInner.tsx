@@ -42,6 +42,9 @@ type ViewData = {
 
   insights?: InsightKV[];
   emotion_distribution?: EmotionDistributionItem[];
+
+  revisit_code?: string | null;
+  revisit_expires_at?: string | null;
 };
 
 /* ================== 의존성 없는 로딩 오버레이 ================== */
@@ -373,19 +376,30 @@ export default function FeedbackPageInner() {
             <div className="wrap kpis">
               <div className="badges">
                 <span className="badge">
-                    이용권 <strong>{data.uuid_code}</strong>
-                    <CopyButton text={data.uuid_code} />
+                    이용권 코드<strong>{data.uuid_code}</strong>
                 </span>
+                {/* 👇 새로 추가되는 재방문 코드 표시 */}
+                {data.revisit_code && (
+                    <span className="badge">
+                    재방문 코드<strong>{data.revisit_code}</strong>
+                    <CopyButton text={data.revisit_code} />
+                    {data.revisit_expires_at && (
+                    <span style={{ marginLeft: 6, color: '#a7aec2' }}>
+                        (만료 {fmtKST(data.revisit_expires_at)})
+                    </span>
+                    )}
+                    </span>
+                )}
                 {data.pass_name && <span className="badge">권종 <strong>{data.pass_name}</strong></span>}
                 <span className="badge">잔여/전체 <strong>{data.remaining_uses}/{data.total_uses}</strong></span>
                 <span className="badge">만료 <strong>{data.expires_at ? fmtKST(data.expires_at) : '—'}</strong></span>
                 <span className="badge">상태 <strong>{data.status_label}</strong></span>
                 {data.prev_linked && <span className="tag">이전 코드 연결됨</span>}
               </div>
-              <div className="cta">
+              {/* <div className="cta">
                 <button className="btn" onClick={onSavePDF}>PDF 저장</button>
-                {/* <button className="btn primary" disabled>누적 리포트 생성</button> */}
-              </div>
+                <button className="btn primary" disabled>누적 리포트 생성</button>
+              </div> */}
             </div>
           </header>
 
