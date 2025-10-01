@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { EmotionPieChart, WeeklyTrendChart, SingleDayEmotionBars, StackedDailyBars } from '@/components/feedback/EmotionCharts';
 import { groupByEmotion, aggregateTrend } from '@/lib/feedback/metrics';
 
@@ -79,8 +79,9 @@ function FullScreenLoaderInline({ msg = '분석 결과를 준비하고 있어요
 
 /* ================== 페이지 ================== */
 export default function FeedbackPage() {
-  // path param
-  const { userId } = useParams<{ userId: string }>();
+  // query param (첫 방문: result.html이 넘겨준 entry_id)
+  const search = useSearchParams();
+  const entryId = useMemo(() => search.get('emotion_entry_id'), [search]);
 
   // 상태
   const [loading, setLoading] = useState(true);
@@ -112,17 +113,36 @@ export default function FeedbackPage() {
     }
   }, [periodDays]); */
 
-  // 데이터 로드: 90일 1회
+    // 첫 방문이면 entry_id를 세션으로 교환하고, 주소에서 쿼리 제거
+    useEffect(() => {
+      (async () => {
+        if (!entryId) return;
+        try {
+          await fetch('/api/session/by-entry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entry_id: entryId }),
+            credentials: 'include',
+          });
+          // emotion_entry_id 쿼리 제거: 깔끔한 /feedback 로 남김
+          const url = new URL(window.location.href);
+          url.searchParams.delete('emotion_entry_id');
+          window.history.replaceState({}, '', url.pathname + (url.search || ''));
+        } catch { /* 실패해도 아래 /api/feedback에서 처리 */ }
+      })();
+    }, [entryId]);
+
+  // 데이터 로드: 30일(테스트 기간 고정)
   useEffect(() => {
     let alive = true;
 
     (async () => {
       try {
         setLoading(true);
-        const r = await fetch(
-          `/api/feedback?user_id=${encodeURIComponent(String(userId))}&range_days=90`,
-          { cache: 'no-store' }
-        );
+        const r = await fetch(`/api/feedback?range_days=30`, {
+          cache: 'no-store',
+          credentials: 'include', // 세션 쿠키 동봉 중요!
+        });
         const j = await r.json();
         if (!r.ok || !j?.ok) throw new Error(j?.error || 'API Failed');
         if (alive) { setData(j.data as ViewData); setErr(null); }
@@ -134,7 +154,7 @@ export default function FeedbackPage() {
     })();
 
     return () => { alive = false; };
-  }, [userId]); // ⬅️ periodDays 제거
+  }, []);
 
   // 로딩 중에는 에러 문구를 절대 보여주지 않음
   const hasError = !loading && (!!err || data == null);
@@ -299,7 +319,7 @@ export default function FeedbackPage() {
   const fmtKST = (iso: string) =>
     new Date(iso).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
 
-  //const onSavePDF = () => window.print();
+  const onSavePDF = () => window.print();
   const recentList = (data?.recent_entries ?? []).slice(1);
 
   const progressPercent = useMemo(() => {
@@ -329,17 +349,20 @@ export default function FeedbackPage() {
           <header className="header">
             <div className="wrap kpis">
               <div className="badges">
-                <span className="badge">이용권 <strong>{data.uuid_code}</strong></span>
+                <span className="badge">
+                    이용권 <strong>{data.uuid_code}</strong>
+                    <CopyButton text={data.uuid_code} />
+                </span>
                 {data.pass_name && <span className="badge">권종 <strong>{data.pass_name}</strong></span>}
                 <span className="badge">잔여/전체 <strong>{data.remaining_uses}/{data.total_uses}</strong></span>
                 <span className="badge">만료 <strong>{data.expires_at ? fmtKST(data.expires_at) : '—'}</strong></span>
                 <span className="badge">상태 <strong>{data.status_label}</strong></span>
                 {data.prev_linked && <span className="tag">이전 코드 연결됨</span>}
               </div>
-              {/* <div className="cta">
+              <div className="cta">
                 <button className="btn" onClick={onSavePDF}>PDF 저장</button>
-                <button className="btn primary" disabled>누적 리포트 생성</button>
-              </div> */}
+                {/* <button className="btn primary" disabled>누적 리포트 생성</button> */}
+              </div>
             </div>
           </header>
 
@@ -538,6 +561,38 @@ export default function FeedbackPage() {
 
       <StyleTag />
     </>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500); // 1.5초 뒤 원복
+    } catch (err) {
+      console.error('복사 실패:', err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      style={{
+        marginLeft: 6,
+        padding: '2px 6px',
+        borderRadius: 6,
+        border: '1px solid rgba(255,255,255,.12)',
+        background: 'linear-gradient(180deg,#1a1f2d,#111522)',
+        color: '#e7e9ee',
+        cursor: 'pointer',
+        fontSize: 12,
+      }}
+    >
+      {copied ? '✅' : '📋'}
+    </button>
   );
 }
 

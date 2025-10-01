@@ -68,7 +68,7 @@ export function WeeklyTrendChart({
     rows.some(row => (emotions || []).some(em => (row[em] ?? 0) > 0));
 
   if (!hasAny) {
-    return <div className="chart" style={{height:260}}>최근 구간에 표시할 데이터가 없어요</div>;
+    return <div className="chart" style={{height:260}}>최근 30일 데이터가 없어요</div>;
   }
 
   const maxV = Math.max(
@@ -153,7 +153,7 @@ type SingleDayProps = {
 
 export function SingleDayEmotionBars({ row, emotions, colorsByEmotion }: SingleDayProps) {
   if (!emotions || emotions.length === 0) {
-    return <div className="chart" style={{height:320}}>표시할 감정이 없습니다</div>;
+    return <div className="chart" style={{height:320}}>최근 30일 데이터가 없어요</div>;
   }
   // 1) 데이터 정규화 (숫자 보장)
   let data = emotions.map((em) => ({

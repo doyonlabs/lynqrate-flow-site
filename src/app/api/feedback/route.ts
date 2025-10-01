@@ -1,18 +1,19 @@
 // app/api/feedback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import {
-  EmotionEntryLite,
   UserPassWithName,
-  PassRollupDigest,
   EmotionFeedback,
   FeedbackApiResponse,
 } from "@/types/feedback";
+import { verifySession } from '@/lib/session';
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const COOKIE = 'lf_sess';
 
 function supa(path: string, init?: RequestInit) {
   if (!SUPABASE_URL || !SERVICE_ROLE) {
@@ -72,33 +73,54 @@ export async function GET(req: NextRequest) {
     // ✅ 기간 토글(7/30/90) 기본 7일
     const rangeDays = Number(sp.get("range_days") ?? 7);
 
-    // ✅ 0) entryId 우선, 없으면 user_id로 최신 entry 찾아서 대체
-    const userId = sp.get("user_id");
-    let entryId = sp.get("emotion_entry_id");
+    // ✨ 세션 쿠키 검증
+    const token = req.cookies.get(COOKIE)?.value;
+    const sess = await verifySession(token);
 
-    if (!entryId && userId) {
+    if (!sess) {
+      return NextResponse.json(
+        { ok: false, error: 'unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const userPassId = sess.passId;
+
+    // ✨ 1) entryId 결정 (쿼리에 있으면 내 것인지 검증, 없으면 최신 1건)
+    let entryId = sp.get('emotion_entry_id');
+
+    // (a) 쿼리에 주어진 entry_id가 "내 pass" 소유인지 검증
+    if (entryId) {
+      const own = await getOne<{ id: string }>(
+        `/rest/v1/emotion_entries` +
+          `?select=id` +
+          `&user_pass_id=eq.${encodeURIComponent(userPassId)}` +
+          `&id=eq.${encodeURIComponent(entryId)}` +
+          `&limit=1`
+      );
+      if (!own) {
+        // 남의 entry거나 존재하지 않으면 무시하고 최신으로 대체
+        entryId = null;
+      }
+    }
+
+    // (b) 없으면 내 pass의 최신 entry로 대체
+    if (!entryId) {
       const latest = await getOne<{ id: string }>(
         `/rest/v1/emotion_entries` +
           `?select=id` +
-          `&user_id=eq.${encodeURIComponent(userId)}` +
+          `&user_pass_id=eq.${encodeURIComponent(userPassId)}` +
           `&order=created_at.desc` +
           `&limit=1`
       );
       entryId = latest?.id ?? null;
+
       if (!entryId) {
         return NextResponse.json(
-          { ok: false, error: "USER_HAS_NO_ENTRIES" },
+          { ok: false, error: 'USER_HAS_NO_ENTRIES' },
           { status: 404 }
         );
       }
-    }
-
-    if (!entryId) {
-      // 여전히 entryId가 없으면 에러
-      return NextResponse.json(
-        { ok: false, error: "MISSING_ENTRY_ID" },
-        { status: 400 }
-      );
     }
 
     // 1) 오늘(현재) emotion_entry 조회
@@ -300,7 +322,7 @@ export async function GET(req: NextRequest) {
       feedback_text: feedbacks?.[0]?.feedback_text ?? null,
     });
 
-    // 같은 pass에서 오늘 제외한 최근 4건
+    // 같은 pass에서 오늘 제외한 최근 5건
     if (entry.user_pass_id) {
       const rows = await getMany<RecentRow>(
         `/rest/v1/emotion_entries` +
