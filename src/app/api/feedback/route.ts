@@ -184,6 +184,27 @@ export async function GET(req: NextRequest) {
     }
     const emotion_distribution = Array.from(baseMap.values()).sort((a, b) => b.count - a.count);
 
+    // 30일 내에서 최빈 감정(하나라도 count>0 있으면 그 라벨 사용)
+    const top30 = emotion_distribution.find(e => e.count > 0);
+
+    // fallback: 30일 내 데이터가 없으면 전체(entries_for_stats) 기준으로 최빈 감정 재계산
+    let mostFrequentLabel = top30?.label ?? "—";
+    if (!top30) {
+      const fallbackMap = new Map<string, number>(); // key: standard_emotion_id, value: count
+      for (const r of entries_for_stats) {
+        if (!r.standard_emotion_id) continue;
+        fallbackMap.set(
+          r.standard_emotion_id,
+          (fallbackMap.get(r.standard_emotion_id) ?? 0) + 1
+        );
+      }
+      if (fallbackMap.size > 0) {
+        const [maxId] = [...fallbackMap.entries()].sort((a, b) => b[1] - a[1])[0];
+        const emo = stdEmotions.find(e => e.id === maxId);
+        mostFrequentLabel = emo?.name ?? "—";
+      }
+    }
+
     // 3) 표준감정 메타
     const standardEmotionName = entry.standard_emotion?.name ?? "—";
     const standardEmotionColor = entry.standard_emotion?.color_code ?? null;
@@ -296,7 +317,7 @@ export async function GET(req: NextRequest) {
           `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
           `&id=neq.${encodeURIComponent(entry.id)}` +
           `&order=created_at.desc` +
-          `&limit=4`
+          `&limit=5`
       );
 
       let latestByEntry = new Map<string, string>();
@@ -318,7 +339,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      rows.reverse().forEach((r) => {
+      rows.forEach((r) => {
         const emo = r.standard_emotion?.name?.trim() || "—";
         const emoColor = r.standard_emotion?.color_code ?? null;
         const sit =
@@ -366,7 +387,7 @@ export async function GET(req: NextRequest) {
       entries_for_stats,
       // ✅ 파이/막대가 동일하게 사용할 집계 결과
       emotion_distribution,
-      insights: [{ k: "최빈 감정", v: standardEmotionName }],
+      insights: [{ k: "최빈 감정", v: mostFrequentLabel }],
     };
 
     return NextResponse.json<FeedbackApiResponse>(
