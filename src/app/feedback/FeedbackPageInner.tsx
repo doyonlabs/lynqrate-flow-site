@@ -519,7 +519,7 @@ export default function FeedbackPageInner() {
                     상태 <strong>{data.status_label}</strong>
                 </span>
 
-                {data.prev_linked && <span className="tag">이전 코드 연결됨</span>}
+                {data.prev_linked && <span className="badge">이전 코드 연결됨</span>}
                 </div>
               {/* <div className="cta">
                 <button className="btn" onClick={onSavePDF}>PDF 저장</button>
@@ -837,7 +837,12 @@ body{
 }
 .wrap{max-width:1200px; margin:0 auto; padding:14px 18px;}
 
-.header .wrap{ max-width: none; width: 100%; padding:14px 18px; }  /* ✅ 헤더는 풀폭 컨테이너 */
+.header .wrap{ 
+  max-width: none !important;
+  width: 100%;
+  margin: 0;
+  padding: 14px 18px;
+}  /* ✅ 헤더는 풀폭 컨테이너 */
 .header .wrap .kpis{ max-width: clamp(1200px, 92vw, 1600px); margin:0 auto; } /* ✅ 중앙 고정 */
 
 /* 데스크톱(≥1280px)에서는 헤더만 더 넓게 */
@@ -851,9 +856,11 @@ body{
     overflow-x: auto;             /* 넘치면 스크롤 */
     -webkit-overflow-scrolling: touch;
   }
-  .header .wrap .badge{
-    flex: 0 0 auto;               /* 줄어들지 않게 */
-    white-space: nowrap;          /* 배지 내부 줄바꿈 방지 */
+  /* ✅ 태그도 배지처럼 한 줄 고정 & 축소 금지 */
+  .header .wrap .badges .badge,
+  .header .wrap .badges .tag{
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 }
 /* 작은 화면: 줄바꿈 되도록 (기본값 유지) */
@@ -885,6 +892,7 @@ body{
 
 .wrap.kpis {
   width: 100%;        /* 전체 폭 채움 */
+  margin: 0;
 }
 .badges{
     display:flex; 
@@ -973,7 +981,20 @@ body{
 .progress{ height:8px; width:100%; background:#0e1220; border-radius:999px; overflow:hidden; border:1px solid rgba(255,255,255,.06) }
 .progress > i{ display:block; height:100%; width:42%; background:linear-gradient(90deg, #6ee7b7, #3b82f6) }
 .small{font-size:12px; color:var(--sub)}
-.tag{display:inline-block; padding:3px 8px; border-radius:999px; background:#0e1424; border:1px solid rgba(255,255,255,.08); color:var(--sub)}
+.tag{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:#0e1424;
+  border:1px solid rgba(255,255,255,.08);
+  color:#a7aec2;
+  /* ✅ 혹시 기본값이 flex: initial이면 스크롤 라인에서 밀리지 않게 고정 */
+  flex:0 0 auto;
+  white-space:nowrap;
+  font-size:12px;
+}
 
 /* ==== Recharts 포커스/외곽선 제거 ==== */
 .chart :focus,

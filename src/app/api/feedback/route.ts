@@ -159,13 +159,38 @@ export async function GET(req: NextRequest) {
     }
 
     // 🔹 현재(가장 최신) 이용권 정보 — user_id 기준 최신 user_pass 1건
-    const currentPass = await getOne<UserPassWithName & { created_at?: string }>(
+    const nowIso = new Date().toISOString();
+
+    let currentPass = await getOne<UserPassWithName & { created_at?: string }>(
       `/rest/v1/user_passes` +
-        `?select=uuid_code,remaining_uses,expires_at,prev_pass_id,is_active,pass:passes(name,total_uses),created_at` +
+        `?select=uuid_code,remaining_uses,expires_at,prev_pass_id,is_active,` +
+        `pass:passes(name,total_uses),created_at` +
         `&user_id=eq.${encodeURIComponent(userId)}` +
+        `&remaining_uses=gt.0` +
+        `&expires_at=gt.${encodeURIComponent(nowIso)}` +
         `&order=created_at.desc` +
         `&limit=1`
     );
+
+    // 없으면 최신 1개 폴백
+    if (!currentPass) {
+      currentPass = await getOne<UserPassWithName & { created_at?: string }>(
+        `/rest/v1/user_passes` +
+          `?select=uuid_code,remaining_uses,expires_at,prev_pass_id,is_active,` +
+          `pass:passes(name,total_uses),created_at` +
+          `&user_id=eq.${encodeURIComponent(userId)}` +
+          `&order=created_at.desc` +
+          `&limit=1`
+      );
+    }
+
+    // 🔹 상태 라벨도 파생 계산
+    const isDerivedActive =
+      (currentPass?.remaining_uses ?? 0) > 0 &&
+      !!currentPass?.expires_at &&
+      new Date(currentPass.expires_at) > new Date();
+
+    const status_label = isDerivedActive ? '진행 중' : '비활성';
 
     // 재방문 코드 가져오기 (REST)
     type RevisitKey = { code: string | null; expires_at: string | null; revoked_at: string | null };
