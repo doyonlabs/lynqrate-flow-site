@@ -741,22 +741,37 @@ body{
   backdrop-filter:saturate(1.2) blur(8px);
   background:linear-gradient(to bottom, rgba(9,10,14,.8), rgba(9,10,14,.3));
   border-bottom:1px solid rgba(255,255,255,.06);
+  overflow-x: auto;                 /* ✅ 내용이 넘치면 헤더 자체가 가로 스크롤 허용 */
 }
 .wrap{max-width:1200px; margin:0 auto; padding:14px 18px;}
 
+.header .wrap{ max-width: none; width: 100%; padding:14px 18px; }  /* ✅ 헤더는 풀폭 컨테이너 */
+.header .wrap .kpis{ max-width: clamp(1200px, 92vw, 1600px); margin:0 auto; } /* ✅ 중앙 고정 */
+
 /* 데스크톱(≥1280px)에서는 헤더만 더 넓게 */
 @media (min-width: 1280px) {
-  .header .wrap { max-width: clamp(1200px, 92vw, 1600px); }
+  .header .wrap .kpis{ max-width: clamp(1200px, 96vw, 1800px); }
 }
-/* 작은 화면에서는 한 줄 스크롤로도 볼 수 있게 */
+/* 데스크톱: 한 줄 유지, 넘치면 가로 스크롤 */
+@media (min-width: 1024px){
+  .header .wrap .badges{
+    flex-wrap: nowrap;            /* 줄바꿈 금지 */
+    overflow-x: auto;             /* 넘치면 스크롤 */
+    -webkit-overflow-scrolling: touch;
+  }
+  .header .wrap .badge{
+    flex: 0 0 auto;               /* 줄어들지 않게 */
+    white-space: nowrap;          /* 배지 내부 줄바꿈 방지 */
+  }
+}
+/* 작은 화면: 줄바꿈 되도록 (기본값 유지) */
 @media (max-width: 640px) {
   .kpis { flex-direction: column; align-items: stretch; }
   .kpis .badges {
-    flex-wrap: nowrap;        /* 줄바꿈 대신 */
-    overflow-x: auto;         /* 가로 스크롤 허용 */
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: wrap;              /* ← 기존 nowrap 제거 */
+    overflow-x: visible;          /* ← 스크롤 제거 */
   }
-  .badge { flex: 0 0 auto; }  /* 배지 하나가 줄바꿈되지 않도록 */
+  .badge { flex: 0 0 auto; }
 }
 .kpis{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-start;}
 
@@ -779,7 +794,12 @@ body{
 .wrap.kpis {
   width: 100%;        /* 전체 폭 채움 */
 }
-.badges{display:flex; gap:8px; flex-wrap:wrap; width: 100%;}
+.badges{
+    display:flex; 
+    gap:8px; 
+    flex-wrap:wrap; 
+    align-items:center;
+}
 .badge {
   display: inline-flex;       /* ← 내부 요소가 같이 움직임 */
   align-items: center;
