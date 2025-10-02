@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid, BarChart, Bar, LabelList
 } from 'recharts';
-
+import type { TooltipProps } from 'recharts';
 
 export function EmotionPieChart({
   data,
@@ -201,12 +201,7 @@ export function SingleDayEmotionBars({ row, emotions, colorsByEmotion }: SingleD
             padding={{ top: 10, bottom: 10 }}     // ✅ 위아래 패딩
           />
 
-          <RTooltip
-            cursor={{ fill: 'rgba(255,255,255,.04)' }}
-            contentStyle={{ background: '#0f1422', border: '1px solid rgba(255,255,255,.08)' }}
-            labelStyle={{ color: '#e7e9ee' }}
-            formatter={(val: any) => [val, '횟수']}
-          />
+          <RTooltip content={<TooltipSingle />} cursor={{ fill: 'rgba(255,255,255,0.04)' }}/>
 
           <Bar dataKey="value" radius={[0, 0, 0, 0]}>
             {data.map((d, i) => (
@@ -293,5 +288,32 @@ export function StackedDailyBars({
         ))}
       </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+function TooltipSingle(props: TooltipProps<any, any>) {
+  const { active } = props;
+  const payload = (props as any).payload as any[]; // 강제 캐스팅
+
+  if (!active || !payload || payload.length === 0) return null;
+  const p = payload[0];
+  const v = Number(p?.value ?? 0);
+  if (v <= 0) return null;
+
+  const label = p?.payload?.emotion ?? p?.name ?? '';
+
+  return (
+    <div
+      style={{
+        background: 'rgba(15,20,34,.95)',
+        border: '1px solid rgba(255,255,255,.12)',
+        padding: '6px 10px',
+        borderRadius: 8,
+        color: '#e7e9ee',
+        fontSize: 13,
+      }}
+    >
+      {label} {v}
+    </div>
   );
 }
