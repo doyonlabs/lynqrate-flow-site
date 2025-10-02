@@ -48,7 +48,7 @@ type ViewData = {
 };
 
 /* ================== 의존성 없는 로딩 오버레이 ================== */
-function FullScreenLoaderInline({ msg = '분석 결과를 준비하고 있어요…' }: { msg?: string }) {
+function FullScreenLoaderInline({ msg = '분석을 진행하고 있어요…' }: { msg?: string }) {
   const wrap: React.CSSProperties = {
     position: 'fixed', inset: 0, zIndex: 9999, display: 'grid', placeItems: 'center',
     background:
@@ -93,6 +93,12 @@ export default function FeedbackPageInner() {
   const [data, setData] = useState<ViewData | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
 
+  //이 페이지가 "entry_id로부터 진입"했음을 기억
+  const cameFromEntry = useRef(false);
+  const kickRef = useRef(false);
+  const attemptsRef = useRef(0);
+  const timersRef = useRef<number[]>([]);
+
   // 플리커 방지용 로더 유지
   const [showLoader, setShowLoader] = useState(true);
   useEffect(() => {
@@ -125,6 +131,9 @@ export default function FeedbackPageInner() {
           setSessionReady(true); // entryId 없으면 그냥 바로 ready
           return;
         }
+        //entry_id로 들어온 방문임을 표시
+        cameFromEntry.current = true;
+
         try {
           const r = await fetch('/api/session/by-entry', {
             method: 'POST',
@@ -347,6 +356,85 @@ export default function FeedbackPageInner() {
 
   const onSavePDF = () => window.print();
   const recentList = (data?.recent_entries ?? []).slice(1);
+
+  // 방금 작성한 기록/차감이 첫 조회에 안 보이면 짧게 재조회 (최대 3회)
+    useEffect(() => {
+        if (loading || !data) return;
+        if (!cameFromEntry.current) return; // entry_id로 들어온 경우만
+
+        const fromId = entryId ?? undefined;
+
+        const recentTs = (() => {
+            const t = data?.recent_entries?.[0]?.entry_datetime;
+            return t ? new Date(t).getTime() : 0;
+        })();
+
+        const looksStale =
+            (data.total_uses ?? 0) > 0 &&
+            data.remaining_uses === data.total_uses &&
+            recentTs > 0 &&
+            Date.now() - recentTs < 60_000;
+
+        const hasJustCreated =
+            !!fromId &&
+            (data.recent_entries?.some((e: any) => e.entry_id === fromId) ?? false);
+
+        // 신선하면 아무 것도 안 함
+        if (!looksStale && (hasJustCreated || !fromId)) return;
+
+        // 이미 재조회 루프를 시작했다면 또 시작하지 않음
+        if (kickRef.current) return;
+        kickRef.current = true;
+        attemptsRef.current = 0;
+
+        const tick = async () => {
+            if (attemptsRef.current >= 3) return;
+            attemptsRef.current += 1;
+            try {
+            const r = await fetch(`/api/feedback?range_days=30&_r=${Date.now()}`, {
+                cache: 'no-store',
+                credentials: 'include',
+            });
+            if (r.ok) {
+                const j = await r.json();
+                setData(j.data);
+
+                const recentTs2 = (() => {
+                const t2 = j?.data?.recent_entries?.[0]?.entry_datetime;
+                return t2 ? new Date(t2).getTime() : 0;
+                })();
+
+                const looksStale2 =
+                (j?.data?.total_uses ?? 0) > 0 &&
+                j?.data?.remaining_uses === j?.data?.total_uses &&
+                recentTs2 > 0 &&
+                Date.now() - recentTs2 < 60_000;
+
+                const hasJustCreated2 =
+                !!fromId &&
+                (j?.data?.recent_entries?.some((e: any) => e.entry_id === fromId) ?? false);
+
+                // 신선해졌으면 종료
+                if (!(looksStale2 || (!hasJustCreated2 && !!fromId))) return;
+            }
+            } catch {}
+            // 다음 시도 예약
+            const id = window.setTimeout(tick, 600);
+            timersRef.current.push(id);
+        };
+
+        // 첫 킥
+        const first = window.setTimeout(tick, 500);
+        timersRef.current.push(first);
+
+        // 정리
+        return () => {
+            kickRef.current = false;
+            attemptsRef.current = 0;
+            timersRef.current.forEach(clearTimeout);
+            timersRef.current = [];
+        };
+    }, [loading, data, entryId]);
 
     // 진행률: 사용한 횟수 / 전체
     const progressPercent = useMemo(() => {
