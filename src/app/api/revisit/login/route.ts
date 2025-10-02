@@ -18,7 +18,7 @@ export async function POST(req: Request){
   if (key.revoked_at) return NextResponse.json({ ok:false, error:'revoked' }, { status:403 });
   if (new Date(key.expires_at) <= new Date()) return NextResponse.json({ ok:false, error:'expired' }, { status:410 });
 
-  const token = await issueSession(key.user_pass_id);
+  const token = await issueSession(key.user_pass_id, 60 * 60 * 12);
 
   await supabaseAdmin.from('revisit_keys')
     .update({ last_used_at: new Date().toISOString() })
@@ -30,9 +30,9 @@ export async function POST(req: Request){
     value: token,
     httpOnly: true,
     sameSite: 'lax',
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: 60 * 60 * 24 * 30, // 30일
+    //maxAge: 60 * 60 * 24 * 30, // 30일
   });
   res.headers.set('Cache-Control', 'no-store');
   return res;
