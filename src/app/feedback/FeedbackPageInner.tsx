@@ -1,7 +1,7 @@
 // src/app/feedback/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { EmotionPieChart, WeeklyTrendChart, SingleDayEmotionBars, StackedDailyBars } from '@/components/feedback/EmotionCharts';
 import { groupByEmotion, aggregateTrend } from '@/lib/feedback/metrics';
@@ -386,15 +386,29 @@ export default function FeedbackPageInner() {
                 </span>
 
                 {data.revisit_code && (
-                    <span className="badge">
-                    재방문 코드 <strong>{data.revisit_code}</strong>
-                    <CopyButton text={data.revisit_code} />
-                    {data.revisit_expires_at && (
-                        <span className="text-xs" style={{ color: '#a7aec2' }}>
-                        (만료 {fmtKST(data.revisit_expires_at)})
+                    <>
+                        <span className="badge">
+                            재방문 코드 <strong>{data.revisit_code}</strong>
+                            <CopyButton text={data.revisit_code} />
+                            {data.revisit_expires_at && (
+                                <span className="text-xs" style={{ color: '#a7aec2' }}>
+                                (만료 {fmtKST(data.revisit_expires_at)})
+                                </span>
+                            )}
                         </span>
-                    )}
-                    </span>
+                        <span className="badge" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            재방문 주소
+                            <a
+                                href="/revisit"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: "#7aa2ff", textDecoration: "underline" }}
+                            >
+                                lynqrateflow.com/revisit
+                            </a>
+                            <CopyButton text="lynqrateflow.com/revisit" />
+                        </span>
+                    </>
                 )}
 
                 {data.pass_name && (
@@ -439,7 +453,9 @@ export default function FeedbackPageInner() {
 
                       <div className="title" style={{ marginTop: 8 }}>
                         <b style={{ color:'#a7aec2' }}>상황</b>
-                        <div>“{data.entries[0].situation_summary || '상황 없음'}”</div>
+                          <div style={{ marginTop: 4 }}>
+                            {data.entries[0].situation_summary || '상황 없음'}
+                        </div>
                       </div>
 
                       {data.entries[0].journal_summary && (
@@ -470,28 +486,30 @@ export default function FeedbackPageInner() {
                           <span className="emotion-chip">표준감정: {r.standard_emotion || '—'}</span>
                         </div>
 
-                        <div className="title">
-                          <b style={{ color:'#a7aec2' }}>상황</b> {r.situation_text ? `“${r.situation_text}”` : '상황 없음'}
+                        <div className="title" style={{ marginTop: 6 }}>
+                            <b style={{ color:'#a7aec2', display:'block', marginBottom:4 }}>상황</b>
+
+                            {r.situation_text ? (
+                                r.situation_text.length > 60 ? (
+                                // 라벨 숨김!
+                                <JournalPreview text={r.situation_text} />
+                                ) : (
+                                <div>{r.situation_text}</div>
+                                )
+                            ) : (
+                                <div>상황 없음</div>
+                            )}
                         </div>
 
                         {r.journal_text && (
-                          <div
-                            className="ai"
-                            style={{
-                              display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical',
-                              overflow:'hidden', marginTop:6
-                            }}
-                          >
-                            <b style={{ color:'#a7aec2' }}>감정 기록</b>
-                            <div style={{ marginTop: 4 }}>{r.journal_text}</div>
-                          </div>
+                            <JournalPreview label="감정 기록" text={r.journal_text} />
                         )}
 
                         {r.feedback_text && r.feedback_text.trim() && (
-                          <details style={{ marginTop: 6 }}>
-                            <summary style={{ cursor:'pointer', color:'#7aa2ff' }}>피드백 보기</summary>
+                        <details style={{ marginTop: 6 }}>
+                            <summary className="summary-toggle">피드백 보기</summary>
                             <div className="ai" style={{ marginTop: 6 }}>{r.feedback_text}</div>
-                          </details>
+                        </details>
                         )}
                       </article>
                     ))}
@@ -578,17 +596,17 @@ export default function FeedbackPageInner() {
                 <div className="section">
                   <h2>누적 리포트</h2>
                   {data.carryover_digest && data.carryover_digest.trim() ? (
-                    <div className="card" style={{ whiteSpace: 'pre-line', maxHeight: 280, overflow: 'auto' }}>
-                      {data.carryover_meta && (
-                        <div className="meta" style={{ marginBottom: 8 }}>
-                          <span>권종: {data.carryover_meta.pass_name ?? '—'}</span>
-                          <span>생성: {data.carryover_meta.generated_at ? fmtKST(data.carryover_meta.generated_at) : '—'}</span>
-                        </div>
-                      )}
-                      {data.carryover_digest}
+                    <div className="card" style={{ whiteSpace: 'pre-line' }}>
+                        {data.carryover_meta && (
+                            <div className="meta" style={{ marginBottom: 8 }}>
+                            <span>권종: {data.carryover_meta.pass_name ?? '—'}</span>
+                            <span>생성: {data.carryover_meta.generated_at ? fmtKST(data.carryover_meta.generated_at) : '—'}</span>
+                            </div>
+                        )}
+                        {data.carryover_digest}
                     </div>
                   ) : (
-                    <div className="card">과거 요약기록이 없습니다.</div>
+                    <div className="card">이전 이용권 요약기록이 없습니다.</div>
                   )}
                 </div>
               </aside>
@@ -649,6 +667,54 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? '복사됨 ✅' : '복사 📋'}
     </button>
+  );
+}
+
+function JournalPreview({
+  text,
+  label,                // ← optional
+}: { text: string; label?: string }) {
+  const [open, setOpen] = useState(false);
+  const [overflow, setOverflow] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setOverflow(el.scrollHeight - el.clientHeight > 1);
+    check();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(check) : null;
+    ro?.observe(el);
+    window.addEventListener('resize', check);
+    return () => { ro?.disconnect(); window.removeEventListener('resize', check); };
+  }, [text]);
+
+  return (
+    <div className="ai" style={{ marginTop: 6 }}>
+      {label ? <b style={{ color:'#a7aec2' }}>{label}</b> : null}
+
+      <div
+        ref={ref}
+        className={open ? 'jp-text open' : 'jp-text'}
+        style={{ marginTop: label ? 4 : 0 }}
+      >
+        {text}
+      </div>
+
+      {(overflow || open) && (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          style={{
+            marginTop: 6, fontSize: 12, color:'#7aa2ff', cursor:'pointer',
+            background:'none', border:'none', padding:0
+          }}
+        >
+          {open ? '접기 ▲' : '더보기 ▼'}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -749,7 +815,31 @@ body{
 }
 .card .meta{display:flex; gap:8px; color:var(--sub); font-size:12px}
 .card .title{font-weight:600; margin:6px 0 4px}
-.card .ai{margin-top:8px; padding:10px; border-radius:10px; background:#0f1422; border:1px solid rgba(255,255,255,.06)}
+.card .ai{
+  margin-top:8px;
+  padding:10px;
+  border-radius:10px;
+  background:#0f1422;
+  border:1px solid rgba(255,255,255,.06);
+  white-space:normal;
+  word-break:break-word;
+}
+
+/* 텍스트만 3줄 미리보기 */
+.jp-text{
+  display:-webkit-box;
+  -webkit-line-clamp:3;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  white-space:normal;
+  word-break:break-word;
+}
+
+/* 펼친 상태 */
+.jp-text.open{
+  display:block;
+  overflow:visible;
+}
 
 .chart{
   border-radius:12px; border:1px dashed rgba(255,255,255,.12);
@@ -781,6 +871,31 @@ body{
 .chart svg:focus { outline: none; }
 .chart .recharts-active-shape { stroke: transparent !important; }
 .chart .recharts-sector, .chart .recharts-rectangle { stroke: none; }
+
+/* details/summary 커스텀 토글 (Safari 포함) */
+.summary-toggle{
+  cursor:pointer;
+  color:#7aa2ff;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-weight:500;
+  -webkit-user-select:none; user-select:none;
+}
+/* Safari 기본 마커 제거 */
+.summary-toggle::-webkit-details-marker{ display:none; }
+
+/* 커스텀 화살표 */
+details > .summary-toggle::before{
+  content:'►';               /* 닫힘 화살표 */
+  font-size:14px;            /* 크기 통일 */
+  line-height:1;
+  display:inline-block;
+  transform: translateY(1px);
+}
+details[open] > .summary-toggle::before{
+  content:'▼';               /* 열림 화살표 */
+}
 `}}/>
   );
 }
