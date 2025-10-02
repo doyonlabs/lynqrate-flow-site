@@ -28,6 +28,7 @@ export default function RevisitPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: code.trim() }),
+        credentials: 'include',
       });
 
       // HTTP 에러 코드 기반 메시지 매핑
@@ -45,16 +46,22 @@ export default function RevisitPage() {
           } catch {}
         }
         setErr(msg);
+        setCode('');   // ✅ 에러일 때도 항상 입력값 지우기
+        inputRef.current?.blur();
         return;
       }
 
       const j = await r.json().catch(() => ({}));
       if (!j?.ok) {
         setErr(j?.error ?? '로그인 실패');
+        setCode('');   // ✅ 실패 시에도 입력값 초기화
+        inputRef.current?.blur();
         return;
       }
 
       // 세션 쿠키 설정 완료 → 결과 페이지로 이동
+      setCode('');                  // ✅ 성공 시 입력값 초기화
+      inputRef.current?.blur();
       router.replace('/feedback');
     } catch (e: any) {
       setErr('네트워크 오류가 발생했어요');
@@ -80,9 +87,8 @@ export default function RevisitPage() {
             const text = e.clipboardData.getData('text');
             setCode(normalize(text));
           }}
-          //placeholder="예: 7KMD3X9QWZP"
           inputMode="text"
-          autoComplete="one-time-code"
+          autoComplete="off"
           maxLength={16} // 12~16자 사용 시 넉넉히 제한
           className="w-full rounded-xl border px-4 py-3 font-mono tracking-wider outline-none focus:ring-2 focus:ring-black/10"
           aria-invalid={!!err}
