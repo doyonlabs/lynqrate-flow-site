@@ -202,6 +202,7 @@ export function SingleDayEmotionBars({ row, emotions, colorsByEmotion }: SingleD
           />
 
           <RTooltip
+            cursor={{ fill: 'rgba(255,255,255,.04)' }}
             contentStyle={{ background: '#0f1422', border: '1px solid rgba(255,255,255,.08)' }}
             labelStyle={{ color: '#e7e9ee' }}
             formatter={(val: any) => [val, '횟수']}

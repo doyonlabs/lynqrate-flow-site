@@ -364,7 +364,13 @@ export default function FeedbackPageInner() {
       {/* 에러는 로딩 끝난 뒤에만 */}
       {!loading && hasError && (
         <div style={{ color:'#a7aec2', padding:24, textAlign:'center' }}>
-          {err ? '불러오기 실패' : '데이터가 없습니다'}
+            {err?.toLowerCase().includes('unauthorized') ? (
+            <>접근할 수 없는 페이지예요</>      
+            ) : data == null || (Array.isArray(data.entries) && data.entries.length === 0) ? (
+            <>아직 기록이 없어요</>                
+            ) : (
+            <>불러오기 실패</>                     
+            )}
         </div>
       )}
 
