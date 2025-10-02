@@ -376,26 +376,39 @@ export default function FeedbackPageInner() {
             <div className="wrap kpis">
               <div className="badges">
                 <span className="badge">
-                    이용권 코드<strong>{data.uuid_code}</strong>
+                    이용권 코드 <strong>{data.uuid_code}</strong>
                 </span>
-                {/* 👇 새로 추가되는 재방문 코드 표시 */}
+
                 {data.revisit_code && (
                     <span className="badge">
-                    재방문 코드<strong>{data.revisit_code}</strong>
+                    재방문 코드 <strong>{data.revisit_code}</strong>
                     <CopyButton text={data.revisit_code} />
                     {data.revisit_expires_at && (
-                    <span style={{ marginLeft: 6, color: '#a7aec2' }}>
+                        <span className="text-xs" style={{ color: '#a7aec2' }}>
                         (만료 {fmtKST(data.revisit_expires_at)})
-                    </span>
+                        </span>
                     )}
                     </span>
                 )}
-                {data.pass_name && <span className="badge">권종 <strong>{data.pass_name}</strong></span>}
-                <span className="badge">잔여/전체 <strong>{data.remaining_uses}/{data.total_uses}</strong></span>
-                <span className="badge">만료 <strong>{data.expires_at ? fmtKST(data.expires_at) : '—'}</strong></span>
-                <span className="badge">상태 <strong>{data.status_label}</strong></span>
+
+                {data.pass_name && (
+                    <span className="badge">권종 <strong>{data.pass_name}</strong></span>
+                )}
+
+                <span className="badge">
+                    잔여/전체 <strong>{data.remaining_uses}/{data.total_uses}</strong>
+                </span>
+
+                <span className="badge">
+                    이용권 만료 <strong>{data.expires_at ? fmtKST(data.expires_at) : '—'}</strong>
+                </span>
+
+                <span className="badge">
+                    상태 <strong>{data.status_label}</strong>
+                </span>
+
                 {data.prev_linked && <span className="tag">이전 코드 연결됨</span>}
-              </div>
+                </div>
               {/* <div className="cta">
                 <button className="btn" onClick={onSavePDF}>PDF 저장</button>
                 <button className="btn primary" disabled>누적 리포트 생성</button>
@@ -628,7 +641,7 @@ function CopyButton({ text }: { text: string }) {
         fontSize: 12,
       }}
     >
-      {copied ? '✅' : '📋'}
+      {copied ? '복사됨 ✅' : '복사 📋'}
     </button>
   );
 }
@@ -658,14 +671,55 @@ body{
   border-bottom:1px solid rgba(255,255,255,.06);
 }
 .wrap{max-width:1200px; margin:0 auto; padding:14px 18px;}
-.kpis{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;}
-.badges{display:flex; gap:8px; flex-wrap:wrap}
-.badge{
-  background:linear-gradient(180deg, #1c2030, #121521);
-  border:1px solid rgba(255,255,255,.1);
-  padding:6px 10px; border-radius:999px; color:var(--sub)
+
+/* 데스크톱(≥1280px)에서는 헤더만 더 넓게 */
+@media (min-width: 1280px) {
+  .header .wrap { max-width: clamp(1200px, 92vw, 1600px); }
 }
-.badge strong{color:var(--text)}
+/* 작은 화면에서는 한 줄 스크롤로도 볼 수 있게 */
+@media (max-width: 640px) {
+  .kpis { flex-direction: column; align-items: stretch; }
+  .kpis .badges {
+    flex-wrap: nowrap;        /* 줄바꿈 대신 */
+    overflow-x: auto;         /* 가로 스크롤 허용 */
+    -webkit-overflow-scrolling: touch;
+  }
+  .badge { flex: 0 0 auto; }  /* 배지 하나가 줄바꿈되지 않도록 */
+}
+.kpis{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:flex-start;}
+
+/* .cta가 있을 때만 좌/우로 벌리기 */
+.kpis:has(.cta){ 
+  justify-content:space-between;
+}
+
+/* .cta가 없으면 배지들을 가운데로 보이게 하고 싶다면(선택) */
+.kpis:not(:has(.cta)) .badges{
+  justify-content:center;                /* 배지 가운데 정렬 */
+}
+  
+/* 배지 줄 */
+.kpis .badges { flex: 1 1 auto; min-width: 0; display:flex; gap:8px; flex-wrap:wrap; }
+
+/* 우측 버튼들 */
+.kpis .cta { flex: 0 0 auto; display:flex; gap:8px; }
+
+.wrap.kpis {
+  width: 100%;        /* 전체 폭 채움 */
+}
+.badges{display:flex; gap:8px; flex-wrap:wrap; width: 100%;}
+.badge {
+  display: inline-flex;       /* ← 내부 요소가 같이 움직임 */
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg,#1c2030,#121521);
+  border: 1px solid rgba(255,255,255,.1);
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: var(--sub);
+  white-space: nowrap;        /* 길면 배지 전체가 다음 줄로 */
+}
+.badge strong { color: var(--text); }
 .cta{display:flex; gap:8px}
 .btn{
   padding:9px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.12);
