@@ -86,21 +86,6 @@ export async function GET(req: NextRequest) {
 
     const userPassId = sess.passId;
 
-    // 재방문 코드 가져오기 (REST)
-    type RevisitKey = { code: string | null; expires_at: string | null; revoked_at: string | null };
-
-    const rk = await getOne<RevisitKey>(
-      `/rest/v1/revisit_keys` +
-        `?select=code,expires_at,revoked_at` +
-        `&user_pass_id=eq.${encodeURIComponent(userPassId)}` +
-        `&limit=1`
-    );
-
-    const revisit_code =
-      rk && !rk.revoked_at ? rk.code : null;
-    const revisit_expires_at =
-      rk && !rk.revoked_at ? rk.expires_at : null;
-
     // ✨ 1) entryId 결정 (쿼리에 있으면 내 것인지 검증, 없으면 최신 1건)
     let entryId = sp.get('emotion_entry_id');
 
@@ -180,6 +165,24 @@ export async function GET(req: NextRequest) {
         { status: 404 }
       );
     }
+
+    // 재방문 코드 가져오기 (REST)
+    type RevisitKey = { code: string | null; expires_at: string | null; revoked_at: string | null };
+
+    const rk = await getOne<RevisitKey>(
+      `/rest/v1/revisit_keys` +
+      `?select=code,expires_at,revoked_at,user_pass_id:user_passes!inner(user_id)` +
+      `&user_pass_id.user_id=eq.${encodeURIComponent(entry.user_id)}` +
+      `&revoked_at=is.null` +
+      `&expires_at=gt.${encodeURIComponent(new Date().toISOString())}` +
+      `&order=expires_at.desc` +
+      `&limit=1`
+    );
+
+    const revisit_code =
+      rk && !rk.revoked_at ? rk.code : null;
+    const revisit_expires_at =
+      rk && !rk.revoked_at ? rk.expires_at : null;
 
     // 2) 차트용 원시행 (색상 포함)
     let entries_for_stats: {

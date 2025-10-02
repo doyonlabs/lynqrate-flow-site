@@ -16,7 +16,7 @@ export async function POST(req: Request){
   const { entry_id } = await req.json().catch(()=>({}));
   if(!entry_id) return NextResponse.json({ ok:false, error:'entry_id required' }, { status:400 });
 
-  // entry → pass
+  // 1) entry → passId
   const { data: entry, error: e1 } = await supabaseAdmin
     .from('emotion_entries')
     .select('user_pass_id')
@@ -26,47 +26,88 @@ export async function POST(req: Request){
 
   const passId = entry.user_pass_id as string;
 
-  // 세션 쿠키 (12시간 토큰)
-  const token = await issueSession(passId, 60 * 60 * 12);
+  // 2) pass → userId
+  const { data: passRow, error: e2 } = await supabaseAdmin
+    .from('user_passes')
+    .select('user_id')
+    .eq('id', passId)
+    .single();
+  if (e2 || !passRow) return NextResponse.json({ ok:false, error:'pass not found' }, { status:404 });
+  const userId = passRow.user_id as string;
 
-  // 재방문 코드: 없으면 생성/있으면 유지
-  const { data: existing } = await supabaseAdmin
-    .from('revisit_keys')
-    .select('code, expires_at, revoked_at')
-    .eq('user_pass_id', passId)
-    .maybeSingle();
-
+  // 3) 사용자 전체에 “살아있는” 재방문 코드가 있는지 먼저 확인 (미회수 + 미만료)
   const now = new Date();
+  const nowIso = now.toISOString();
+
+  // 사용자 모든 pass id 수집
+  const { data: passesAll } = await supabaseAdmin
+    .from('user_passes')
+    .select('id')
+    .eq('user_id', userId);
+  const passIds = (passesAll ?? []).map(p => p.id as string);
+
   let revisitCode: string | undefined;
 
-  const active = !!(existing && !existing.revoked_at && existing.expires_at && new Date(existing.expires_at) > now);
+  if (passIds.length > 0) {
+    const { data: activeKey } = await supabaseAdmin
+      .from('revisit_keys')
+      .select('code, expires_at, revoked_at, user_pass_id')
+      .in('user_pass_id', passIds)
+      .is('revoked_at', null)
+      .gt('expires_at', nowIso)
+      .order('expires_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (active) {
-    revisitCode = existing!.code; // 이미 발급된 코드 보여주기
-  } else {
-    const expiresAt = new Date(Date.now()+1000*60*60*24*30).toISOString();
-    // 3회 정도 유니크 충돌(23505) 재시도
-    for (let i = 0; i < 3; i++) {
-      const code = genCode();
-      const { error } = await supabaseAdmin
-        .from('revisit_keys')
-        .upsert({ user_pass_id: passId, code, expires_at: expiresAt }, { onConflict:'user_pass_id' });
-      if (!error) { revisitCode = code; break; }
-      // @ts-ignore supabase error code 접근 (환경별로 다를 수 있어 그냥 한 번 더 시도)
-      if (error?.code !== '23505') throw error;
-      if (i === 2) throw error;
+    if (activeKey && activeKey.code) {
+      // 사용자에게 이미 유효한 코드가 있으면 그걸 그대로 사용 (새 발급 X)
+      revisitCode = activeKey.code;
     }
   }
 
+  // 4) 사용자 전체에 유효 코드가 없을 때만 “현재 pass”에 새로 발급 / 또는 기존 것 갱신
+  if (!revisitCode) {
+    const { data: existingForThisPass } = await supabaseAdmin
+      .from('revisit_keys')
+      .select('code, expires_at, revoked_at')
+      .eq('user_pass_id', passId)
+      .maybeSingle();
+
+    const stillValid =
+      !!(existingForThisPass &&
+        !existingForThisPass.revoked_at &&
+        existingForThisPass.expires_at &&
+        new Date(existingForThisPass.expires_at) > now);
+
+    if (stillValid) {
+      revisitCode = existingForThisPass!.code!;
+    } else {
+      const expiresAt = new Date(Date.now()+1000*60*60*24*30).toISOString();
+      // 23505(유니크 충돌) 대비 3회 재시도
+      for (let i = 0; i < 3; i++) {
+        const code = genCode();
+        const { error } = await supabaseAdmin
+          .from('revisit_keys')
+          .upsert({ user_pass_id: passId, code, expires_at: expiresAt }, { onConflict:'user_pass_id' });
+        if (!error) { revisitCode = code; break; }
+        // @ts-ignore: supabase pg error code
+        if (error?.code !== '23505' || i === 2) throw error;
+      }
+    }
+  }
+
+  // 5) 세션 쿠키 (12시간)
+  const token = await issueSession(passId, 60 * 60 * 12);
+
   const res = NextResponse.json({ ok:true, revisit_code: revisitCode ?? null });
   res.cookies.set({
-    name: COOKIE, 
-    value: token, 
-    httpOnly: true, 
-    sameSite: 'lax', 
-    secure: process.env.NODE_ENV === 'production', 
+    name: COOKIE,
+    value: token,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
     path: '/',
-    //maxAge: 60 * 60 * 24 * 30,
+    // maxAge 생략 → 브라우저/세션 종료 시 소멸(브라우저별 동작 상이)
   });
   res.headers.set('Cache-Control', 'no-store');
   return res;

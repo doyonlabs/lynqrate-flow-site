@@ -348,11 +348,15 @@ export default function FeedbackPageInner() {
   const onSavePDF = () => window.print();
   const recentList = (data?.recent_entries ?? []).slice(1);
 
-  const progressPercent = useMemo(() => {
+    // 진행률: 사용한 횟수 / 전체
+    const progressPercent = useMemo(() => {
     if (!data) return 0;
-    const pct = Math.round((data.remaining_uses / Math.max(1, data.total_uses)) * 100);
+    const total = Math.max(1, Number(data.total_uses || 0));
+    const remaining = Math.max(0, Number(data.remaining_uses || 0));
+    const used = Math.max(0, total - remaining);
+    const pct = Math.round((used / total) * 100);
     return Math.max(0, Math.min(100, pct));
-  }, [data]);
+    }, [data]);
 
   return (
     <>
@@ -617,8 +621,8 @@ export default function FeedbackPageInner() {
           <footer className="footerBar">
             <div className="wrap">
               <div style={{ minWidth: '220px' }}>
-                <div className="small">이번 권종 진행률</div>
-                <div className="progress"><i style={{ width: progressPercent + '%' }} /></div>
+                <div className="small">이번 권종 진행률(소진)</div>
+                <div className="progress"><i style={{ width: progressPercent === 0 ? 0 : `calc(${progressPercent}% + 2px)` }} /></div>
               </div>
               <div className="kicker">
                 {data.prev_linked ? '이전 코드 연결됨 · ' : ''}
@@ -750,7 +754,7 @@ body{
 
 /* 데스크톱(≥1280px)에서는 헤더만 더 넓게 */
 @media (min-width: 1280px) {
-  .header .wrap .kpis{ max-width: clamp(1200px, 96vw, 1800px); }
+  .header .wrap { max-width: clamp(1200px, 92vw, 1600px); }
 }
 /* 데스크톱: 한 줄 유지, 넘치면 가로 스크롤 */
 @media (min-width: 1024px){
