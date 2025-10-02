@@ -84,42 +84,34 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const userPassId = sess.passId;
+    // 🔹 passId → user_id로 승격
+    const owner = await getOne<{ user_id: string }>(
+      `/rest/v1/user_passes?select=user_id&id=eq.${encodeURIComponent(sess.passId)}&limit=1`
+    );
+    if (!owner?.user_id) {
+      return NextResponse.json({ ok:false, error:'owner_not_found' }, { status: 401 });
+    }
+    const userId = owner.user_id;
 
-    // ✨ 1) entryId 결정 (쿼리에 있으면 내 것인지 검증, 없으면 최신 1건)
+    // ✨ 1) entryId 결정 (쿼리에 있으면 "내 user" 것인지 검증, 없으면 내 user의 최신 1건)
     let entryId = sp.get('emotion_entry_id');
 
-    // (a) 쿼리에 주어진 entry_id가 "내 pass" 소유인지 검증
+    // (a) 쿼리로 들어온 entryId가 내 user 소유인지 확인
     if (entryId) {
       const own = await getOne<{ id: string }>(
-        `/rest/v1/emotion_entries` +
-          `?select=id` +
-          `&user_pass_id=eq.${encodeURIComponent(userPassId)}` +
-          `&id=eq.${encodeURIComponent(entryId)}` +
-          `&limit=1`
+        `/rest/v1/emotion_entries?select=id&user_id=eq.${encodeURIComponent(userId)}&id=eq.${encodeURIComponent(entryId)}&limit=1`
       );
-      if (!own) {
-        // 남의 entry거나 존재하지 않으면 무시하고 최신으로 대체
-        entryId = null;
-      }
+      if (!own) entryId = null; // 남의 것이면 무시
     }
 
-    // (b) 없으면 내 pass의 최신 entry로 대체
+    // (b) 없으면 이 user의 최신 엔트리 1건
     if (!entryId) {
       const latest = await getOne<{ id: string }>(
-        `/rest/v1/emotion_entries` +
-          `?select=id` +
-          `&user_pass_id=eq.${encodeURIComponent(userPassId)}` +
-          `&order=created_at.desc` +
-          `&limit=1`
+        `/rest/v1/emotion_entries?select=id&user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=1`
       );
       entryId = latest?.id ?? null;
-
       if (!entryId) {
-        return NextResponse.json(
-          { ok: false, error: 'USER_HAS_NO_ENTRIES' },
-          { status: 404 }
-        );
+        return NextResponse.json({ ok:false, error:'USER_HAS_NO_ENTRIES' }, { status:404 });
       }
     }
 
@@ -166,6 +158,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // 🔹 현재(가장 최신) 이용권 정보 — user_id 기준 최신 user_pass 1건
+    const currentPass = await getOne<UserPassWithName & { created_at?: string }>(
+      `/rest/v1/user_passes` +
+        `?select=uuid_code,remaining_uses,expires_at,prev_pass_id,is_active,pass:passes(name,total_uses),created_at` +
+        `&user_id=eq.${encodeURIComponent(userId)}` +
+        `&order=created_at.desc` +
+        `&limit=1`
+    );
+
     // 재방문 코드 가져오기 (REST)
     type RevisitKey = { code: string | null; expires_at: string | null; revoked_at: string | null };
 
@@ -184,24 +185,25 @@ export async function GET(req: NextRequest) {
     const revisit_expires_at =
       rk && !rk.revoked_at ? rk.expires_at : null;
 
-    // 2) 차트용 원시행 (색상 포함)
+    // 2) 차트용 원시행 (색상 포함) — user_id 기준
     let entries_for_stats: {
       entry_datetime: string;
       standard_emotion_id?: string | null;
       standard_emotion: string;
       color_code?: string | null;
     }[] = [];
-    if (entry.user_pass_id) {
+
+    {
       const rows = await getMany<any>(
         `/rest/v1/emotion_entries` +
           `?select=created_at,standard_emotion:standard_emotions(id,name,color_code)` +
-          `&user_id=eq.${encodeURIComponent(entry.user_id)}` +
+          `&user_id=eq.${encodeURIComponent(userId)}` +
           `&order=created_at.desc&limit=200`
       );
       entries_for_stats = rows.map((r: any) => ({
         entry_datetime: r.created_at,
         standard_emotion_id: r.standard_emotion?.id ?? null,
-        standard_emotion: r.standard_emotion?.name ?? "미정",
+        standard_emotion: r.standard_emotion?.name ?? '미정',
         color_code: r.standard_emotion?.color_code ?? null,
       }));
     }
@@ -263,7 +265,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 5) 직전 패스의 최종 carryover_digest (권종 완료본) + 메타
+    // 5) 직전 패스의 최종 carryover_digest (권종 완료본) + 메타 — currentPass 기준
     let final_digest: string | null = null;
     let carryover_meta: { pass_name: string | null; generated_at: string | null } | null = null;
 
@@ -273,6 +275,8 @@ export async function GET(req: NextRequest) {
       );
 
       const prevId = up?.prev_pass_id;
+      console.log("[carryover debug] entry.user_pass_id=", entry.user_pass_id, "prevId=", prevId);
+
       if (prevId) {
         const ar = await getOne<{ stats_json?: { carryover_digest?: string }; created_at: string }>(
           `/rest/v1/analysis_requests` +
@@ -343,75 +347,76 @@ export async function GET(req: NextRequest) {
     });
 
     // 같은 pass에서 오늘 제외한 최근 5건
-    if (entry.user_pass_id) {
-      const rows = await getMany<RecentRow>(
-        `/rest/v1/emotion_entries` +
-          `?select=` +
-          [
-            `id`,
-            `created_at`,
-            `situation_summary_text`,
-            `journal_summary_text`,
-            `situation_raw_text`,
-            `journal_raw_text`,
-            `standard_emotion:standard_emotions(name,color_code)`,
-          ].join(",") +
-          `&user_id=eq.${encodeURIComponent(entry.user_id)}` +
-          `&id=neq.${encodeURIComponent(entry.id)}` +
-          `&order=created_at.desc` +
-          `&limit=5`
-      );
+    const rows = await getMany<RecentRow>(
+      `/rest/v1/emotion_entries` +
+        `?select=` +
+        [
+          `id`,
+          `created_at`,
+          `situation_summary_text`,
+          `journal_summary_text`,
+          `situation_raw_text`,
+          `journal_raw_text`,
+          `standard_emotion:standard_emotions(name,color_code)`,
+        ].join(",") +
+        `&user_id=eq.${encodeURIComponent(entry.user_id)}` +
+        `&id=neq.${encodeURIComponent(entry.id)}` +
+        `&order=created_at.desc` +
+        `&limit=5`
+    );
 
-      let latestByEntry = new Map<string, string>();
-      if (rows.length) {
-        const ids = rows.map(r => r.id);
-        const rf = await supa(
-          `/rest/v1/emotion_feedbacks` +
-            `?select=emotion_entry_id,feedback_text,created_at` +
-            `&emotion_entry_id=in.(${ids.map(encodeURIComponent).join(",")})` +
-            `&order=created_at.desc`
-        );
-        if (rf.ok) {
-          const list: Array<{emotion_entry_id:string;feedback_text:string;created_at:string}> = await rf.json();
-          for (const f of list) {
-            if (!latestByEntry.has(f.emotion_entry_id)) {
-              latestByEntry.set(f.emotion_entry_id, f.feedback_text);
-            }
+    let latestByEntry = new Map<string, string>();
+    if (rows.length) {
+      const ids = rows.map(r => r.id);
+      const rf = await supa(
+        `/rest/v1/emotion_feedbacks` +
+          `?select=emotion_entry_id,feedback_text,created_at` +
+          `&emotion_entry_id=in.(${ids.map(encodeURIComponent).join(",")})` +
+          `&order=created_at.desc`
+      );
+      if (rf.ok) {
+        const list: Array<{emotion_entry_id:string;feedback_text:string;created_at:string}> = await rf.json();
+        for (const f of list) {
+          if (!latestByEntry.has(f.emotion_entry_id)) {
+            latestByEntry.set(f.emotion_entry_id, f.feedback_text);
           }
         }
       }
-
-      rows.forEach((r) => {
-        const emo = r.standard_emotion?.name?.trim() || "—";
-        const emoColor = r.standard_emotion?.color_code ?? null;
-        const sit =
-          (r.situation_summary_text ?? r.situation_raw_text ?? "")?.trim();
-        const jour =
-          (r.journal_summary_text ?? r.journal_raw_text ?? "")?.trim();
-
-        recent_entries.push({
-          entry_id: r.id,
-          entry_datetime: r.created_at,
-          standard_emotion: emo,
-          standard_emotion_color: emoColor,
-          situation_text: sit || "(상황 없음)",
-          journal_text: jour || "",
-          feedback_text: latestByEntry.get(r.id) ?? null,
-        });
-      });
     }
+
+    rows.forEach((r) => {
+      const emo = r.standard_emotion?.name?.trim() || "—";
+      const emoColor = r.standard_emotion?.color_code ?? null;
+      const sit =
+        (r.situation_summary_text ?? r.situation_raw_text ?? "")?.trim();
+      const jour =
+        (r.journal_summary_text ?? r.journal_raw_text ?? "")?.trim();
+
+      recent_entries.push({
+        entry_id: r.id,
+        entry_datetime: r.created_at,
+        standard_emotion: emo,
+        standard_emotion_color: emoColor,
+        situation_text: sit || "(상황 없음)",
+        journal_text: jour || "",
+        feedback_text: latestByEntry.get(r.id) ?? null,
+      });
+    });
+
 
     // 8) 응답
     const data: FeedbackApiResponse["data"] = {
-      uuid_code: pass?.uuid_code ?? "—",
-      remaining_uses: pass?.remaining_uses ?? 0,
-      total_uses: pass?.pass?.total_uses ?? 0,
-      expires_at: pass?.expires_at ?? null,
-      status_label: pass?.is_active === false ? "비활성" : "진행 중",
-      prev_linked: !!pass?.prev_pass_id,
-      pass_name: pass?.pass?.name ?? null,
+      uuid_code: currentPass?.uuid_code ?? "—",
+      remaining_uses: currentPass?.remaining_uses ?? 0,
+      total_uses: currentPass?.pass?.total_uses ?? 0,
+      expires_at: currentPass?.expires_at ?? null,
+      status_label: currentPass?.is_active === false ? "비활성" : "진행 중",
+      prev_linked: !!currentPass?.prev_pass_id,
+      pass_name: currentPass?.pass?.name ?? null,
+
       revisit_code,
       revisit_expires_at,
+
       entries: [
         {
           entry_datetime: entry.created_at,
@@ -428,7 +433,6 @@ export async function GET(req: NextRequest) {
       carryover_meta,
       recent_entries,
       entries_for_stats,
-      // ✅ 파이/막대가 동일하게 사용할 집계 결과
       emotion_distribution,
       insights: [{ k: "최빈 감정", v: mostFrequentLabel }],
     };
