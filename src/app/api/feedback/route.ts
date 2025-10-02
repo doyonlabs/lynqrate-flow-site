@@ -192,7 +192,7 @@ export async function GET(req: NextRequest) {
       const rows = await getMany<any>(
         `/rest/v1/emotion_entries` +
           `?select=created_at,standard_emotion:standard_emotions(id,name,color_code)` +
-          `&user_pass_id=eq.${encodeURIComponent(entry.user_pass_id)}` +
+          `&user_id=eq.${encodeURIComponent(entry.user_id)}` +
           `&order=created_at.desc&limit=200`
       );
       entries_for_stats = rows.map((r: any) => ({
