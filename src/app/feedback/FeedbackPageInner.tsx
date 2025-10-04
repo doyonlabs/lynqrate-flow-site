@@ -449,9 +449,7 @@ export default function FeedbackPageInner() {
   return (
     <>
       {/* 로딩 오버레이 */}
-      {showLoader && !hasError && (
-        <FullScreenLoaderInline msg="기록을 정리하고 결과를 불러오고 있어요" />
-      )}
+      <FeedbackLoaderOverlay show={showLoader} hasError={hasError} />
 
       {/* 에러는 로딩 끝난 뒤에만 */}
       {!loading && hasError && (
@@ -808,6 +806,31 @@ function JournalPreview({
       )}
     </div>
   );
+}
+
+/* ================== 로딩 오버레이 with 메시지 순환 ================== */
+function FeedbackLoaderOverlay({ show, hasError }: { show: boolean; hasError: boolean }) {
+  const messages = [
+    "기록을 정리하고 결과를 불러오고 있어요",
+    "곧 오늘의 기록과 통계를 확인할 수 있습니다",
+    "마지막 데이터를 정리하고 있어요…",
+    "이제 곧 결과가 표시됩니다!"
+  ];
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (!show) return;
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      if (i < messages.length) setIdx(i);
+      else clearInterval(iv); // 마지막 메시지에서 멈춤
+    }, 3000); // 3초 간격
+    return () => clearInterval(iv);
+  }, [show]);
+
+  if (!show || hasError) return null;
+  return <FullScreenLoaderInline msg={messages[idx]} />;
 }
 
 /* ================== 스타일 ================== */
