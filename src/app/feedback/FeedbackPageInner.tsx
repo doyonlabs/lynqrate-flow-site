@@ -83,6 +83,8 @@ function FullScreenLoaderInline({ msg = '분석을 진행하고 있어요…' }:
 
 /* ================== 페이지 ================== */
 export default function FeedbackPageInner() {
+  const SHOW_REVISIT_BADGE = process.env.NEXT_PUBLIC_SHOW_REVISIT_BADGE === 'true';
+
   // query param (첫 방문: result.html이 넘겨준 entry_id)
   const search = useSearchParams();
   const entryId = useMemo(() => search.get('emotion_entry_id'), [search]);
@@ -387,8 +389,15 @@ export default function FeedbackPageInner() {
         kickRef.current = true;
         attemptsRef.current = 0;
 
+        // 하드 타임아웃 3초: 재시도 루프 강제 종료
+        const hard = window.setTimeout(() => {
+          kickRef.current = false;
+          attemptsRef.current = 999; // 더 이상 재시도 금지
+        }, 3000);
+        timersRef.current.push(hard);
+
         const tick = async () => {
-            if (attemptsRef.current >= 3) return;
+            if (attemptsRef.current >= 2) return;
             attemptsRef.current += 1;
             try {
             const r = await fetch(`/api/feedback?range_days=30&_r=${Date.now()}`, {
@@ -419,12 +428,12 @@ export default function FeedbackPageInner() {
             }
             } catch {}
             // 다음 시도 예약
-            const id = window.setTimeout(tick, 600);
+            const id = window.setTimeout(tick, 380);
             timersRef.current.push(id);
         };
 
         // 첫 킥
-        const first = window.setTimeout(tick, 500);
+        const first = window.setTimeout(tick, 250);
         timersRef.current.push(first);
 
         // 정리
@@ -474,31 +483,36 @@ export default function FeedbackPageInner() {
                 <span className="badge">
                     이용권 코드 <strong>{data.uuid_code}</strong>
                 </span>
-
-                {data.revisit_code && (
+                {SHOW_REVISIT_BADGE && data.revisit_code && (
                     <>
-                        <span className="badge">
-                            재방문 코드 <strong>{data.revisit_code}</strong>
-                            <CopyButton text={data.revisit_code} />
-                            {data.revisit_expires_at && (
-                                <span className="text-xs" style={{ color: '#a7aec2' }}>
-                                (만료 {fmtKST(data.revisit_expires_at)})
-                                </span>
-                            )}
-                        </span>
-                        <span className="badge" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            재방문 주소
-                            <a
-                                href="/revisit"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: "#7aa2ff", textDecoration: "underline" }}
-                            >
-                                lynqrateflow.com/revisit
-                            </a>
-                            <CopyButton text="lynqrateflow.com/revisit" />
-                        </span>
+                    <span className="badge">
+                        재방문 코드 <strong>{data.revisit_code}</strong>
+                        <CopyButton text={data.revisit_code} />
+                        {data.revisit_expires_at && (
+                            <span className="text-xs" style={{ color: '#a7aec2' }}>
+                            (만료 {fmtKST(data.revisit_expires_at)})
+                            </span>
+                        )}
+                    </span>
+                    <span className="badge" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        재방문 주소
+                        <a
+                            href="/revisit"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "#7aa2ff", textDecoration: "underline" }}
+                        >
+                            lynqrateflow.com/revisit
+                        </a>
+                        <CopyButton text="lynqrateflow.com/revisit" />
+                    </span>
                     </>
+                )}
+
+                {!SHOW_REVISIT_BADGE && (
+                    <span className="badge">
+                        재방문 링크는 <strong>이메일로 발송</strong>됩니다
+                    </span>
                 )}
 
                 {data.pass_name && (
