@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const sid = searchParams.get("sid") || "";
 
-  const headers = { "Cache-Control": "no-store" };
+  const headers = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" };
 
   if (!sid) {
     return NextResponse.json(

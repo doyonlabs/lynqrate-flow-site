@@ -428,12 +428,12 @@ export default function FeedbackPageInner() {
             }
             } catch {}
             // 다음 시도 예약
-            const id = window.setTimeout(tick, 600);
+            const id = window.setTimeout(tick, 380);
             timersRef.current.push(id);
         };
 
         // 첫 킥
-        const first = window.setTimeout(tick, 500);
+        const first = window.setTimeout(tick, 250);
         timersRef.current.push(first);
 
         // 정리

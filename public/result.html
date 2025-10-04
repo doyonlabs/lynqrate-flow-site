@@ -5,6 +5,7 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>처리 중…</title>
+  <link rel="preconnect" href="https://app.lynqrateflow.com" crossorigin>
   <style>
     html,body{height:100%;margin:0}
     body{display:grid;place-items:center;font-family:system-ui,Apple SD Gothic Neo,sans-serif}
@@ -18,7 +19,7 @@
   <div class="wrap">
     <div class="spinner" aria-hidden="true"></div>
     <div class="sub" id="progressMsg">
-      AI가 기록을 정리하고 있습니다 (평균 20~40초).<br>
+      AI가 기록을 정리하고 있습니다 (평균 20~30초).<br>
       <strong>이 페이지를 닫지 마세요.</strong>
     </div>
   </div>
@@ -27,47 +28,79 @@
     const sid = new URLSearchParams(location.search).get('sid') || '';
     if (!sid) location.replace('/fail');
 
-    // 5초 간격 메시지 (0~30초, 총 7단계)
+    // 메시지 타이머(UX용): 4초 간격 유지
     const messages = [
-      "AI가 기록을 정리하고 있습니다 (평균 20~40초).<br><strong>이 페이지를 닫지 마세요.</strong>",
-      "입력하신 내용을 요약하고 있어요…",
-      "감정을 분석하는 중입니다…",
-      "맞춤 피드백을 준비하고 있습니다…",
-      "마지막 점검 중입니다…",
-      "이 창은 곧 자동으로 전환됩니다."
+        "AI가 기록을 정리하고 있습니다 (평균 20~30초).<br><strong>이 페이지를 닫지 마세요.</strong>",
+        "입력하신 내용을 요약하고 있어요…",
+        "감정을 분석하는 중입니다…",
+        "맞춤 피드백을 준비하고 있습니다…",
+        "마지막 점검 중입니다…",
+        "이 창은 곧 자동으로 전환됩니다."
     ];
-
     const msgEl = document.getElementById("progressMsg");
     let idx = 0;
     const iv = setInterval(() => {
-      idx++;
-      if (idx < messages.length) {
-        msgEl.innerHTML = messages[idx];
-      } else {
-        clearInterval(iv); // 30초 이후에는 마지막 문구 유지
-      }
+        idx++;
+        if (idx < messages.length) msgEl.innerHTML = messages[idx];
+        else clearInterval(iv);
     }, 4000);
 
+    // ⬇️ 폴링 최적화
+    const tStart = Date.now();
+    let stopped = false;
+
+    // 초기 3초는 300ms, 이후 800ms. 에러면 900ms.
+    function nextDelay(ok = true) {
+        if (!ok) return 900;
+        return (Date.now() - tStart) < 3000 ? 300 : 800;
+    }
+
     async function poll() {
-      try {
-        const r = await fetch(`/api/status?sid=${encodeURIComponent(sid)}`, { cache: 'no-store' });
+        if (stopped) return;
+
+        // 탭이 백그라운드면 과폴링 완화
+        if (document.visibilityState === 'hidden') {
+        setTimeout(poll, 800);
+        return;
+        }
+
+        // 네트워크가 묶이는 경우 대비 타임아웃(3.5s)
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 3500);
+
+        try {
+        const r = await fetch(`/api/status?sid=${encodeURIComponent(sid)}`, {
+            cache: 'no-store',
+            credentials: 'include',
+            signal: ctrl.signal,
+        });
+        clearTimeout(to);
         if (!r.ok) throw new Error('bad status');
+
         const { status, emotion_entry_id } = await r.json();
 
         if (status === 'ready' && emotion_entry_id) {
-          clearInterval(iv);
-          location.replace(`/feedback?emotion_entry_id=${encodeURIComponent(emotion_entry_id)}`);
-        } else if (status === 'fail' || status === 'error') {
-          clearInterval(iv);
-          location.replace('/fail');
-        } else {
-          setTimeout(poll, 1200);
+            stopped = true;
+            clearInterval(iv);
+            location.replace(`/feedback?emotion_entry_id=${encodeURIComponent(emotion_entry_id)}`);
+            return;
         }
-      } catch {
-        setTimeout(poll, 1500);
-      }
+        if (status === 'fail' || status === 'error') {
+            stopped = true;
+            clearInterval(iv);
+            location.replace('/fail');
+            return;
+        }
+
+        setTimeout(poll, nextDelay(true));
+        } catch {
+        clearTimeout(to);
+        setTimeout(poll, nextDelay(false));
+        }
     }
+
+    // ✅ 즉시 1회 시작 (초기 응답을 바로 잡아챔)
     poll();
-  </script>
+    </script>
 </body>
 </html>
