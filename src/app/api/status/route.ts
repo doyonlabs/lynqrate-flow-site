@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     }
 
     // ready면 entry_id 포함, fail이면 reason 포함
-    if (data.submit_status === "ready") {
+    if (data.submit_status === "ready" || data.submit_status === "done") {
       return NextResponse.json(
         {
           status: "ready",
