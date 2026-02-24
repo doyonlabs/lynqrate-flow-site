@@ -12,7 +12,7 @@ AI 기반 감정 기록/분석 서비스 — 프론트엔드
 Next.js / TypeScript / Vercel
 
 ## 주요 구조
-src/
+```src/
 ├── app/
 │   ├── api/
 │   │   ├── feedback/      # 감정 피드백 API
@@ -23,6 +23,7 @@ src/
 │   ├── feedback/          # 감정 분석 결과 페이지
 │   ├── revisit/           # 재방문 사용자 페이지
 │   └── fail/              # 오류 처리 페이지
+```
 
 ## 배포
 Vercel CI/CD — GitHub 연동 자동 배포
