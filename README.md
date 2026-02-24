@@ -1,7 +1,7 @@
 # Mind-Echo (Site)
 AI 기반 감정 기록/분석 서비스 — 프론트엔드
 > 본 저장소는 Mind-Echo 서비스의 프론트엔드 코드를 담은 저장소입니다.
-> DB 설계는 별도 저장소(lynqrate-flow-template)에서 관리됩니다.
+> DB 설계는 별도 저장소[https://github.com/lynqrate/lynqrate-flow-template]에서 관리됩니다.
 
 ## 주요 기능
 - 이용권 단위 감정 기록
