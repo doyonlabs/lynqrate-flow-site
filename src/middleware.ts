@@ -9,12 +9,7 @@ export async function middleware(req: NextRequest) {
   console.log('미들웨어 실행됨:', req.nextUrl.pathname);
   const host = req.headers.get('host')?.toLowerCase() || '';
 
-  // 1. dev 서브도메인은 무조건 통과 (리다이렉트 금지)
-  if (host.startsWith('dev.')) {
-    return NextResponse.next();
-  }
-
-  // 2. 루트/WWW에서만 app.으로 리다이렉트
+  // 1. 루트/WWW에서만 app.으로 리다이렉트
   if (host === 'lynqrateflow.com' || host === 'www.lynqrateflow.com') {
     const url = req.nextUrl.clone();
     url.protocol = 'https:'; // http 요청도 https로
@@ -22,7 +17,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // 3. 로그인 보호 페이지 체크
+  // 2. 로그인 보호 페이지 체크
   const isProtected = protectedRoutes.some(route => 
     req.nextUrl.pathname.startsWith(route)
   );
@@ -60,7 +55,7 @@ console.log('error:', error);
     return res;
   }
 
-  // 4. 나머지는 그대로 통과
+  // 3. 나머지는 그대로 통과
   return NextResponse.next();
 }
 
