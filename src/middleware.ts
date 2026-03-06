@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 // 로그인이 필요한 페이지들
-const protectedRoutes = ['/form', '/result', '/dashboard'];
+const protectedRoutes = ['/form', '/result', '/dashboard', '/settings'];
 
 export async function middleware(req: NextRequest) {
   console.log('미들웨어 실행됨:', req.nextUrl.pathname);
@@ -17,7 +17,33 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  // 2. 로그인 보호 페이지 체크
+  // 2. 로그인 상태에서 /login 접근 시 /form으로 리다이렉트
+  if (req.nextUrl.pathname === '/login') {
+    const res = NextResponse.next();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return req.cookies.getAll() },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              res.cookies.set(name, value, options)
+            )
+          },
+        },
+      }
+    )
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const formUrl = req.nextUrl.clone()
+      formUrl.pathname = '/form'
+      return NextResponse.redirect(formUrl)
+    }
+    return res
+  }
+
+  // 2-1. 로그인 보호 페이지 체크
   const isProtected = protectedRoutes.some(route => 
     req.nextUrl.pathname.startsWith(route)
   );

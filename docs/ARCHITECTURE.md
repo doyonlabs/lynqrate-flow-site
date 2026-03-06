@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-05
+> 마지막 업데이트: 2026-03-06
 
 ---
 
@@ -12,7 +12,7 @@
 - **백엔드**: Next.js API Routes
 - **DB**: Supabase (PostgreSQL)
 - **인증**: Supabase Auth (Google OAuth)
-- **AI**: GPT-4o API
+- **AI**: GPT-4o-mini API
 - **배포**: Vercel
 
 ---
@@ -28,13 +28,11 @@
         ↓
 [감정 입력 폼 /form] ← 로그인 필수
         ↓ 폼 제출
-[API Route] → DB 저장 → GPT 분석
+[POST /api/analyze] → GPT-4o-mini 호출
         ↓ 분석 완료
-[결과 페이지 /result]
+[피드백 말풍선 — /form 내부에서 표시]
         ↓
-[피드백 페이지 /feedback]
-        ↓
-[대시보드 /dashboard] ← 누적 기록
+[대시보드 /dashboard] ← 사이드바에서 뷰 전환
 ```
 
 ---
@@ -44,10 +42,10 @@
 | 경로 | 역할 | 로그인 필요 |
 |------|------|------------|
 | `/login` | Google 소셜 로그인 | ❌ |
-| `/form` | 감정/상황 입력 폼 | ✅ |
-| `/result` | GPT 분석 결과 | ✅ |
-| `/feedback` | 피드백 상세 | ✅ |
-| `/dashboard` | 누적 사용기록 | ✅ |
+| `/form` | 감정 입력 폼 + 피드백 말풍선 + 설정/대시보드 뷰 | ✅ |
+| `/dashboard` | 누적 사용기록 시각화 (예정) | ✅ |
+
+> `/result`, `/feedback` 별도 페이지 없음 — `/form` 내부 view 상태로 전환
 
 ---
 
@@ -70,18 +68,68 @@ Google 로그인 클릭
 | `src/lib/supabaseBrowser.ts` | 브라우저용 Supabase 클라이언트 (anon key) |
 | `src/lib/supabaseServer.ts` | 서버용 Supabase 클라이언트 (쿠키 기반 세션) |
 | `src/lib/supabaseAdmin.ts` | 관리자용 Supabase 클라이언트 (service role key) |
+| `src/lib/themeCookie.ts` | 테마 쿠키 저장/읽기 유틸 |
+| `src/context/ThemeContext.tsx` | 다크/라이트 테마 전역 상태 관리 |
 | `src/app/auth/callback/route.ts` | OAuth 콜백 처리 + public.users 생성 |
 | `src/app/login/page.tsx` | 로그인 페이지 UI |
-| `src/middleware.ts` | 비로그인 사용자 접근 차단 |
+| `src/components/FormClient.tsx` | 폼 + 피드백 말풍선 + 설정/대시보드 뷰 |
+| `src/app/api/analyze/route.ts` | GPT 분석 API Route |
+| `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login 접근 시 /form 리다이렉트 |
 
 ---
 
 ## 미들웨어 보호 라우트
 
 ```
-/form, /result, /dashboard → 비로그인 시 /login으로 리다이렉트
+/form, /dashboard → 비로그인 시 /login으로 리다이렉트
+/login → 로그인 상태 시 /form으로 리다이렉트
 www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 ```
+
+---
+
+## 테마 시스템
+
+```
+최초 방문 → 쿠키 없음 → 기본값 dark
+테마 토글 → setThemeCookie() → 쿠키 저장
+페이지 로드 → layout.tsx에서 쿠키 읽기 → SSR 단계에서 테마 결정
+→ 깜빡임(flash) 없음
+```
+
+---
+
+## API Route
+
+### POST /api/analyze
+
+**역할**: 감정 입력값 검증 → GPT-4o-mini 호출 → 피드백 반환
+
+**요청 바디**:
+```json
+{
+  "emotion": "불안",
+  "intensity": 4,
+  "story": "오늘 있었던 일...",
+  "feedbackType": "공감과 위로",
+  "tone": "친근체"
+}
+```
+
+**응답**:
+```json
+{
+  "status": "ok",
+  "feedback": "피드백 텍스트"
+}
+```
+
+**처리 순서**:
+1. 로그인 유저 확인
+2. 필수값 검증 + 공백 방지 (normalizeWhitespace)
+3. XSS 방지 (escapeHtml)
+4. GPT-4o-mini 호출 (JSON 응답 형식)
+5. TODO: DB 저장 (emotion_entries, emotion_feedbacks) — DB 연결 후 활성화
 
 ---
 
@@ -99,8 +147,6 @@ user_passes (이용권)
 emotion_entries (감정 기록)
     ↓
 emotion_feedbacks (GPT 피드백)
-    ↓
-analysis_requests (분석 요청)
 ```
 
 ### 주요 테이블 설명
@@ -111,10 +157,7 @@ analysis_requests (분석 요청)
 | `user_passes` | 이용권 관리 (사용 횟수, 만료일) |
 | `emotion_entries` | 감정/상황 입력 기록 |
 | `emotion_feedbacks` | GPT 생성 피드백 |
-| `submission_state` | 분석 진행 상태 폴링용 |
-| `analysis_requests` | 분석 요청 이력 |
-| `ai_task_runs` | GPT API 호출 로그 |
-| `standard_emotions` | 표준 감정 분류 |
+| `standard_emotions` | 표준 감정 분류 (향후 매칭 로직 활성화 예정) |
 
 ---
 
@@ -126,7 +169,7 @@ analysis_requests (분석 요청)
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 일반 권한 키 | 브라우저 |
 | `SUPABASE_URL` | Supabase URL | 서버만 |
 | `SUPABASE_SERVICE_ROLE_KEY` | 관리자 권한 키 | 서버만 |
-| `APP_SESSION_SECRET` | JWT 세션 키 (레거시, 제거 예정) | 서버만 |
+| `OPENAI_API_KEY` | OpenAI API 키 | 서버만 |
 
 ---
 
@@ -157,10 +200,17 @@ src/app/api/session/         ← 세션 발급 API
 
 ## 다음 작업 예정
 
-- [ ] /form 페이지 구현 (감정 입력 폼)
-- [ ] GPT 분석 API Route (Make.com → Next.js 전환)
-- [ ] /result 페이지 구현
-- [ ] /dashboard 페이지 구현
+- [x] /form 페이지 구현 (감정 입력 폼 + 피드백 말풍선)
+- [x] GPT 분석 API Route (Make.com → Next.js 전환)
+- [x] 다크/라이트 테마 (쿠키 기반 SSR)
+- [x] 설정 뷰 (/form 내부 뷰 전환)
+- [ ] DB 연결 (emotion_entries, emotion_feedbacks 저장)
+- [ ] 사이드바 과거 기록 실제 데이터 연동
+- [ ] 사용자 이름/이메일 Supabase에서 가져오기
+- [ ] 로그아웃 기능 구현
+- [ ] /dashboard 뷰 구현 (누적 통계 시각화)
+- [ ] 이용권 로직 연동 (user_passes)
+- [ ] standard_emotions 매칭 로직 활성화
 - [ ] 카카오 로그인 추가
 - [ ] 결제 연동 (Toss Payments)
 - [ ] 레거시 코드 제거
