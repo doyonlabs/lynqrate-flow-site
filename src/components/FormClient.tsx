@@ -3,40 +3,25 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 
-const STEPS = [
-  {
-    id: 1, key: 'emotion',
-    question: '지금 느끼는 감정을 한 단어로 적어주세요.',
-    sub: '예: 불안, 슬픔, 설렘, 억울함 (10자 이내)',
-    type: 'text', maxLength: 10,
-  },
-  {
-    id: 2, key: 'intensity',
-    question: '그 감정이 얼마나 강하게 느껴지나요?',
-    sub: '1(약하게) ~ 5(매우 강하게)',
-    type: 'intensity',
-  },
-  {
-    id: 3, key: 'story',
-    question: '오늘 있었던 일과 감정을 자유롭게 적어주세요.',
-    sub: '20자 이상 500자 이하',
-    type: 'textarea', minLength: 20, maxLength: 500,
-  },
-  {
-    id: 4, key: 'feedbackType',
-    question: '어떤 피드백을 받고 싶으신가요?',
-    sub: '하나를 선택해주세요',
-    type: 'select',
-    options: ['공감과 위로', '통찰과 확장', '용기와 격려', '행동 제안', '함께 기뻐하기'],
-  },
-  {
-    id: 5, key: 'tone',
-    question: '어떤 말투로 피드백을 받고 싶으신가요?',
-    sub: '하나를 선택해주세요',
-    type: 'select',
-    options: ['격식체', '존중체', '친근체', '직설체'],
-  },
-]
+// ─── 타입 ───────────────────────────────────────────────────────────────────
+
+type Role = 'ai' | 'user'
+
+interface Message {
+  role: Role
+  content: string
+}
+
+interface ExtractedData {
+  emotion: string
+  intensity: number
+  trigger: string
+  summary: string
+}
+
+type View = 'chat' | 'settings' | 'dashboard'
+
+// ─── 목업 히스토리 (DB 연결 전 임시) ────────────────────────────────────────
 
 const HISTORY = [
   { date: '3월 5일', emotion: '불안', intensity: 4 },
@@ -45,67 +30,92 @@ const HISTORY = [
   { date: '2월 28일', emotion: '외로움', intensity: 2 },
 ]
 
-// 라인 아이콘 SVG
+// ─── 아이콘 ──────────────────────────────────────────────────────────────────
+
 const Icons = {
   menu: (color: string) => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <line x1="3" y1="6" x2="21" y2="6"/>
-      <line x1="3" y1="12" x2="21" y2="12"/>
-      <line x1="3" y1="18" x2="21" y2="18"/>
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
     </svg>
   ),
   plus: (color: string) => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   ),
   chart: (color: string) => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <rect x="3" y="12" width="4" height="9"/>
-      <rect x="10" y="7" width="4" height="14"/>
-      <rect x="17" y="3" width="4" height="18"/>
+      <rect x="3" y="12" width="4" height="9" />
+      <rect x="10" y="7" width="4" height="14" />
+      <rect x="17" y="3" width="4" height="18" />
     </svg>
   ),
   settings: (color: string) => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   ),
   logout: (color: string) => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-      <polyline points="16 17 21 12 16 7"/>
-      <line x1="21" y1="12" x2="9" y2="12"/>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
   back: (color: string) => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <line x1="19" y1="12" x2="5" y2="12"/>
-      <polyline points="12 19 5 12 12 5"/>
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  ),
+  send: (color: string) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  ),
+  stop: (color: string) => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
     </svg>
   ),
 }
 
-type View = 'form' | 'settings' | 'dashboard'
+// ─── 컴포넌트 ────────────────────────────────────────────────────────────────
 
 export default function FormClient() {
   const { isDark, toggleTheme } = useTheme()
-  const [view, setView] = useState<View>('form')
-  const [step, setStep] = useState(0)
-  const [answers, setAnswers] = useState<Record<string, any>>({})
-  const [submitted, setSubmitted] = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [feedback, setFeedback] = useState('')
+  const t = isDark ? dark : light
+
+  const [view, setView] = useState<View>('chat')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  // 채팅 상태
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: 'ai',
+      content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.',
+    },
+  ])
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [sessionEnded, setSessionEnded] = useState(false)
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
+  const [isExtracting, setIsExtracting] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const t = isDark ? dark : light
-  const current = STEPS[step]
+  const hasUserMessage = messages.some(m => m.role === 'user')
 
+  // 클릭 외부 감지 (설정 팝업)
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
@@ -116,70 +126,103 @@ export default function FormClient() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // 자동 스크롤
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [step, feedback, analyzing])
+  }, [messages, isLoading, isExtracting, extractedData])
 
-  const getValue = () => answers[current?.key] ?? ''
-  const setValue = (v: any) => setAnswers({ ...answers, [current?.key]: v })
-
-  const canNext = () => {
-    const v = getValue()
-    if (!current) return false
-    if (current.type === 'text') {
-      const norm = v.replace(/[\u00A0\u200B\uFEFF]/g, '').replace(/\s+/g, '')
-      return norm.length >= 1 && v.length <= 10
+  // textarea 자동 높이
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`
     }
-    if (current.type === 'intensity') return v >= 1 && v <= 5
-    if (current.type === 'textarea') return v.length >= 20 && v.length <= 500
-    if (current.type === 'select') return !!v
-    return false
-  }
+  }, [input])
 
-  const handleNext = async () => {
-    if (step < STEPS.length - 1) {
-      setStep(step + 1)
-    } else {
-      setSubmitted(true)
-      setAnalyzing(true)
-      try {
-        const res = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            emotion: answers.emotion,
-            intensity: answers.intensity,
-            story: answers.story,
-            feedbackType: answers.feedbackType,
-            tone: answers.tone,
-          }),
-        })
-        const data = await res.json()
-        setFeedback(data.feedback ?? '피드백을 가져오지 못했어요.')
-      } catch {
-        setFeedback('오류가 발생했어요. 다시 시도해주세요.')
-      } finally {
-        setAnalyzing(false)
-      }
+  // ─── 메시지 전송 ────────────────────────────────────────────────────────────
+
+  const handleSend = async () => {
+    const trimmed = input.trim()
+    if (!trimmed || isLoading || sessionEnded) return
+
+    const userMessage: Message = { role: 'user', content: trimmed }
+    const newMessages = [...messages, userMessage]
+    setMessages(newMessages)
+    setInput('')
+    setIsLoading(true)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({
+            role: m.role === 'ai' ? 'assistant' : 'user',
+            content: m.content,
+          })),
+          sessionId,  // ← 추가
+        }),
+      })
+      const data = await res.json()
+        setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
+      if (data.sessionId) setSessionId(data.sessionId)  // ← 추가
+    } catch {
+      setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 다시 시도해주세요.' }])
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const handleNewRecord = () => {
-    setStep(0)
-    setAnswers({})
-    setSubmitted(false)
-    setAnalyzing(false)
-    setFeedback('')
-    setView('form')
+  // ─── 대화 종료 ──────────────────────────────────────────────────────────────
+
+  const handleEndSession = async () => {
+    if (!hasUserMessage || isLoading || sessionEnded) return
+
+    setSessionEnded(true)
+    setIsExtracting(true)
+
+    try {
+      const res = await fetch('/api/chat/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages.map(m => ({
+            role: m.role === 'ai' ? 'assistant' : 'user',
+            content: m.content,
+          })),
+          sessionId,  // ← 추가
+        }),
+      })
+      const data = await res.json()
+      setExtractedData(data)
+      // TODO: DB 저장 (emotion_entries) — DB 연결 후 활성화
+    } catch {
+      setExtractedData({
+        emotion: '알 수 없음',
+        intensity: 0,
+        trigger: '추출 실패',
+        summary: '감정 데이터를 추출하지 못했어요.',
+      })
+    } finally {
+      setIsExtracting(false)
+    }
   }
 
-  const messages = STEPS.slice(0, submitted ? STEPS.length : step + 1).map((s) => ({
-    question: s.question,
-    answer: answers[s.key],
-    key: s.key,
-  }))
+  // ─── 새 대화 ─────────────────────────────────────────────────────────────
 
-  const AIBubble = () => (
+  const handleNewChat = () => {
+    setMessages([{ role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.' }])
+    setInput('')
+    setSessionEnded(false)
+    setExtractedData(null)
+    setIsExtracting(false)
+    setView('chat')
+    setSessionId(null)
+  }
+
+  // ─── 서브 컴포넌트 ────────────────────────────────────────────────────────
+
+  const AIAvatar = () => (
     <div style={{
       width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
       background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
@@ -188,7 +231,23 @@ export default function FormClient() {
     }}>✦</div>
   )
 
-  const SidebarItem = ({ icon, label, active, onClick }: any) => (
+  const IntensityBar = ({ value }: { value: number }) => (
+    <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <div key={n} style={{
+          width: 20, height: 5, borderRadius: 3,
+          background: n <= value
+            ? `hsl(${260 - n * 16}, 80%, ${isDark ? '65%' : '55%'})`
+            : t.border,
+          transition: 'background 0.2s',
+        }} />
+      ))}
+    </div>
+  )
+
+  const SidebarItem = ({ icon, label, active, onClick }: {
+    icon: React.ReactNode; label: string; active: boolean; onClick: () => void
+  }) => (
     <button onClick={onClick} style={{
       width: '100%', padding: '9px 12px', borderRadius: 8,
       background: active ? t.hover : 'transparent',
@@ -201,6 +260,8 @@ export default function FormClient() {
     </button>
   )
 
+  // ─── 렌더 ─────────────────────────────────────────────────────────────────
+
   return (
     <div style={{
       display: 'flex', height: '100vh',
@@ -209,7 +270,7 @@ export default function FormClient() {
       transition: 'background 0.3s, color 0.3s',
     }}>
 
-      {/* 사이드바 — 열림 */}
+      {/* ── 사이드바 (열림) ── */}
       {sidebarOpen && (
         <div style={{
           width: 260, flexShrink: 0,
@@ -217,6 +278,7 @@ export default function FormClient() {
           display: 'flex', flexDirection: 'column',
           background: t.sidebar, transition: 'background 0.3s',
         }}>
+          {/* 로고 + 새 대화 */}
           <div style={{ padding: '16px 12px 12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <div style={{
@@ -227,16 +289,17 @@ export default function FormClient() {
               }}>✦</div>
               <span style={{ fontSize: 14, fontWeight: 600, color: t.text }}>Mind Echo</span>
             </div>
-            <button onClick={handleNewRecord} style={{
+            <button onClick={handleNewChat} style={{
               width: '100%', padding: '8px 12px', borderRadius: 8,
               background: 'transparent', border: `1px solid ${t.border}`,
               color: t.text, fontSize: 13, cursor: 'pointer',
               fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              {Icons.plus(t.text)} 새 기록
+              {Icons.plus(t.text)} 새 대화
             </button>
           </div>
 
+          {/* 대시보드 버튼 */}
           <div style={{ padding: '0 8px 8px' }}>
             <SidebarItem
               icon={Icons.chart(view === 'dashboard' ? t.text : t.muted)}
@@ -247,11 +310,16 @@ export default function FormClient() {
             <div style={{ height: 1, background: t.border, margin: '8px 4px' }} />
           </div>
 
+          {/* 최근 기록 */}
           <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto' }}>
-            <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>최근 기록</p>
+            <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>
+              최근 기록
+            </p>
+            {/* TODO: DB 연결 후 실제 데이터로 교체 */}
             {HISTORY.map((h, i) => (
               <div key={i} style={{
-                padding: '9px 12px', borderRadius: 8, cursor: 'pointer', marginBottom: 2,
+                padding: '9px 12px', borderRadius: 8,
+                cursor: 'pointer', marginBottom: 2,
               }}>
                 <div style={{ fontSize: 13, color: t.text, fontWeight: 500 }}>{h.emotion}</div>
                 <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{h.date} · 강도 {h.intensity}</div>
@@ -259,7 +327,7 @@ export default function FormClient() {
             ))}
           </div>
 
-          {/* 하단 사용자/설정 */}
+          {/* 하단 유저/설정 */}
           <div style={{ padding: '8px', position: 'relative' }} ref={settingsRef}>
             {settingsOpen && (
               <div style={{
@@ -269,16 +337,13 @@ export default function FormClient() {
                 boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.12)',
                 zIndex: 100,
               }}>
-                <button
-                  onClick={() => { setSettingsOpen(false); setView('settings') }}
-                  style={{
-                    width: '100%', padding: '11px 14px',
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'transparent', border: 'none',
-                    color: t.text, fontSize: 13, cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'left',
-                  }}
-                >
+                <button onClick={() => { setSettingsOpen(false); setView('settings') }} style={{
+                  width: '100%', padding: '11px 14px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: 'transparent', border: 'none',
+                  color: t.text, fontSize: 13, cursor: 'pointer',
+                  fontFamily: 'inherit', textAlign: 'left',
+                }}>
                   {Icons.settings(t.muted)}
                   <span>설정</span>
                 </button>
@@ -295,16 +360,12 @@ export default function FormClient() {
                 </button>
               </div>
             )}
-
-            <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              style={{
-                width: '100%', padding: '8px 10px', borderRadius: 8,
-                display: 'flex', alignItems: 'center', gap: 10,
-                background: settingsOpen ? t.hover : 'transparent',
-                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
+            <button onClick={() => setSettingsOpen(!settingsOpen)} style={{
+              width: '100%', padding: '8px 10px', borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: settingsOpen ? t.hover : 'transparent',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            }}>
               <div style={{
                 width: 30, height: 30, borderRadius: '50%',
                 background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
@@ -312,6 +373,7 @@ export default function FormClient() {
                 fontSize: 13, color: '#fff', flexShrink: 0, fontWeight: 600,
               }}>도</div>
               <div style={{ flex: 1, textAlign: 'left', overflow: 'hidden' }}>
+                {/* TODO: Supabase에서 유저 이름/이메일 가져오기 */}
                 <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>도영</div>
                 <div style={{ fontSize: 11, color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>user@gmail.com</div>
               </div>
@@ -321,7 +383,7 @@ export default function FormClient() {
         </div>
       )}
 
-      {/* 사이드바 — 닫힘 */}
+      {/* ── 사이드바 (닫힘) ── */}
       {!sidebarOpen && (
         <div style={{
           width: 52, flexShrink: 0,
@@ -335,7 +397,7 @@ export default function FormClient() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 12, color: '#fff', marginBottom: 8,
           }}>✦</div>
-          <button onClick={handleNewRecord} title="새 기록" style={{
+          <button onClick={handleNewChat} title="새 대화" style={{
             width: 32, height: 32, borderRadius: 8,
             background: 'transparent', border: `1px solid ${t.border}`,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -357,105 +419,165 @@ export default function FormClient() {
         </div>
       )}
 
-      {/* 메인 영역 */}
+      {/* ── 메인 영역 ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* 헤더 */}
         <div style={{
           height: 52, borderBottom: `1px solid ${t.border}`,
           display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12,
-          background: t.bg,
+          background: t.bg, flexShrink: 0,
         }}>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
             background: 'none', border: 'none', cursor: 'pointer', padding: 4,
           }}>{Icons.menu(t.muted)}</button>
-          <span style={{ fontSize: 14, color: t.muted }}>
+
+          <span style={{ fontSize: 14, color: t.muted, flex: 1 }}>
             {view === 'settings' ? '설정'
               : view === 'dashboard' ? '대시보드'
-              : feedback ? '분석 완료'
-              : analyzing ? 'AI 분석 중...'
-              : `감정 기록 · ${step + 1} / ${STEPS.length}`}
+              : sessionEnded ? '대화 종료'
+              : isLoading ? '답변 생성 중...'
+              : '감정 대화'}
           </span>
-          {view === 'form' && (
-            <div style={{ flex: 1, height: 2, borderRadius: 1, background: t.border, overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: feedback ? '100%' : `${((step + (canNext() ? 1 : 0)) / STEPS.length) * 100}%`,
-                background: 'linear-gradient(90deg, #a78bfa, #60a5fa)',
-                transition: 'width 0.4s ease',
-              }} />
-            </div>
+
+          {/* 대화 종료 버튼 — 채팅 뷰 + 유저 메시지 있을 때만 */}
+          {view === 'chat' && hasUserMessage && !sessionEnded && (
+            <button onClick={handleEndSession} disabled={isLoading} style={{
+              padding: '6px 14px', borderRadius: 8,
+              background: 'transparent',
+              border: `1px solid ${isLoading ? t.border : '#f87171'}`,
+              color: isLoading ? t.muted : '#f87171',
+              fontSize: 12, cursor: isLoading ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 6,
+              transition: 'opacity 0.2s',
+            }}>
+              {Icons.stop(isLoading ? t.muted : '#f87171')} 대화 종료
+            </button>
           )}
-          {view !== 'form' && <div style={{ flex: 1 }} />}
-          {view !== 'form' && (
-            <button onClick={() => setView('form')} style={{
+
+          {view !== 'chat' && (
+            <button onClick={() => setView('chat')} style={{
               background: 'none', border: 'none', cursor: 'pointer', padding: 4,
             }}>{Icons.back(t.muted)}</button>
           )}
         </div>
 
-        {/* 폼 뷰 */}
-        {view === 'form' && (
+        {/* ── 채팅 뷰 ── */}
+        {view === 'chat' && (
           <>
+            {/* 메시지 스크롤 영역 */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px 0', background: t.bg }}>
               <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 24px' }}>
 
-                {messages.slice(0, submitted ? messages.length : messages.length - 1).map((m, i) => (
-                  <div key={i} style={{ marginBottom: 28 }}>
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-                      <AIBubble />
-                      <div style={{
-                        background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
-                        padding: '12px 16px', fontSize: 14, lineHeight: 1.6, color: t.text, maxWidth: '80%',
-                      }}>{m.question}</div>
-                    </div>
-                    {m.answer && (
+                {messages.map((msg, i) => (
+                  <div key={i} style={{ marginBottom: 20 }}>
+                    {msg.role === 'ai' ? (
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <AIAvatar />
+                        <div style={{
+                          background: t.aiMsg,
+                          borderRadius: '4px 16px 16px 16px',
+                          padding: '12px 16px',
+                          fontSize: 14, lineHeight: 1.7, color: t.text,
+                          maxWidth: '80%', whiteSpace: 'pre-wrap',
+                        }}>
+                          {msg.content}
+                        </div>
+                      </div>
+                    ) : (
                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <div style={{
-                          background: '#7c3aed', borderRadius: '16px 4px 16px 16px',
-                          padding: '12px 16px', fontSize: 14, lineHeight: 1.6, color: '#fff', maxWidth: '80%',
+                          background: '#7c3aed',
+                          borderRadius: '16px 4px 16px 16px',
+                          padding: '12px 16px',
+                          fontSize: 14, lineHeight: 1.7, color: '#fff',
+                          maxWidth: '80%', whiteSpace: 'pre-wrap',
                         }}>
-                          {typeof m.answer === 'number' ? `강도 ${m.answer}` : m.answer}
+                          {msg.content}
                         </div>
                       </div>
                     )}
                   </div>
                 ))}
 
-                {analyzing && (
-                  <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
-                    <AIBubble />
+                {/* AI 타이핑 인디케이터 */}
+                {isLoading && (
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+                    <AIAvatar />
                     <div style={{
                       background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
-                      padding: '12px 16px', fontSize: 14, color: t.muted,
+                      padding: '14px 18px', display: 'flex', gap: 5, alignItems: 'center',
                     }}>
-                      <span style={{ display: 'inline-flex', gap: 4 }}>
-                        <span style={{ animation: 'blink 1.2s infinite' }}>●</span>
-                        <span style={{ animation: 'blink 1.2s 0.4s infinite' }}>●</span>
-                        <span style={{ animation: 'blink 1.2s 0.8s infinite' }}>●</span>
-                      </span>
+                      {[0, 0.3, 0.6].map((delay, i) => (
+                        <span key={i} style={{
+                          width: 7, height: 7, borderRadius: '50%',
+                          background: t.muted, display: 'inline-block',
+                          animation: `pulse 1.2s ${delay}s infinite`,
+                        }} />
+                      ))}
                     </div>
                   </div>
                 )}
 
-                {feedback && (
-                  <div style={{ display: 'flex', gap: 12, marginBottom: 28 }}>
-                    <AIBubble />
+                {/* 감정 추출 중 */}
+                {isExtracting && (
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+                    <AIAvatar />
                     <div style={{
                       background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
-                      padding: '16px 20px', fontSize: 14, lineHeight: 1.8, color: t.text,
-                      maxWidth: '80%',
+                      padding: '12px 16px', fontSize: 13, color: t.muted,
                     }}>
-                      {feedback}
+                      오늘 대화를 정리하고 있어요...
+                    </div>
+                  </div>
+                )}
+
+                {/* 추출 결과 카드 */}
+                {extractedData && !isExtracting && (
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+                    <AIAvatar />
+                    <div style={{
+                      background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
+                      padding: '16px 20px', maxWidth: '80%',
+                    }}>
+                      <p style={{ fontSize: 13, color: t.muted, marginBottom: 12, letterSpacing: '0.04em' }}>
+                        오늘의 감정 기록
+                      </p>
+
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 20, fontWeight: 600, color: t.text }}>
+                          {extractedData.emotion}
+                        </span>
+                        <span style={{ fontSize: 12, color: t.muted }}>강도</span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#a78bfa' }}>
+                          {extractedData.intensity}
+                        </span>
+                      </div>
+
+                      <IntensityBar value={extractedData.intensity} />
+
+                      {extractedData.trigger && (
+                        <p style={{ fontSize: 13, color: t.muted, marginTop: 12, lineHeight: 1.6 }}>
+                          {extractedData.trigger}
+                        </p>
+                      )}
+
+                      {extractedData.summary && (
+                        <p style={{ fontSize: 14, color: t.text, marginTop: 10, lineHeight: 1.7 }}>
+                          {extractedData.summary}
+                        </p>
+                      )}
+
                       <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button onClick={handleNewRecord} style={{
+                        <button onClick={handleNewChat} style={{
                           padding: '8px 16px', borderRadius: 20,
                           background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                           border: 'none', color: '#fff', fontSize: 12,
                           cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
                           display: 'flex', alignItems: 'center', gap: 6,
                         }}>
-                          {Icons.plus('#fff')} 새 기록하기
+                          {Icons.plus('#fff')} 새 대화 시작
                         </button>
                         <button onClick={() => setView('dashboard')} style={{
                           padding: '8px 16px', borderRadius: 20,
@@ -464,133 +586,86 @@ export default function FormClient() {
                           cursor: 'pointer', fontFamily: 'inherit',
                           display: 'flex', alignItems: 'center', gap: 6,
                         }}>
-                          {Icons.chart(t.muted)} 대시보드
+                          {Icons.chart(t.muted)} 대시보드 보기
                         </button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {!submitted && (
-                  <div style={{ marginBottom: 28 }}>
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                      <AIBubble />
-                      <div>
-                        <div style={{
-                          background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
-                          padding: '12px 16px', fontSize: 14, lineHeight: 1.6, color: t.text, marginBottom: 6,
-                        }}>{current.question}</div>
-                        <div style={{ fontSize: 12, color: t.muted, paddingLeft: 4 }}>{current.sub}</div>
-                      </div>
-                    </div>
-
-                    <div style={{ paddingLeft: 40 }}>
-                      {current.type === 'text' && (
-                        <input
-                          value={getValue()}
-                          onChange={e => setValue(e.target.value)}
-                          maxLength={10}
-                          placeholder="감정 단어를 입력하세요..."
-                          style={{
-                            width: '100%', padding: '12px 16px', borderRadius: 12,
-                            background: t.input, border: `1px solid ${t.border}`,
-                            color: t.text, fontSize: 14, outline: 'none',
-                            boxSizing: 'border-box', fontFamily: 'inherit',
-                          }}
-                          onFocus={e => e.target.style.borderColor = '#a78bfa'}
-                          onBlur={e => e.target.style.borderColor = t.border}
-                          onKeyDown={e => e.key === 'Enter' && canNext() && handleNext()}
-                        />
-                      )}
-                      {current.type === 'intensity' && (
-                        <div style={{ display: 'flex', gap: 10 }}>
-                          {[1, 2, 3, 4, 5].map(n => (
-                            <button key={n} onClick={() => setValue(n)} style={{
-                              width: 52, height: 52, borderRadius: 12,
-                              background: getValue() === n ? 'linear-gradient(135deg, #a78bfa, #60a5fa)' : t.input,
-                              border: `1px solid ${getValue() === n ? '#a78bfa' : t.border}`,
-                              color: getValue() === n ? '#fff' : t.muted,
-                              fontSize: 15, fontWeight: 600, cursor: 'pointer',
-                              transition: 'all 0.2s', fontFamily: 'inherit',
-                            }}>{n}</button>
-                          ))}
-                        </div>
-                      )}
-                      {current.type === 'textarea' && (
-                        <div>
-                          <textarea
-                            value={getValue()}
-                            onChange={e => setValue(e.target.value)}
-                            maxLength={500}
-                            placeholder="자유롭게 적어주세요..."
-                            style={{
-                              width: '100%', minHeight: 140, padding: '12px 16px',
-                              borderRadius: 12, background: t.input,
-                              border: `1px solid ${t.border}`, color: t.text,
-                              fontSize: 14, lineHeight: 1.7, resize: 'none',
-                              outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-                            }}
-                            onFocus={e => e.target.style.borderColor = '#a78bfa'}
-                            onBlur={e => e.target.style.borderColor = t.border}
-                          />
-                          <div style={{
-                            fontSize: 12, color: getValue().length < 20 ? '#f87171' : t.muted,
-                            textAlign: 'right', marginTop: 4,
-                          }}>
-                            {getValue().length} / 500자{getValue().length < 20 ? ` (${20 - getValue().length}자 더 입력)` : ''}
-                          </div>
-                        </div>
-                      )}
-                      {current.type === 'select' && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                          {current.options?.map(opt => (
-                            <button key={opt} onClick={() => setValue(opt)} style={{
-                              padding: '10px 16px', borderRadius: 20,
-                              background: getValue() === opt ? 'linear-gradient(135deg, #a78bfa, #60a5fa)' : t.input,
-                              border: `1px solid ${getValue() === opt ? '#a78bfa' : t.border}`,
-                              color: getValue() === opt ? '#fff' : t.text,
-                              fontSize: 13, cursor: 'pointer', transition: 'all 0.2s',
-                              fontWeight: getValue() === opt ? 500 : 400, fontFamily: 'inherit',
-                            }}>{opt}</button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
                 <div ref={bottomRef} />
               </div>
             </div>
 
-            {!submitted && (
-              <div style={{ padding: '12px 24px', background: t.bg, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                {step > 0 && (
-                  <button onClick={() => setStep(step - 1)} style={{
-                    padding: '10px 18px', borderRadius: 10,
-                    background: 'none', border: `1px solid ${t.border}`,
-                    color: t.muted, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-                  }}>← 이전</button>
-                )}
-                <button onClick={handleNext} disabled={!canNext()} style={{
-                  padding: '10px 24px', borderRadius: 10,
-                  background: canNext() ? 'linear-gradient(135deg, #a78bfa, #60a5fa)' : t.input,
-                  border: 'none', color: canNext() ? '#fff' : t.muted,
-                  fontSize: 13, fontWeight: 500,
-                  cursor: canNext() ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s', fontFamily: 'inherit',
-                }}>
-                  {step < STEPS.length - 1 ? '다음 →' : '✦ 분석 시작'}
-                </button>
+            {/* 입력창 */}
+            {!sessionEnded && (
+              <div style={{
+                padding: '12px 24px 16px',
+                background: t.bg,
+                borderTop: `1px solid ${t.border}`,
+                flexShrink: 0,
+              }}>
+                <div style={{ maxWidth: 680, margin: '0 auto' }}>
+                  <div style={{
+                    display: 'flex', gap: 10, alignItems: 'flex-end',
+                    background: t.input,
+                    border: `1px solid ${t.border}`,
+                    borderRadius: 14, padding: '10px 12px',
+                    transition: 'border-color 0.2s',
+                  }}
+                    onFocus={() => {}}
+                  >
+                    <textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      placeholder="지금 어떤 마음인지 말해보세요..."
+                      rows={1}
+                      disabled={isLoading}
+                      style={{
+                        flex: 1, background: 'transparent', border: 'none',
+                        color: t.text, fontSize: 14, lineHeight: 1.6,
+                        resize: 'none', outline: 'none',
+                        fontFamily: 'inherit', overflowY: 'hidden',
+                        minHeight: 24,
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          handleSend()
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handleSend}
+                      disabled={!input.trim() || isLoading}
+                      style={{
+                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                        background: input.trim() && !isLoading
+                          ? 'linear-gradient(135deg, #a78bfa, #60a5fa)'
+                          : t.border,
+                        border: 'none',
+                        cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.2s',
+                      }}
+                    >
+                      {Icons.send(input.trim() && !isLoading ? '#fff' : t.muted)}
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 11, color: t.muted, textAlign: 'center', marginTop: 8 }}>
+                    Enter로 전송 · Shift+Enter 줄바꿈 · 대화가 끝나면 "대화 종료"를 눌러주세요
+                  </p>
+                </div>
               </div>
             )}
           </>
         )}
 
-        {/* 설정 뷰 */}
+        {/* ── 설정 뷰 ── */}
         {view === 'settings' && (
           <div style={{ flex: 1, overflowY: 'auto', background: t.bg }}>
             <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 24px' }}>
-
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>화면</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -601,7 +676,8 @@ export default function FormClient() {
                   <button onClick={toggleTheme} style={{
                     width: 44, height: 24, borderRadius: 12,
                     background: isDark ? '#a78bfa' : '#d1d5db',
-                    border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.3s', flexShrink: 0,
+                    border: 'none', cursor: 'pointer', position: 'relative',
+                    transition: 'background 0.3s', flexShrink: 0,
                   }}>
                     <div style={{
                       width: 18, height: 18, borderRadius: '50%', background: '#fff',
@@ -616,6 +692,7 @@ export default function FormClient() {
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
+                    {/* TODO: Supabase에서 유저 정보 가져오기 */}
                     <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>도영</div>
                     <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>user@gmail.com</div>
                   </div>
@@ -627,6 +704,7 @@ export default function FormClient() {
                   }}>도</div>
                 </div>
                 <div style={{ height: 1, background: t.border }} />
+                {/* TODO: 로그아웃 기능 구현 */}
                 <button style={{
                   width: '100%', padding: '14px 16px',
                   display: 'flex', alignItems: 'center', gap: 10,
@@ -641,7 +719,7 @@ export default function FormClient() {
           </div>
         )}
 
-        {/* 대시보드 뷰 (임시) */}
+        {/* ── 대시보드 뷰 (준비 중) ── */}
         {view === 'dashboard' && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.bg }}>
             <div style={{ textAlign: 'center' }}>
@@ -657,13 +735,18 @@ export default function FormClient() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
-        input::placeholder, textarea::placeholder { color: #555; }
+        textarea::placeholder { color: #555; }
         button { font-family: inherit; }
-        @keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+        @keyframes pulse {
+          0%, 100% { opacity: 0.2; transform: scale(0.8); }
+          50% { opacity: 1; transform: scale(1); }
+        }
       `}</style>
     </div>
   )
 }
+
+// ─── 테마 ────────────────────────────────────────────────────────────────────
 
 const dark = {
   bg: '#0a0a0a', sidebar: '#0f0f0f', text: '#e8e8e8', muted: '#555',

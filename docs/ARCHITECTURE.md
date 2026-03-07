@@ -1,12 +1,12 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-06
+> 마지막 업데이트: 2026-03-07
 
 ---
 
 ## 서비스 개요
 
-감정과 상황을 입력하면 GPT가 분석해서 피드백을 제공하는 AI 감정 기록 서비스.
+감정을 채팅으로 털어놓으면 GPT가 공감하고, 대화 종료 시 감정 데이터를 자동 추출해 대시보드에서 패턴을 시각화하는 AI 감정 대화 서비스.
 
 - **프론트엔드**: Next.js (App Router) + TypeScript + Tailwind CSS v4
 - **백엔드**: Next.js API Routes
@@ -24,15 +24,15 @@
         ↓ Google 소셜 로그인
 [Google OAuth → Supabase Auth]
         ↓ 인증 완료
-[/auth/callback] → public.users 자동 생성
+[/auth/callback] → public.users + subscriptions 자동 생성
         ↓
-[감정 입력 폼 /form] ← 로그인 필수
-        ↓ 폼 제출
-[POST /api/analyze] → GPT-4o-mini 호출
-        ↓ 분석 완료
-[피드백 말풍선 — /form 내부에서 표시]
+[채팅 /form] ← 로그인 필수
+        ↓ 메시지 전송마다
+[POST /api/chat] → GPT-4o-mini 호출 → chat_messages 저장
+        ↓ 대화 종료 버튼
+[POST /api/chat/extract] → GPT 감정 추출 → emotion_entries 저장
         ↓
-[대시보드 /dashboard] ← 사이드바에서 뷰 전환
+[대시보드 /form 내 dashboard 뷰] ← 사이드바에서 뷰 전환
 ```
 
 ---
@@ -42,10 +42,9 @@
 | 경로 | 역할 | 로그인 필요 |
 |------|------|------------|
 | `/login` | Google 소셜 로그인 | ❌ |
-| `/form` | 감정 입력 폼 + 피드백 말풍선 + 설정/대시보드 뷰 | ✅ |
-| `/dashboard` | 누적 사용기록 시각화 (예정) | ✅ |
+| `/form` | 채팅 + 설정/대시보드 뷰 | ✅ |
 
-> `/result`, `/feedback` 별도 페이지 없음 — `/form` 내부 view 상태로 전환
+> `/result`, `/feedback`, `/dashboard` 별도 페이지 없음 — `/form` 내부 view 상태로 전환
 
 ---
 
@@ -57,7 +56,7 @@ Google 로그인 클릭
 → Google 인증 완료
 → /auth/callback?code=... 리다이렉트
 → exchangeCodeForSession(code) → Supabase 세션 생성
-→ public.users에 row upsert (없으면 생성, 있으면 updated_at 업데이트)
+→ public.users upsert (없으면 생성 + subscriptions free 플랜 생성, 있으면 updated_at 업데이트)
 → /form으로 이동
 ```
 
@@ -70,10 +69,11 @@ Google 로그인 클릭
 | `src/lib/supabaseAdmin.ts` | 관리자용 Supabase 클라이언트 (service role key) |
 | `src/lib/themeCookie.ts` | 테마 쿠키 저장/읽기 유틸 |
 | `src/context/ThemeContext.tsx` | 다크/라이트 테마 전역 상태 관리 |
-| `src/app/auth/callback/route.ts` | OAuth 콜백 처리 + public.users 생성 |
+| `src/app/auth/callback/route.ts` | OAuth 콜백 처리 + public.users + subscriptions 생성 |
 | `src/app/login/page.tsx` | 로그인 페이지 UI |
-| `src/components/FormClient.tsx` | 폼 + 피드백 말풍선 + 설정/대시보드 뷰 |
-| `src/app/api/analyze/route.ts` | GPT 분석 API Route |
+| `src/components/FormClient.tsx` | 채팅 UI + 설정/대시보드 뷰 |
+| `src/app/api/chat/route.ts` | 채팅 API Route (GPT 대화 + chat_messages 저장) |
+| `src/app/api/chat/extract/route.ts` | 대화 종료 시 감정 추출 + emotion_entries 저장 |
 | `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login 접근 시 /form 리다이렉트 |
 
 ---
@@ -81,7 +81,7 @@ Google 로그인 클릭
 ## 미들웨어 보호 라우트
 
 ```
-/form, /dashboard → 비로그인 시 /login으로 리다이렉트
+/form → 비로그인 시 /login으로 리다이렉트
 /login → 로그인 상태 시 /form으로 리다이렉트
 www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 ```
@@ -101,35 +101,63 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 
 ## API Route
 
-### POST /api/analyze
+### POST /api/chat
 
-**역할**: 감정 입력값 검증 → GPT-4o-mini 호출 → 피드백 반환
+**역할**: 대화 히스토리 누적 → GPT-4o-mini 호출 → chat_messages 저장 → 답변 반환
 
 **요청 바디**:
 ```json
 {
-  "emotion": "불안",
-  "intensity": 4,
-  "story": "오늘 있었던 일...",
-  "feedbackType": "공감과 위로",
-  "tone": "친근체"
+  "messages": [{ "role": "user", "content": "..." }],
+  "sessionId": "uuid (없으면 신규 세션 생성)"
 }
 ```
 
 **응답**:
 ```json
 {
-  "status": "ok",
-  "feedback": "피드백 텍스트"
+  "reply": "AI 답변",
+  "sessionId": "uuid"
 }
 ```
 
 **처리 순서**:
 1. 로그인 유저 확인
-2. 필수값 검증 + 공백 방지 (normalizeWhitespace)
-3. XSS 방지 (escapeHtml)
-4. GPT-4o-mini 호출 (JSON 응답 형식)
-5. TODO: DB 저장 (emotion_entries, emotion_feedbacks) — DB 연결 후 활성화
+2. sessionId 없으면 chat_sessions 신규 생성
+3. 유저 메시지 chat_messages 저장
+4. GPT-4o-mini 호출
+5. AI 답변 chat_messages 저장
+6. reply + sessionId 반환
+
+---
+
+### POST /api/chat/extract
+
+**역할**: 대화 종료 시 전체 대화에서 감정 데이터 추출 → emotion_entries 저장
+
+**요청 바디**:
+```json
+{
+  "messages": [{ "role": "user|assistant", "content": "..." }],
+  "sessionId": "uuid"
+}
+```
+
+**응답**:
+```json
+{
+  "emotion": "불안",
+  "intensity": 4,
+  "trigger": "상황 설명",
+  "summary": "AI 코치 한두 문장 정리"
+}
+```
+
+**처리 순서**:
+1. 로그인 유저 확인
+2. GPT-4o-mini 호출 (JSON 추출, temperature 0.3)
+3. emotion_entries 저장
+4. chat_sessions.ended_at 업데이트
 
 ---
 
@@ -142,11 +170,13 @@ auth.users (Supabase 관리)
     ↓ id 연동 (로그인 시 자동)
 public.users
     ↓
-user_passes (이용권)
+subscriptions (구독 관리)
+monthly_usage (무료 플랜 월별 사용량)
+chat_sessions (대화 세션)
     ↓
-emotion_entries (감정 기록)
-    ↓
-emotion_feedbacks (GPT 피드백)
+chat_messages (메시지 원문)
+emotion_entries (감정 추출 데이터 — 대시보드 원천)
+standard_emotions (표준 감정 분류 — 향후 활성화 예정)
 ```
 
 ### 주요 테이블 설명
@@ -154,10 +184,31 @@ emotion_feedbacks (GPT 피드백)
 | 테이블 | 역할 |
 |--------|------|
 | `public.users` | 서비스 사용자 정보 |
-| `user_passes` | 이용권 관리 (사용 횟수, 만료일) |
-| `emotion_entries` | 감정/상황 입력 기록 |
-| `emotion_feedbacks` | GPT 생성 피드백 |
+| `subscriptions` | 구독 관리 (free/pro, active/cancelled/expired) |
+| `monthly_usage` | 무료 플랜 월별 사용량 추적 (월 5회 제한) |
+| `chat_sessions` | 대화 세션 단위 (사이드바 목록) |
+| `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
+| `emotion_entries` | 대화 종료 시 GPT 추출 감정 데이터 (대시보드 분석 원천) |
 | `standard_emotions` | 표준 감정 분류 (향후 매칭 로직 활성화 예정) |
+
+### 스키마 파일
+
+```
+supabase/
+  schema.sql   — 현재 최신 전체 스키마
+```
+
+---
+
+## 수익 모델
+
+| 플랜 | 내용 |
+|------|------|
+| 무료 | 채팅 + 기본 피드백 월 5회 |
+| Pro | 대시보드 패턴 분석 + 무제한 기록 + 감정 리포트 |
+
+- 월 4,900원 내외 구독료 검토 중
+- 구독 전환 트리거: 대시보드에서 패턴이 보이기 시작하는 순간
 
 ---
 
@@ -175,13 +226,12 @@ emotion_feedbacks (GPT 피드백)
 
 ## 레거시 코드 (제거 예정)
 
-Google 로그인 전환 완료 후 삭제할 것들:
-
 ```
 src/lib/session.ts           ← 이용권 코드 JWT 세션
 src/app/revisit/             ← 재방문 코드 입력 페이지
 src/app/api/revisit/         ← 재방문 코드 관련 API
 src/app/api/session/         ← 세션 발급 API
+src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 ```
 
 ---
@@ -190,26 +240,25 @@ src/app/api/session/         ← 세션 발급 API
 
 | 환경 | 도메인 | 브랜치 | DB |
 |------|--------|--------|-----|
-| 로컬 | localhost:3000 | - | 운영 Supabase |
-| 개발 | dev.lynqrateflow.com | hotfix/prod-flow-dev-env | 운영 Supabase |
+| 로컬 | localhost:3000 | - | 개발 Supabase |
 | 운영 | app.lynqrateflow.com | main | 운영 Supabase |
-
-> 현재 DB는 하나로 통합 운영 중. 사용자 증가 시 분리 예정.
 
 ---
 
 ## 다음 작업 예정
 
-- [x] /form 페이지 구현 (감정 입력 폼 + 피드백 말풍선)
-- [x] GPT 분석 API Route (Make.com → Next.js 전환)
-- [x] 다크/라이트 테마 (쿠키 기반 SSR)
-- [x] 설정 뷰 (/form 내부 뷰 전환)
-- [ ] DB 연결 (emotion_entries, emotion_feedbacks 저장)
-- [ ] 사이드바 과거 기록 실제 데이터 연동
+- [x] 채팅형 UI 전환 (FormClient.tsx 재설계)
+- [x] 채팅 API Route (/api/chat)
+- [x] 대화 종료 감정 추출 API Route (/api/chat/extract)
+- [x] DB 스키마 재설계 (구독 모델 + 채팅형 반영)
+- [x] DB 연결 (chat_sessions, chat_messages, emotion_entries 저장)
+- [x] Google OAuth 재연동 (새 Supabase 프로젝트)
+- [ ] 사이드바 과거 대화 목록 실제 데이터 연동
 - [ ] 사용자 이름/이메일 Supabase에서 가져오기
 - [ ] 로그아웃 기능 구현
-- [ ] /dashboard 뷰 구현 (누적 통계 시각화)
-- [ ] 이용권 로직 연동 (user_passes)
+- [ ] 대시보드 뷰 구현 (누적 통계 시각화)
+- [ ] 월별 사용량 체크 로직 (monthly_usage)
+- [ ] 구독 모델 연동
 - [ ] standard_emotions 매칭 로직 활성화
 - [ ] 카카오 로그인 추가
 - [ ] 결제 연동 (Toss Payments)

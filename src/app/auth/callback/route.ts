@@ -11,31 +11,39 @@ export async function GET(request: NextRequest) {
     const { data } = await supabase.auth.exchangeCodeForSession(code)
 
     if (data.user) {
-        // 이미 있으면 updated_at만 업데이트, 없으면 새로 생성
-        const { data: existingUser } = await supabaseAdmin
-            .from('users')
-            .select('id')
-            .eq('id', data.user.id)
-            .single()
+      const { data: existingUser } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('id', data.user.id)
+        .single()
 
-        if (existingUser) {
-            // 이미 있으면 updated_at만 업데이트
-            await supabaseAdmin
-                .from('users')
-                .update({ updated_at: new Date().toISOString() })
-                .eq('id', data.user.id)
-        } else {
-            // 없으면 새로 생성
-            await supabaseAdmin
-                .from('users')
-                .insert({
-                    id: data.user.id,
-                    email: data.user.email,
-                    is_guest: false,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-        }
+      if (existingUser) {
+        // 기존 유저 — updated_at 갱신
+        await supabaseAdmin
+          .from('users')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', data.user.id)
+      } else {
+        // 신규 유저 — users 생성 + subscriptions free 플랜 생성
+        await supabaseAdmin
+          .from('users')
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            display_name: data.user.user_metadata?.full_name ?? null,
+            avatar_url: data.user.user_metadata?.avatar_url ?? null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+        await supabaseAdmin
+          .from('subscriptions')
+          .insert({
+            user_id: data.user.id,
+            plan: 'free',
+            status: 'active',
+          })
+      }
     }
   }
 
