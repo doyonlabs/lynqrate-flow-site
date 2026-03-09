@@ -95,8 +95,10 @@ export async function middleware(req: NextRequest) {
 
     const { data: { user }, error } = await supabase.auth.getUser();
 
-/* console.log('user:', user);
-console.log('error:', error); */
+console.log('pathname:', req.nextUrl.pathname)
+console.log('cookies:', req.cookies.getAll().map(c => c.name))
+console.log('user:', user?.id ?? null)
+console.log('error:', error?.message ?? null)
 
     if (!user) {
       const loginUrl = req.nextUrl.clone();
