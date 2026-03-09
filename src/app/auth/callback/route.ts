@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabaseServer'
+import { createServerClient } from '@supabase/ssr'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -6,8 +6,26 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
 
+  const response = NextResponse.redirect(`${origin}/form`)
+
   if (code) {
-    const supabase = await createServerSupabaseClient()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            )
+          },
+        },
+      }
+    )
+
     const { data } = await supabase.auth.exchangeCodeForSession(code)
 
     if (data.user) {
@@ -18,13 +36,11 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (existingUser) {
-        // 기존 유저 — updated_at 갱신
         await supabaseAdmin
           .from('users')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', data.user.id)
       } else {
-        // 신규 유저 — users 생성 + subscriptions free 플랜 생성
         await supabaseAdmin
           .from('users')
           .insert({
@@ -47,5 +63,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/form`)
+  return response
 }
