@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-07
+> 마지막 업데이트: 2026-03-09
 
 ---
 
@@ -20,13 +20,15 @@
 ## 전체 서비스 흐름
 
 ```
+[랜딩 페이지 /]
+        ↓ 무료로 시작하기 클릭
 [로그인 페이지 /login]
         ↓ Google 소셜 로그인
 [Google OAuth → Supabase Auth]
         ↓ 인증 완료
 [/auth/callback] → public.users + subscriptions 자동 생성
         ↓
-[채팅 /form] ← 로그인 필수
+[채팅 /form] ← 로그인 필수 (기본 뷰: dashboard)
         ↓ 메시지 전송마다
 [POST /api/chat] → GPT-4o-mini 호출 → chat_messages 저장
         ↓ 대화 종료 버튼
@@ -41,10 +43,12 @@
 
 | 경로 | 역할 | 로그인 필요 |
 |------|------|------------|
+| `/` | 랜딩페이지 (서비스 소개 + 기술 스택) | ❌ |
 | `/login` | Google 소셜 로그인 | ❌ |
-| `/form` | 채팅 + 설정/대시보드 뷰 | ✅ |
+| `/form` | 채팅 + 대시보드 뷰 | ✅ |
 
 > `/result`, `/feedback`, `/dashboard` 별도 페이지 없음 — `/form` 내부 view 상태로 전환
+> 로그인 상태에서 `/` 접근 시 `/form`으로 자동 리다이렉트
 
 ---
 
@@ -55,7 +59,7 @@ Google 로그인 클릭
 → supabase.auth.signInWithOAuth({ provider: 'google' })
 → Google 인증 완료
 → /auth/callback?code=... 리다이렉트
-→ exchangeCodeForSession(code) → Supabase 세션 생성
+→ exchangeCodeForSession(code) → Supabase 세션 생성 (response에 쿠키 직접 set)
 → public.users upsert (없으면 생성 + subscriptions free 플랜 생성, 있으면 updated_at 업데이트)
 → /form으로 이동
 ```
@@ -64,6 +68,7 @@ Google 로그인 클릭
 
 | 파일 | 역할 |
 |------|------|
+| `src/app/page.tsx` | 랜딩페이지 (서비스 소개 + 기술 스택, 테마 연동) |
 | `src/lib/supabaseBrowser.ts` | 브라우저용 Supabase 클라이언트 (anon key) |
 | `src/lib/supabaseServer.ts` | 서버용 Supabase 클라이언트 (쿠키 기반 세션) |
 | `src/lib/supabaseAdmin.ts` | 관리자용 Supabase 클라이언트 (service role key) |
@@ -71,10 +76,10 @@ Google 로그인 클릭
 | `src/context/ThemeContext.tsx` | 다크/라이트 테마 전역 상태 관리 |
 | `src/app/auth/callback/route.ts` | OAuth 콜백 처리 + public.users + subscriptions 생성 |
 | `src/app/login/page.tsx` | 로그인 페이지 UI |
-| `src/components/FormClient.tsx` | 채팅 UI + 설정/대시보드 뷰 |
+| `src/components/FormClient.tsx` | 채팅 UI + 대시보드 뷰 (기본값: dashboard) |
 | `src/app/api/chat/route.ts` | 채팅 API Route (GPT 대화 + chat_messages 저장) |
 | `src/app/api/chat/extract/route.ts` | 대화 종료 시 감정 추출 + emotion_entries 저장 |
-| `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login 접근 시 /form 리다이렉트 |
+| `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login, / 접근 시 /form 리다이렉트 |
 
 ---
 
@@ -83,6 +88,7 @@ Google 로그인 클릭
 ```
 /form → 비로그인 시 /login으로 리다이렉트
 /login → 로그인 상태 시 /form으로 리다이렉트
+/ → 로그인 상태 시 /form으로 리다이렉트
 www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 ```
 
@@ -95,6 +101,7 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 테마 토글 → setThemeCookie() → 쿠키 저장
 페이지 로드 → layout.tsx에서 쿠키 읽기 → SSR 단계에서 테마 결정
 → 깜빡임(flash) 없음
+로그아웃 시 → 테마 쿠키 유지 (로그인 후 마지막 설정 유지)
 ```
 
 ---
@@ -123,11 +130,12 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 
 **처리 순서**:
 1. 로그인 유저 확인
-2. sessionId 없으면 chat_sessions 신규 생성
-3. 유저 메시지 chat_messages 저장
-4. GPT-4o-mini 호출
-5. AI 답변 chat_messages 저장
-6. reply + sessionId 반환
+2. 무료 플랜 월별 사용량 체크 (신규 세션 시 chat_sessions 카운트, 5회 초과 시 429 반환)
+3. sessionId 없으면 chat_sessions 신규 생성 (title: 첫 메시지 30자)
+4. 유저 메시지 chat_messages 저장
+5. GPT-4o-mini 호출 (최근 10개 메시지만 전달)
+6. AI 답변 chat_messages 저장
+7. reply + sessionId 반환
 
 ---
 
@@ -156,7 +164,7 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 **처리 순서**:
 1. 로그인 유저 확인
 2. GPT-4o-mini 호출 (JSON 추출, temperature 0.3)
-3. emotion_entries 저장
+3. emotion_entries 저장 (감정은 standard_emotions 10개 중 하나로 고정)
 4. chat_sessions.ended_at 업데이트
 
 ---
@@ -171,12 +179,12 @@ auth.users (Supabase 관리)
 public.users
     ↓
 subscriptions (구독 관리)
-monthly_usage (무료 플랜 월별 사용량)
+monthly_usage (현재 미사용 — chat_sessions 카운트로 대체)
 chat_sessions (대화 세션)
     ↓
 chat_messages (메시지 원문)
 emotion_entries (감정 추출 데이터 — 대시보드 원천)
-standard_emotions (표준 감정 분류 — 향후 활성화 예정)
+standard_emotions (표준 감정 분류 10개)
 ```
 
 ### 주요 테이블 설명
@@ -185,11 +193,11 @@ standard_emotions (표준 감정 분류 — 향후 활성화 예정)
 |--------|------|
 | `public.users` | 서비스 사용자 정보 |
 | `subscriptions` | 구독 관리 (free/pro, active/cancelled/expired) |
-| `monthly_usage` | 무료 플랜 월별 사용량 추적 (월 5회 제한) |
+| `monthly_usage` | 현재 미사용 — 무료 플랜 사용량은 chat_sessions 카운트로 체크 |
 | `chat_sessions` | 대화 세션 단위 (사이드바 목록) |
 | `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
 | `emotion_entries` | 대화 종료 시 GPT 추출 감정 데이터 (대시보드 분석 원천) |
-| `standard_emotions` | 표준 감정 분류 (향후 매칭 로직 활성화 예정) |
+| `standard_emotions` | 표준 감정 10개: 불안/무기력/분노/슬픔/외로움/두려움/설렘/기쁨/감사/평온 |
 
 ### 스키마 파일
 
@@ -208,6 +216,7 @@ supabase/
 | Pro | 대시보드 패턴 분석 + 무제한 기록 + 감정 리포트 |
 
 - 월 4,900원 내외 구독료 검토 중
+- 목표 수익: 월 100만원 (구독자 약 205명)
 - 구독 전환 트리거: 대시보드에서 패턴이 보이기 시작하는 순간
 
 ---
@@ -241,7 +250,8 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 | 환경 | 도메인 | 브랜치 | DB |
 |------|--------|--------|-----|
 | 로컬 | localhost:3000 | - | 개발 Supabase |
-| 운영 | app.lynqrateflow.com | main | 운영 Supabase |
+| 개발 | dev.lynqrateflow.com | hotfix/prod-flow-dev-env | 개발 Supabase |
+| 운영 | app.lynqrateflow.com | main | 운영 Supabase (배포 시 생성 예정) |
 
 ---
 
@@ -253,13 +263,19 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] DB 스키마 재설계 (구독 모델 + 채팅형 반영)
 - [x] DB 연결 (chat_sessions, chat_messages, emotion_entries 저장)
 - [x] Google OAuth 재연동 (새 Supabase 프로젝트)
-- [ ] 사이드바 과거 대화 목록 실제 데이터 연동
-- [ ] 사용자 이름/이메일 Supabase에서 가져오기
-- [ ] 로그아웃 기능 구현
-- [ ] 대시보드 뷰 구현 (누적 통계 시각화)
-- [ ] 월별 사용량 체크 로직 (monthly_usage)
-- [ ] 구독 모델 연동
-- [ ] standard_emotions 매칭 로직 활성화
+- [x] 사이드바 과거 대화 목록 실제 데이터 연동
+- [x] 사용자 이름/이메일 Supabase에서 가져오기
+- [x] 로그아웃 기능 구현
+- [x] 대시보드 뷰 구현 (감정 타임라인 + 빈도 차트 + 이번주 vs 지난주 비교)
+- [x] 월별 사용량 체크 로직 (chat_sessions 카운트 방식)
+- [x] 랜딩페이지 (서비스 소개 + 기술 스택 + 테마 연동)
+- [x] 시스템 프롬프트 개선 (감정 외 주제 차단, 두세 문장 이내)
+- [x] auth callback 세션 쿠키 처리 수정
+- [x] sessionId 저장 누락 버그 수정
+- [x] 개발 서버 배포 (dev.lynqrateflow.com)
+- [ ] 운영 Supabase 생성 + schema.sql 실행
+- [ ] 운영 배포 (app.lynqrateflow.com)
+- [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
-- [ ] 결제 연동 (Toss Payments)
 - [ ] 레거시 코드 제거
+- [ ] standard_emotions 매칭 로직 활성화
