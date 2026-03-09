@@ -268,6 +268,12 @@ export default function FormClient() {
       }
 
       setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
+
+      if (data.sessionId && !sessionId) {
+        setSessionId(data.sessionId)
+        setActiveSessionId(data.sessionId)
+        await fetchSessions()
+      }
     } catch {
       setIsLoading(false)
       setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 다시 시도해주세요.' }])
