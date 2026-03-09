@@ -2,24 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabaseServer'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-const SYSTEM_PROMPT = `당신은 Mind Echo의 AI 감정 코치입니다.
-
-역할:
-- 사용자가 감정을 자연스럽게 털어놓을 수 있도록 돕습니다.
-- 판단하지 않고 있는 그대로 공감합니다.
-- 공감에서 멈추지 않고 패턴을 짚어주고, 불편한 것도 따뜻하게 건드립니다.
-- 오늘 당장 할 수 있는 작은 행동을 제안합니다.
-
-말투 원칙:
-- 자연스러운 한국말로 대화합니다. 번역체, 어색한 존댓말 금지.
-- 명령형 금지. 이모지 금지. 해시태그 금지.
-- 짧고 진심 어린 반응이 길고 공허한 말보다 낫습니다.
-- 질문은 한 번에 하나만. 질문 폭탄 금지.
-
-대화 흐름:
-- 사용자가 감정이나 상황을 말하면 먼저 충분히 들어줍니다.
-- 감정과 무관한 대화가 나오면 자연스럽게 감정 주제로 돌아옵니다.
-- 분석이나 조언은 충분히 들은 뒤에 합니다.`
+const SYSTEM_PROMPT = `당신은 Mind Echo입니다. 한국 사람들이 감정을 털어놓는 공간입니다.
+말하는 사람의 말을 먼저 충분히 듣고, 그 사람의 언어로 공감하세요.`
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
@@ -28,22 +12,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // TODO: 월별 사용량 체크 (monthly_usage) — 구독 모델 연결 후 활성화
-
   const { messages, sessionId } = await req.json()
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 })
   }
 
-  // 세션 없으면 새로 생성
-  let currentSessionId = sessionId
-  if (!currentSessionId) {
+  // 월별 사용량 체크 (무료 플랜 — 신규 세션 월 5회 제한)
+    const yearMonth = new Date().toISOString().slice(0, 7)
+
+    const { data: sub } = await supabaseAdmin
+    .from('subscriptions')
+    .select('plan')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .single()
+
+    if (!sub || sub.plan === 'free') {
+    if (!sessionId) {
+        // 신규 세션일 때만 체크
+        const { count } = await supabaseAdmin
+        .from('chat_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', `${yearMonth}-01`)
+
+        if ((count ?? 0) >= 5) {
+        return NextResponse.json({ error: 'limit_exceeded' }, { status: 429 })
+        }
+    }
+    }
+
+    // 세션 없으면 새로 생성
+    let currentSessionId = sessionId
+    if (!currentSessionId) {
+    const firstUserMessage = messages.find((m: { role: string }) => m.role === 'user')
+    const title = firstUserMessage?.content?.slice(0, 30) ?? null
+
     const { data: session, error } = await supabaseAdmin
-      .from('chat_sessions')
-      .insert({ user_id: user.id })
-      .select('id')
-      .single()
+        .from('chat_sessions')
+        .insert({ user_id: user.id, title })
+        .select('id')
+        .single()
 
     if (error || !session) {
       console.error('[/api/chat] session create error:', error)
@@ -76,7 +86,7 @@ export async function POST(req: NextRequest) {
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          ...messages,
+          ...messages.slice(-10),
         ],
         max_tokens: 500,
         temperature: 0.85,

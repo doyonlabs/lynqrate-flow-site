@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 import { useTheme } from '@/context/ThemeContext'
+import { ScatterChart, Scatter, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ZAxis } from 'recharts'
 
 // ─── 타입 ───────────────────────────────────────────────────────────────────
 
@@ -19,16 +21,34 @@ interface ExtractedData {
   summary: string
 }
 
+interface ChatSession {
+  id: string
+  title: string | null
+  started_at: string
+  ended_at: string | null
+}
+
+interface UserInfo {
+  display_name: string | null
+  email: string | null
+}
+
+interface EmotionEntry {
+  id: string
+  raw_emotion: string
+  intensity: number
+  created_at: string
+  summary: string | null
+}
+
 type View = 'chat' | 'settings' | 'dashboard'
 
-// ─── 목업 히스토리 (DB 연결 전 임시) ────────────────────────────────────────
+// ─── Supabase ────────────────────────────────────────────────────────────────
 
-const HISTORY = [
-  { date: '3월 5일', emotion: '불안', intensity: 4 },
-  { date: '3월 4일', emotion: '무기력', intensity: 3 },
-  { date: '3월 2일', emotion: '설렘', intensity: 4 },
-  { date: '2월 28일', emotion: '외로움', intensity: 2 },
-]
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // ─── 아이콘 ──────────────────────────────────────────────────────────────────
 
@@ -91,16 +111,13 @@ export default function FormClient() {
   const { isDark, toggleTheme } = useTheme()
   const t = isDark ? dark : light
 
-  const [view, setView] = useState<View>('chat')
+  const [view, setView] = useState<View>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // 채팅 상태
   const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'ai',
-      content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.',
-    },
+    { role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.' },
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -108,6 +125,18 @@ export default function FormClient() {
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [isExtracting, setIsExtracting] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
+
+  // 사이드바 데이터
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [userInfo, setUserInfo] = useState<UserInfo>({ display_name: null, email: null })
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+
+  const [dashboardData, setDashboardData] = useState<EmotionEntry[]>([])
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+
+  const [emotionColors, setEmotionColors] = useState<Record<string, string>>({})
+
+  const [hoveredPoint, setHoveredPoint] = useState<any>(null)
 
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -139,6 +168,72 @@ export default function FormClient() {
     }
   }, [input])
 
+  // 포커스 복구
+  useEffect(() => {
+    if (!isLoading) {
+      textareaRef.current?.focus()
+    }
+  }, [isLoading])
+
+  // 유저 정보 + 세션 목록 초기 로드
+  useEffect(() => {
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('display_name, email')
+        .eq('id', user.id)
+        .single()
+
+      if (userData) setUserInfo(userData)
+
+      await fetchSessions()
+    }
+    load()
+  }, [])
+
+  useEffect(() => {
+    if (view === 'dashboard') fetchDashboardData()
+  }, [view])
+
+  // ─── 세션 목록 조회 ─────────────────────────────────────────────────────────
+
+  const fetchSessions = async () => {
+    const { data } = await supabase
+      .from('chat_sessions')
+      .select('id, title, started_at, ended_at')
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    if (data) setSessions(data)
+  }
+
+  const fetchDashboardData = async () => {
+    setDashboardLoading(true)
+
+    const [{ data: entries }, { data: emotions }] = await Promise.all([
+      supabase
+        .from('emotion_entries')
+        .select('id, raw_emotion, intensity, created_at, summary')
+        .order('created_at', { ascending: true })
+        .limit(50),
+      supabase
+        .from('standard_emotions')
+        .select('name, color_code'),
+    ])
+
+    if (entries) setDashboardData(entries)
+    if (emotions) {
+      const map: Record<string, string> = {}
+      emotions.forEach(e => { map[e.name] = e.color_code })
+      setEmotionColors(map)
+    }
+
+    setDashboardLoading(false)
+  }
+
   // ─── 메시지 전송 ────────────────────────────────────────────────────────────
 
   const handleSend = async () => {
@@ -160,17 +255,23 @@ export default function FormClient() {
             role: m.role === 'ai' ? 'assistant' : 'user',
             content: m.content,
           })),
-          sessionId,  // ← 추가
+          sessionId,
         }),
       })
       const data = await res.json()
-        setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
-      if (data.sessionId) setSessionId(data.sessionId)  // ← 추가
-    } catch {
-      setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 다시 시도해주세요.' }])
-    } finally {
       setIsLoading(false)
-    }
+
+      if (res.status === 429) {
+        setMessages(prev => [...prev, { role: 'ai', content: '이번 달 무료 대화 횟수(5회)를 모두 사용했어요. 다음 달에 다시 만나요.' }])
+        setSessionEnded(true)
+        return
+      }
+
+      setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
+    } catch {
+      setIsLoading(false)
+      setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 다시 시도해주세요.' }])
+    } 
   }
 
   // ─── 대화 종료 ──────────────────────────────────────────────────────────────
@@ -190,12 +291,12 @@ export default function FormClient() {
             role: m.role === 'ai' ? 'assistant' : 'user',
             content: m.content,
           })),
-          sessionId,  // ← 추가
+          sessionId,
         }),
       })
       const data = await res.json()
       setExtractedData(data)
-      // TODO: DB 저장 (emotion_entries) — DB 연결 후 활성화
+      await fetchSessions() // 종료 후 목록 갱신 (ended_at 반영)
     } catch {
       setExtractedData({
         emotion: '알 수 없음',
@@ -208,7 +309,7 @@ export default function FormClient() {
     }
   }
 
-  // ─── 새 대화 ─────────────────────────────────────────────────────────────
+  // ─── 새 대화 ────────────────────────────────────────────────────────────────
 
   const handleNewChat = () => {
     setMessages([{ role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.' }])
@@ -218,6 +319,41 @@ export default function FormClient() {
     setIsExtracting(false)
     setView('chat')
     setSessionId(null)
+    setActiveSessionId(null)
+  }
+
+  // ─── 과거 세션 불러오기 ──────────────────────────────────────────────────────
+
+  const handleLoadSession = async (session: ChatSession) => {
+    if (activeSessionId === session.id) return
+
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('chat_session_id', session.id)
+      .order('created_at', { ascending: true })
+
+    if (!data || data.length === 0) return
+
+    const loaded: Message[] = data.map(m => ({
+      role: m.role === 'assistant' ? 'ai' : 'user',
+      content: m.content,
+    }))
+
+    setMessages(loaded)
+    setSessionId(session.id)
+    setActiveSessionId(session.id)
+    setSessionEnded(!!session.ended_at)
+    setExtractedData(null)
+    setIsExtracting(false)
+    setView('chat')
+  }
+
+  // ─── 로그아웃 ────────────────────────────────────────────────────────────────
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
   }
 
   // ─── 서브 컴포넌트 ────────────────────────────────────────────────────────
@@ -259,6 +395,9 @@ export default function FormClient() {
       <span style={{ fontSize: 13, color: active ? t.text : t.muted }}>{label}</span>
     </button>
   )
+
+  // 유저 이름 이니셜
+  const initial = (userInfo.display_name ?? '?')[0]
 
   // ─── 렌더 ─────────────────────────────────────────────────────────────────
 
@@ -315,16 +454,38 @@ export default function FormClient() {
             <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>
               최근 기록
             </p>
-            {/* TODO: DB 연결 후 실제 데이터로 교체 */}
-            {HISTORY.map((h, i) => (
-              <div key={i} style={{
-                padding: '9px 12px', borderRadius: 8,
-                cursor: 'pointer', marginBottom: 2,
-              }}>
-                <div style={{ fontSize: 13, color: t.text, fontWeight: 500 }}>{h.emotion}</div>
-                <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>{h.date} · 강도 {h.intensity}</div>
-              </div>
-            ))}
+            {sessions.length === 0 ? (
+              <p style={{ fontSize: 12, color: t.muted, padding: '8px 12px' }}>
+                아직 대화 기록이 없어요
+              </p>
+            ) : (
+              sessions.map((s) => {
+                const label = s.title ?? new Date(s.started_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+                const isActive = activeSessionId === s.id
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => handleLoadSession(s)}
+                    style={{
+                      padding: '9px 12px', borderRadius: 8,
+                      cursor: 'pointer', marginBottom: 2,
+                      background: isActive ? t.hover : 'transparent',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    <div style={{
+                      fontSize: 13, color: t.text, fontWeight: 500,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {label}
+                    </div>
+                    <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>
+                      {s.ended_at ? '완료' : '진행 중'}
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </div>
 
           {/* 하단 유저/설정 */}
@@ -348,7 +509,7 @@ export default function FormClient() {
                   <span>설정</span>
                 </button>
                 <div style={{ height: 1, background: t.border }} />
-                <button style={{
+                <button onClick={handleLogout} style={{
                   width: '100%', padding: '11px 14px',
                   display: 'flex', alignItems: 'center', gap: 10,
                   background: 'transparent', border: 'none',
@@ -371,11 +532,14 @@ export default function FormClient() {
                 background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 13, color: '#fff', flexShrink: 0, fontWeight: 600,
-              }}>도</div>
+              }}>{initial}</div>
               <div style={{ flex: 1, textAlign: 'left', overflow: 'hidden' }}>
-                {/* TODO: Supabase에서 유저 이름/이메일 가져오기 */}
-                <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>도영</div>
-                <div style={{ fontSize: 11, color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>user@gmail.com</div>
+                <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {userInfo.display_name ?? '사용자'}
+                </div>
+                <div style={{ fontSize: 11, color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {userInfo.email ?? ''}
+                </div>
               </div>
               <span style={{ color: t.muted, fontSize: 12 }}>···</span>
             </button>
@@ -415,7 +579,7 @@ export default function FormClient() {
             border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 13, color: '#fff', fontWeight: 600, fontFamily: 'inherit',
-          }}>도</button>
+          }}>{initial}</button>
         </div>
       )}
 
@@ -440,7 +604,6 @@ export default function FormClient() {
               : '감정 대화'}
           </span>
 
-          {/* 대화 종료 버튼 — 채팅 뷰 + 유저 메시지 있을 때만 */}
           {view === 'chat' && hasUserMessage && !sessionEnded && (
             <button onClick={handleEndSession} disabled={isLoading} style={{
               padding: '6px 14px', borderRadius: 8,
@@ -466,7 +629,6 @@ export default function FormClient() {
         {/* ── 채팅 뷰 ── */}
         {view === 'chat' && (
           <>
-            {/* 메시지 스크롤 영역 */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px 0', background: t.bg }}>
               <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 24px' }}>
 
@@ -501,7 +663,6 @@ export default function FormClient() {
                   </div>
                 ))}
 
-                {/* AI 타이핑 인디케이터 */}
                 {isLoading && (
                   <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                     <AIAvatar />
@@ -520,7 +681,6 @@ export default function FormClient() {
                   </div>
                 )}
 
-                {/* 감정 추출 중 */}
                 {isExtracting && (
                   <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                     <AIAvatar />
@@ -533,7 +693,6 @@ export default function FormClient() {
                   </div>
                 )}
 
-                {/* 추출 결과 카드 */}
                 {extractedData && !isExtracting && (
                   <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                     <AIAvatar />
@@ -544,31 +703,22 @@ export default function FormClient() {
                       <p style={{ fontSize: 13, color: t.muted, marginBottom: 12, letterSpacing: '0.04em' }}>
                         오늘의 감정 기록
                       </p>
-
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontSize: 20, fontWeight: 600, color: t.text }}>
-                          {extractedData.emotion}
-                        </span>
+                        <span style={{ fontSize: 20, fontWeight: 600, color: t.text }}>{extractedData.emotion}</span>
                         <span style={{ fontSize: 12, color: t.muted }}>강도</span>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: '#a78bfa' }}>
-                          {extractedData.intensity}
-                        </span>
+                        <span style={{ fontSize: 15, fontWeight: 600, color: '#a78bfa' }}>{extractedData.intensity}</span>
                       </div>
-
                       <IntensityBar value={extractedData.intensity} />
-
                       {extractedData.trigger && (
                         <p style={{ fontSize: 13, color: t.muted, marginTop: 12, lineHeight: 1.6 }}>
                           {extractedData.trigger}
                         </p>
                       )}
-
                       {extractedData.summary && (
                         <p style={{ fontSize: 14, color: t.text, marginTop: 10, lineHeight: 1.7 }}>
                           {extractedData.summary}
                         </p>
                       )}
-
                       <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button onClick={handleNewChat} style={{
                           padding: '8px 16px', borderRadius: 20,
@@ -597,7 +747,6 @@ export default function FormClient() {
               </div>
             </div>
 
-            {/* 입력창 */}
             {!sessionEnded && (
               <div style={{
                 padding: '12px 24px 16px',
@@ -611,10 +760,7 @@ export default function FormClient() {
                     background: t.input,
                     border: `1px solid ${t.border}`,
                     borderRadius: 14, padding: '10px 12px',
-                    transition: 'border-color 0.2s',
-                  }}
-                    onFocus={() => {}}
-                  >
+                  }}>
                     <textarea
                       ref={textareaRef}
                       value={input}
@@ -670,7 +816,7 @@ export default function FormClient() {
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>다크 모드</div>
+                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>화면 테마</div>
                     <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{isDark ? '다크 모드 사용 중' : '라이트 모드 사용 중'}</div>
                   </div>
                   <button onClick={toggleTheme} style={{
@@ -692,20 +838,18 @@ export default function FormClient() {
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    {/* TODO: Supabase에서 유저 정보 가져오기 */}
-                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>도영</div>
-                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>user@gmail.com</div>
+                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>{userInfo.display_name ?? '사용자'}</div>
+                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{userInfo.email ?? ''}</div>
                   </div>
                   <div style={{
                     width: 36, height: 36, borderRadius: '50%',
                     background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 14, color: '#fff', fontWeight: 600,
-                  }}>도</div>
+                  }}>{initial}</div>
                 </div>
                 <div style={{ height: 1, background: t.border }} />
-                {/* TODO: 로그아웃 기능 구현 */}
-                <button style={{
+                <button onClick={handleLogout} style={{
                   width: '100%', padding: '14px 16px',
                   display: 'flex', alignItems: 'center', gap: 10,
                   background: 'transparent', border: 'none',
@@ -719,15 +863,274 @@ export default function FormClient() {
           </div>
         )}
 
-        {/* ── 대시보드 뷰 (준비 중) ── */}
+        {/* ── 대시보드 뷰 ── */}
         {view === 'dashboard' && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.bg }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ marginBottom: 12 }}>{Icons.chart(t.muted)}</div>
-              <p style={{ fontSize: 14, color: t.muted }}>대시보드는 준비 중이에요</p>
+          <div style={{ flex: 1, overflowY: 'auto', background: t.bg }}>
+            <div style={{ padding: '28px 32px' }}>
+              {dashboardLoading ? (
+                <p style={{ color: t.muted, fontSize: 14 }}>불러오는 중...</p>
+              ) : dashboardData.length === 0 ? (
+                <div style={{
+                  height: '80vh', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 16,
+                }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #a78bfa22, #60a5fa22)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {Icons.chart(t.muted)}
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 16, color: t.text, fontWeight: 600, marginBottom: 8 }}>아직 감정 기록이 없어요</p>
+                    <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>대화를 마치면 감정이 여기 쌓여요.<br />데이터가 쌓일수록 패턴이 보이기 시작해요.</p>
+                  </div>
+                  <button onClick={() => { setView('chat'); handleNewChat() }} style={{
+                    marginTop: 8, padding: '12px 28px', borderRadius: 24,
+                    background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                    border: 'none', color: '#fff', fontSize: 14, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}>
+                    첫 대화 시작하기
+                  </button>
+                </div>
+              ) : (() => {
+                const total = dashboardData.length
+                const freq: Record<string, number> = {}
+                dashboardData.forEach(e => { freq[e.raw_emotion] = (freq[e.raw_emotion] ?? 0) + 1 })
+                const top3 = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 3)
+                const topEmotion = top3[0]
+                const avgIntensity = (dashboardData.reduce((s, e) => s + e.intensity, 0) / total).toFixed(1)
+                const barData = Object.entries(freq).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }))
+
+                // 이번주 vs 지난주
+                const now = new Date()
+                const startOfThisWeek = new Date(now); startOfThisWeek.setDate(now.getDate() - now.getDay())
+                const startOfLastWeek = new Date(startOfThisWeek); startOfLastWeek.setDate(startOfThisWeek.getDate() - 7)
+                const thisWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfThisWeek)
+                const lastWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfLastWeek && new Date(e.created_at) < startOfThisWeek)
+                const thisWeekAvg = thisWeekData.length ? (thisWeekData.reduce((s, e) => s + e.intensity, 0) / thisWeekData.length) : null
+                const lastWeekAvg = lastWeekData.length ? (lastWeekData.reduce((s, e) => s + e.intensity, 0) / lastWeekData.length) : null
+                const weekDiff = thisWeekAvg !== null && lastWeekAvg !== null ? (thisWeekAvg - lastWeekAvg) : null
+
+                // 타임라인 데이터 — Y축: 감정 종류, X축: 날짜 인덱스, 크기: 강도
+                const emotionList = [...new Set(dashboardData.map(e => e.raw_emotion))]
+                const timelineData = dashboardData.map((e, i) => ({
+                  x: i,
+                  y: emotionList.indexOf(e.raw_emotion),
+                  z: e.intensity * 15 + 30,
+                  emotion: e.raw_emotion,
+                  intensity: e.intensity,
+                  date: new Date(e.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
+                  color: emotionColors[e.raw_emotion] ?? '#a78bfa',
+                }))
+
+                // 인사이트 문장
+                const insightText = (() => {
+                  const highIntensity = dashboardData.filter(e => e.intensity >= 4).length
+                  if (weekDiff !== null && weekDiff > 0.5) return `이번 주 감정 강도가 지난 주보다 높아졌어요. ${topEmotion[0]}이 많이 느껴지고 있네요.`
+                  if (weekDiff !== null && weekDiff < -0.5) return `이번 주는 지난 주보다 조금 가라앉은 것 같아요. ${topEmotion[0]}이 주를 이루고 있어요.`
+                  if (highIntensity > total * 0.6) return `요즘 감정 강도가 높은 편이에요. ${topEmotion[0]}을(를) 가장 자주 느끼고 있어요.`
+                  return `${total}번의 기록 중 ${topEmotion[0]}을(를) 가장 많이 느꼈어요.`
+                })()
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+
+                    {/* ① 인사이트 + CTA */}
+                    <div style={{
+                      gridColumn: '1 / 4',
+                      background: 'linear-gradient(135deg, #7c3aed22, #3b82f622)',
+                      border: `1px solid #a78bfa33`,
+                      borderRadius: 20, padding: '24px 28px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                    }}>
+                      <div>
+                        <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>이번 달 요약</p>
+                        <p style={{ fontSize: 17, color: t.text, fontWeight: 600, lineHeight: 1.5 }}>{insightText}</p>
+                      </div>
+                      <button onClick={() => { setView('chat'); handleNewChat() }} style={{
+                        flexShrink: 0, padding: '11px 22px', borderRadius: 20,
+                        background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                        border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                      }}>
+                        오늘 털어놓기
+                      </button>
+                    </div>
+
+                    {/* ② 총 기록 */}
+                    <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                      <p style={{ fontSize: 11, color: t.muted, marginBottom: 12 }}>총 기록</p>
+                      <p style={{ fontSize: 36, fontWeight: 700, color: t.text, lineHeight: 1 }}>
+                        {total}<span style={{ fontSize: 14, color: t.muted, marginLeft: 4 }}>회</span>
+                      </p>
+                    </div>
+
+                    {/* ③ 평균 강도 */}
+                    <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                      <p style={{ fontSize: 11, color: t.muted, marginBottom: 12 }}>평균 강도</p>
+                      <p style={{ fontSize: 36, fontWeight: 700, color: '#a78bfa', lineHeight: 1 }}>
+                        {avgIntensity}<span style={{ fontSize: 14, color: t.muted, marginLeft: 4 }}>/5</span>
+                      </p>
+                    </div>
+
+                    {/* ④ 자주 느낀 감정 */}
+                    <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                      <p style={{ fontSize: 11, color: t.muted, marginBottom: 12 }}>자주 느낀 감정</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {top3.map(([emotion, count], i) => (
+                          <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{
+                              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                              background: emotionColors[emotion] ?? '#a78bfa',
+                              opacity: 1 - i * 0.25,
+                            }} />
+                            <span style={{ fontSize: 14, color: t.text, fontWeight: i === 0 ? 600 : 400 }}>{emotion}</span>
+                            <span style={{ fontSize: 12, color: t.muted, marginLeft: 'auto' }}>{count}회</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* ⑤ 이번주 vs 지난주 */}
+                    {weekDiff !== null && (
+                      <div style={{
+                        gridColumn: '1 / 4',
+                        background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
+                        display: 'flex', alignItems: 'center', gap: 40,
+                      }}>
+                        <div>
+                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>이번 주 평균 강도</p>
+                          <p style={{ fontSize: 28, fontWeight: 700, color: t.text }}>
+                            {thisWeekAvg!.toFixed(1)}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>/5</span>
+                          </p>
+                        </div>
+                        <div style={{ fontSize: 20, color: t.muted }}>vs</div>
+                        <div>
+                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>지난 주 평균 강도</p>
+                          <p style={{ fontSize: 28, fontWeight: 700, color: t.text }}>
+                            {lastWeekAvg!.toFixed(1)}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>/5</span>
+                          </p>
+                        </div>
+                        <div style={{
+                          marginLeft: 'auto', padding: '8px 16px', borderRadius: 20,
+                          background: weekDiff > 0 ? '#f8717122' : '#6ee7b722',
+                          color: weekDiff > 0 ? '#f87171' : '#6ee7b7',
+                          fontSize: 13, fontWeight: 600,
+                        }}>
+                          {weekDiff > 0 ? `▲ ${weekDiff.toFixed(1)} 상승` : `▼ ${Math.abs(weekDiff).toFixed(1)} 하락`}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ⑥ 감정 타임라인 */}
+                    <div style={{ gridColumn: '1 / 3', background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                      <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 4 }}>감정 타임라인</p>
+                      <p style={{ fontSize: 11, color: t.muted, marginBottom: 16 }}>점 크기 = 감정 강도</p>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <ScatterChart margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+                          <XAxis
+                            dataKey="x"
+                            type="number"
+                            domain={[-0.5, dashboardData.length - 0.5]}
+                            tick={false} axisLine={false} tickLine={false}
+                          />
+                          <YAxis
+                            dataKey="y"
+                            type="number"
+                            domain={[-0.5, emotionList.length - 0.5]}
+                            ticks={emotionList.map((_, i) => i)}
+                            tickFormatter={(v) => emotionList[v] ?? ''}
+                            tick={{ fontSize: 11, fill: t.muted }}
+                            axisLine={false} tickLine={false} width={36}
+                          />
+                          <ZAxis dataKey="z" range={[40, 160]} />
+                          {hoveredPoint && (
+                            <foreignObject x={hoveredPoint.cx + 10} y={hoveredPoint.cy - 20} width={140} height={50}>
+                              <div style={{
+                                background: t.popup, border: `1px solid ${t.border}`,
+                                borderRadius: 8, padding: '6px 10px', fontSize: 12, color: t.text,
+                                whiteSpace: 'nowrap',
+                              }}>
+                                <div style={{ fontWeight: 600 }}>{hoveredPoint.emotion} · 강도 {hoveredPoint.intensity}</div>
+                                <div style={{ color: t.muted }}>{hoveredPoint.date}</div>
+                              </div>
+                            </foreignObject>
+                          )}
+                          <Scatter
+                            data={timelineData}
+                            shape={(props: any) => {
+                              const { cx, cy, payload } = props
+                              return (
+                                <circle
+                                  cx={cx} cy={cy}
+                                  r={Math.sqrt(payload.z) * 1.0}
+                                  fill={payload.color} fillOpacity={0.8}
+                                  style={{ cursor: 'pointer' }}
+                                  onMouseEnter={() => setHoveredPoint({ ...payload, cx, cy })}
+                                  onMouseLeave={() => setHoveredPoint(null)}
+                                />
+                              )
+                            }}
+                          />
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* ⑦ 감정 빈도 */}
+                    <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                      <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정 빈도</p>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={barData} barSize={20} layout="vertical">
+                          <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: t.muted }} axisLine={false} tickLine={false} width={36} />
+                          <Tooltip
+                            contentStyle={{ background: t.popup, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12 }}
+                            formatter={(value) => [`${value}회`]}
+                          />
+                          <Bar
+                            dataKey="count"
+                            shape={(props: any) => {
+                              const { x, y, width, height, payload } = props
+                              return <rect x={x} y={y} width={width} height={height} fill={emotionColors[payload.name] ?? '#a78bfa'} rx={4} ry={4} />
+                            }}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* ⑧ 최근 기록 */}
+                    <div style={{ gridColumn: '1 / 4', background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, overflow: 'hidden' }}>
+                      <p style={{ fontSize: 13, color: t.text, fontWeight: 500, padding: '20px 24px 12px' }}>최근 기록</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                        {[...dashboardData].reverse().slice(0, 6).map((e, i) => (
+                          <div key={e.id} style={{
+                            padding: '14px 24px',
+                            borderTop: `1px solid ${t.border}`,
+                            borderRight: i % 2 === 0 ? `1px solid ${t.border}` : 'none',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <div style={{ width: 8, height: 8, borderRadius: '50%', background: emotionColors[e.raw_emotion] ?? '#a78bfa', flexShrink: 0 }} />
+                              <span style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{e.raw_emotion}</span>
+                              <span style={{ fontSize: 11, color: '#a78bfa' }}>강도 {e.intensity}</span>
+                              <span style={{ fontSize: 11, color: t.muted, marginLeft: 'auto' }}>
+                                {new Date(e.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+                              </span>
+                            </div>
+                            {e.summary && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.6, marginLeft: 16 }}>{e.summary}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+                )
+              })()}
             </div>
           </div>
         )}
+
       </div>
 
       <style>{`
