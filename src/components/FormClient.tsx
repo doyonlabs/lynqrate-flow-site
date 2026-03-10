@@ -457,7 +457,7 @@ export default function FormClient() {
           </div>
 
           {/* 최근 기록 */}
-          <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
             <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>최근 기록</p>
             {sessions.length === 0 ? (
               <p style={{ fontSize: 12, color: t.muted, padding: '8px 12px' }}>아직 대화 기록이 없어요</p>

@@ -45,6 +45,7 @@
 
 body {
   overscroll-behavior: none;
+  background: var(--background);
 }
 
 :root {
