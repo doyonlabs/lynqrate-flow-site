@@ -618,7 +618,7 @@ export default function FormClient() {
         {/* ── 채팅 뷰 ── */}
         {view === 'chat' && (
           <>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 0', background: t.bg }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 0', background: t.bg, minHeight: 0 }}>
               {/* [FIX] 모바일 패딩 줄임 */}
               <div style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
 
@@ -716,7 +716,7 @@ export default function FormClient() {
 
             {!sessionEnded && (
               <div style={{
-                padding: isMobile ? '10px 12px 12px' : '12px 24px 16px',
+                padding: isMobile ? '10px 12px env(safe-area-inset-bottom, 12px)' : '12px 24px 16px',
                 background: t.bg, borderTop: `1px solid ${t.border}`, flexShrink: 0,
               }}>
                 <div style={{ maxWidth: 680, margin: '0 auto' }}>
