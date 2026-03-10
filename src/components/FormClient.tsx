@@ -391,6 +391,7 @@ export default function FormClient() {
       display: 'flex',
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
+      overscrollBehavior: 'none',
       background: t.bg, color: t.text,
       fontFamily: "'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       transition: 'background 0.3s, color 0.3s',
@@ -621,7 +622,7 @@ export default function FormClient() {
         {/* ── 채팅 뷰 ── */}
         {view === 'chat' && (
           <>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 0', background: t.bg, minHeight: 0 }}>
+            <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', padding: '24px 0', background: t.bg, minHeight: 0 }}>
               {/* [FIX] 모바일 패딩 줄임 */}
               <div style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
 
@@ -774,7 +775,7 @@ export default function FormClient() {
 
         {/* ── 설정 뷰 ── */}
         {view === 'settings' && (
-          <div style={{ flex: 1, overflowY: 'auto', background: t.bg }}>
+          <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg }}>
             <div style={{ maxWidth: 560, margin: '0 auto', padding: isMobile ? '24px 16px' : '32px 24px' }}>
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>화면</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
@@ -828,7 +829,7 @@ export default function FormClient() {
 
         {/* ── 대시보드 뷰 ── */}
         {view === 'dashboard' && (
-          <div style={{ flex: 1, overflowY: 'auto', background: t.bg }}>
+          <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg }}>
             {/* [FIX] 모바일 패딩 줄임 */}
             <div style={{ padding: isMobile ? '16px 12px 60px' : '28px 32px 40px', minHeight: '100%', background: t.bg }}>
               {dashboardLoading ? (
