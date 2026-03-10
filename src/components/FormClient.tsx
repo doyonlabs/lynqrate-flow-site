@@ -873,7 +873,7 @@ export default function FormClient() {
                 const emotionList = [...new Set(dashboardData.map(e => e.raw_emotion))]
                 const timelineData = dashboardData.map((e, i) => ({
                   x: i, y: emotionList.indexOf(e.raw_emotion),
-                  z: e.intensity * 15 + 30,
+                  z: Math.pow(e.intensity, 2) * 8 + 20,
                   emotion: e.raw_emotion, intensity: e.intensity,
                   date: new Date(e.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
                   color: emotionColors[e.raw_emotion] ?? '#a78bfa',
@@ -1036,6 +1036,19 @@ export default function FormClient() {
                           />
                         </BarChart>
                       </ResponsiveContainer>
+                    </div>
+
+                    {/* ⑦-1 감정 컬러 범례 */}
+                    <div style={{ gridColumn: fullSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '20px 28px' }}>
+                      <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정 색상 범례</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                        {Object.entries(emotionColors).map(([name, color]) => (
+                          <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                            <span style={{ fontSize: 13, color: t.text }}>{name}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     {/* ⑧ 최근 기록 */}

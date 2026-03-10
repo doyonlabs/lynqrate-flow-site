@@ -34,6 +34,7 @@ export function ThemeProvider({
     // 배경 즉시 반영
     document.documentElement.style.background = next === 'dark' ? '#0a0a0a' : '#ffffff'
     document.body.style.background = next === 'dark' ? '#0a0a0a' : '#ffffff'
+    document.documentElement.classList.toggle('dark', next === 'dark')
   }
 
   return (
