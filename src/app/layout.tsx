@@ -8,6 +8,13 @@ export const metadata: Metadata = {
   description: '나의 감정을 기록하고 AI 피드백을 받아보세요',
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+
 export default async function RootLayout({
   children,
 }: {

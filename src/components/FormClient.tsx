@@ -144,6 +144,7 @@ export default function FormClient() {
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const scrollInstant = useRef(false)
 
   const hasUserMessage = messages.some(m => m.role === 'user')
 
@@ -169,12 +170,10 @@ export default function FormClient() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  //기존 대화 세션 들어갔을 때 대화 제일 하단 보여주기(스크롤x)
-  const scrollInstant = useRef(false)
-
+  // 자동 스크롤
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
-      behavior: scrollInstant.current ? 'instant' : 'smooth'
+      behavior: scrollInstant.current ? 'instant' as ScrollBehavior : 'smooth'
     })
     scrollInstant.current = false
   }, [messages, isLoading, isExtracting, extractedData])
@@ -578,10 +577,10 @@ export default function FormClient() {
 
       {/* ── 메인 영역 ── */}
       {/* [FIX] minWidth: 0 → flex child가 제대로 줄어들게 */}
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0,
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0,
         transform: isMobile && sidebarOpen ? 'translateX(260px)' : 'translateX(0)',
         transition: 'transform 0.25s ease',
+        pointerEvents: isMobile && sidebarOpen ? 'none' : 'auto',
       }}>
 
         {/* 헤더 */}
@@ -613,6 +612,8 @@ export default function FormClient() {
               <span>대화 종료</span>
             </button>
           )}
+
+
         </div>
 
         {/* ── 채팅 뷰 ── */}
@@ -827,7 +828,7 @@ export default function FormClient() {
         {view === 'dashboard' && (
           <div style={{ flex: 1, overflowY: 'auto', background: t.bg }}>
             {/* [FIX] 모바일 패딩 줄임 */}
-            <div style={{ padding: isMobile ? '16px 12px' : '28px 32px' }}>
+            <div style={{ padding: isMobile ? '16px 12px 40px' : '28px 32px 40px' }}>
               {dashboardLoading ? (
                 <p style={{ color: t.muted, fontSize: 14 }}>불러오는 중...</p>
               ) : dashboardData.length === 0 ? (
