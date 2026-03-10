@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useTheme } from '@/context/ThemeContext'
 import { ScatterChart, Scatter, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ZAxis } from 'recharts'
@@ -111,8 +111,12 @@ export default function FormClient() {
   const { isDark, toggleTheme } = useTheme()
   const t = isDark ? dark : light
 
+  // [FIX] 모바일 감지 — SSR safe (false로 시작, mount 후 실제값)
+  const [isMobile, setIsMobile] = useState(false)
+
   const [view, setView] = useState<View>('dashboard')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // [FIX] 사이드바 초기값도 false로 시작, mount 후 뷰포트에 따라 세팅
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // 채팅 상태
@@ -131,11 +135,10 @@ export default function FormClient() {
   const [userInfo, setUserInfo] = useState<UserInfo>({ display_name: null, email: null })
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
 
+  // [FIX] dashboardLoading 초기값 true → 첫 렌더 empty state 플래시 방지
   const [dashboardData, setDashboardData] = useState<EmotionEntry[]>([])
-  const [dashboardLoading, setDashboardLoading] = useState(false)
-
+  const [dashboardLoading, setDashboardLoading] = useState(true)
   const [emotionColors, setEmotionColors] = useState<Record<string, string>>({})
-
   const [hoveredPoint, setHoveredPoint] = useState<any>(null)
 
   const settingsRef = useRef<HTMLDivElement>(null)
@@ -144,20 +147,36 @@ export default function FormClient() {
 
   const hasUserMessage = messages.some(m => m.role === 'user')
 
-  // 클릭 외부 감지 (설정 팝업)
+  // [FIX] mount 후 뷰포트 감지 → SSR hydration 불일치 없음
+  useEffect(() => {
+    const checkViewport = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      setSidebarOpen(!mobile) // 데스크탑: 열림 / 모바일: 닫힘
+    }
+    checkViewport()
+    window.addEventListener('resize', checkViewport)
+    return () => window.removeEventListener('resize', checkViewport)
+  }, [])
+
+  // 외부 클릭 감지
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node))
         setSettingsOpen(false)
-      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // 자동 스크롤
+  //기존 대화 세션 들어갔을 때 대화 제일 하단 보여주기(스크롤x)
+  const scrollInstant = useRef(false)
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    bottomRef.current?.scrollIntoView({
+      behavior: scrollInstant.current ? 'instant' : 'smooth'
+    })
+    scrollInstant.current = false
   }, [messages, isLoading, isExtracting, extractedData])
 
   // textarea 자동 높이
@@ -168,27 +187,19 @@ export default function FormClient() {
     }
   }, [input])
 
-  // 포커스 복구
+  // 포커스 복구 (데스크탑만)
   useEffect(() => {
-    if (!isLoading) {
-      textareaRef.current?.focus()
-    }
-  }, [isLoading])
+    if (!isLoading && !isMobile) textareaRef.current?.focus()
+  }, [isLoading, isMobile])
 
-  // 유저 정보 + 세션 목록 초기 로드
+  // 초기 로드
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-
       const { data: userData } = await supabase
-        .from('users')
-        .select('display_name, email')
-        .eq('id', user.id)
-        .single()
-
+        .from('users').select('display_name, email').eq('id', user.id).single()
       if (userData) setUserInfo(userData)
-
       await fetchSessions()
     }
     load()
@@ -198,77 +209,65 @@ export default function FormClient() {
     if (view === 'dashboard') fetchDashboardData()
   }, [view])
 
-  // ─── 세션 목록 조회 ─────────────────────────────────────────────────────────
+  // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
   const fetchSessions = async () => {
     const { data } = await supabase
-      .from('chat_sessions')
-      .select('id, title, started_at, ended_at')
-      .order('created_at', { ascending: false })
-      .limit(30)
-
+      .from('chat_sessions').select('id, title, started_at, ended_at')
+      .order('created_at', { ascending: false }).limit(30)
     if (data) setSessions(data)
   }
 
   const fetchDashboardData = async () => {
     setDashboardLoading(true)
-
     const [{ data: entries }, { data: emotions }] = await Promise.all([
-      supabase
-        .from('emotion_entries')
+      supabase.from('emotion_entries')
         .select('id, raw_emotion, intensity, created_at, summary')
-        .order('created_at', { ascending: true })
-        .limit(50),
-      supabase
-        .from('standard_emotions')
-        .select('name, color_code'),
+        .order('created_at', { ascending: true }).limit(50),
+      supabase.from('standard_emotions').select('name, color_code'),
     ])
-
     if (entries) setDashboardData(entries)
     if (emotions) {
       const map: Record<string, string> = {}
       emotions.forEach(e => { map[e.name] = e.color_code })
       setEmotionColors(map)
     }
-
     setDashboardLoading(false)
   }
 
-  // ─── 메시지 전송 ────────────────────────────────────────────────────────────
+  // ─── 헬퍼 ────────────────────────────────────────────────────────────────
+
+  const closeSidebarOnMobile = useCallback(() => {
+    if (isMobile) setSidebarOpen(false)
+  }, [isMobile])
+
+  // ─── 메시지 전송 ─────────────────────────────────────────────────────────
 
   const handleSend = async () => {
     const trimmed = input.trim()
     if (!trimmed || isLoading || sessionEnded) return
-
     const userMessage: Message = { role: 'user', content: trimmed }
     const newMessages = [...messages, userMessage]
     setMessages(newMessages)
     setInput('')
     setIsLoading(true)
-
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({
-            role: m.role === 'ai' ? 'assistant' : 'user',
-            content: m.content,
-          })),
+          messages: newMessages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })),
           sessionId,
         }),
       })
       const data = await res.json()
       setIsLoading(false)
-
       if (res.status === 429) {
         setMessages(prev => [...prev, { role: 'ai', content: '이번 달 무료 대화 횟수(5회)를 모두 사용했어요. 다음 달에 다시 만나요.' }])
         setSessionEnded(true)
         return
       }
-
       setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
-
       if (data.sessionId && !sessionId) {
         setSessionId(data.sessionId)
         setActiveSessionId(data.sessionId)
@@ -277,47 +276,37 @@ export default function FormClient() {
     } catch {
       setIsLoading(false)
       setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 다시 시도해주세요.' }])
-    } 
+    }
   }
 
-  // ─── 대화 종료 ──────────────────────────────────────────────────────────────
+  // ─── 대화 종료 ───────────────────────────────────────────────────────────
 
   const handleEndSession = async () => {
     if (!hasUserMessage || isLoading || sessionEnded) return
-
     setSessionEnded(true)
     setIsExtracting(true)
-
     try {
       const res = await fetch('/api/chat/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: messages.map(m => ({
-            role: m.role === 'ai' ? 'assistant' : 'user',
-            content: m.content,
-          })),
+          messages: messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })),
           sessionId,
         }),
       })
       const data = await res.json()
       setExtractedData(data)
-      await fetchSessions() // 종료 후 목록 갱신 (ended_at 반영)
+      await fetchSessions()
     } catch {
-      setExtractedData({
-        emotion: '알 수 없음',
-        intensity: 0,
-        trigger: '추출 실패',
-        summary: '감정 데이터를 추출하지 못했어요.',
-      })
+      setExtractedData({ emotion: '알 수 없음', intensity: 0, trigger: '추출 실패', summary: '감정 데이터를 추출하지 못했어요.' })
     } finally {
       setIsExtracting(false)
     }
   }
 
-  // ─── 새 대화 ────────────────────────────────────────────────────────────────
+  // ─── 새 대화 ────────────────────────────────────────────────────────────
 
-  const handleNewChat = () => {
+  const handleNewChat = useCallback(() => {
     setMessages([{ role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.' }])
     setInput('')
     setSessionEnded(false)
@@ -326,43 +315,36 @@ export default function FormClient() {
     setView('chat')
     setSessionId(null)
     setActiveSessionId(null)
-  }
+    closeSidebarOnMobile()
+  }, [closeSidebarOnMobile])
 
-  // ─── 과거 세션 불러오기 ──────────────────────────────────────────────────────
+  // ─── 과거 세션 불러오기 ──────────────────────────────────────────────────
 
   const handleLoadSession = async (session: ChatSession) => {
-    if (activeSessionId === session.id) return
-
+    if (activeSessionId === session.id) { closeSidebarOnMobile(); return }
     const { data } = await supabase
-      .from('chat_messages')
-      .select('role, content')
-      .eq('chat_session_id', session.id)
-      .order('created_at', { ascending: true })
-
+      .from('chat_messages').select('role, content')
+      .eq('chat_session_id', session.id).order('created_at', { ascending: true })
     if (!data || data.length === 0) return
-
-    const loaded: Message[] = data.map(m => ({
-      role: m.role === 'assistant' ? 'ai' : 'user',
-      content: m.content,
-    }))
-
-    setMessages(loaded)
+    scrollInstant.current = true
+    setMessages(data.map(m => ({ role: m.role === 'assistant' ? 'ai' : 'user' as Role, content: m.content })))
     setSessionId(session.id)
     setActiveSessionId(session.id)
     setSessionEnded(!!session.ended_at)
     setExtractedData(null)
     setIsExtracting(false)
     setView('chat')
+    closeSidebarOnMobile()
   }
 
-  // ─── 로그아웃 ────────────────────────────────────────────────────────────────
+  // ─── 로그아웃 ────────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = '/login'
   }
 
-  // ─── 서브 컴포넌트 ────────────────────────────────────────────────────────
+  // ─── 서브 컴포넌트 ───────────────────────────────────────────────────────
 
   const AIAvatar = () => (
     <div style={{
@@ -378,9 +360,7 @@ export default function FormClient() {
       {[1, 2, 3, 4, 5].map(n => (
         <div key={n} style={{
           width: 20, height: 5, borderRadius: 3,
-          background: n <= value
-            ? `hsl(${260 - n * 16}, 80%, ${isDark ? '65%' : '55%'})`
-            : t.border,
+          background: n <= value ? `hsl(${260 - n * 16}, 80%, ${isDark ? '65%' : '55%'})` : t.border,
           transition: 'background 0.2s',
         }} />
       ))}
@@ -402,18 +382,32 @@ export default function FormClient() {
     </button>
   )
 
-  // 유저 이름 이니셜
   const initial = (userInfo.display_name ?? '?')[0]
 
-  // ─── 렌더 ─────────────────────────────────────────────────────────────────
+  // ─── 렌더 ────────────────────────────────────────────────────────────────
 
   return (
+    // [FIX] height: 100dvh → iOS Safari 주소창 포함 실제 뷰포트 높이
     <div style={{
-      display: 'flex', height: '100vh',
+      display: 'flex', height: '100dvh',
       background: t.bg, color: t.text,
       fontFamily: "'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       transition: 'background 0.3s, color 0.3s',
+      overflow: 'hidden',
+      position: 'relative',
     }}>
+
+      {/* [FIX] 모바일 사이드바 백드롭 */}
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 40,
+          }}
+        />
+      )}
 
       {/* ── 사이드바 (열림) ── */}
       {sidebarOpen && (
@@ -422,6 +416,12 @@ export default function FormClient() {
           borderRight: `1px solid ${t.border}`,
           display: 'flex', flexDirection: 'column',
           background: t.sidebar, transition: 'background 0.3s',
+          // [FIX] 모바일: fixed overlay
+          ...(isMobile ? {
+            position: 'fixed' as const,
+            top: 0, left: 0, bottom: 0,
+            zIndex: 50,
+          } : {}),
         }}>
           {/* 로고 + 새 대화 */}
           <div style={{ padding: '16px 12px 12px' }}>
@@ -450,39 +450,28 @@ export default function FormClient() {
               icon={Icons.chart(view === 'dashboard' ? t.text : t.muted)}
               label="대시보드"
               active={view === 'dashboard'}
-              onClick={() => setView('dashboard')}
+              onClick={() => { setView('dashboard'); closeSidebarOnMobile() }}
             />
             <div style={{ height: 1, background: t.border, margin: '8px 4px' }} />
           </div>
 
           {/* 최근 기록 */}
           <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto' }}>
-            <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>
-              최근 기록
-            </p>
+            <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>최근 기록</p>
             {sessions.length === 0 ? (
-              <p style={{ fontSize: 12, color: t.muted, padding: '8px 12px' }}>
-                아직 대화 기록이 없어요
-              </p>
+              <p style={{ fontSize: 12, color: t.muted, padding: '8px 12px' }}>아직 대화 기록이 없어요</p>
             ) : (
-              sessions.map((s) => {
+              sessions.map(s => {
                 const label = s.title ?? new Date(s.started_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
                 const isActive = activeSessionId === s.id
                 return (
-                  <div
-                    key={s.id}
-                    onClick={() => handleLoadSession(s)}
-                    style={{
-                      padding: '9px 12px', borderRadius: 8,
-                      cursor: 'pointer', marginBottom: 2,
-                      background: isActive ? t.hover : 'transparent',
-                      transition: 'background 0.15s',
-                    }}
-                  >
-                    <div style={{
-                      fontSize: 13, color: t.text, fontWeight: 500,
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    }}>
+                  <div key={s.id} onClick={() => handleLoadSession(s)} style={{
+                    padding: '9px 12px', borderRadius: 8,
+                    cursor: 'pointer', marginBottom: 2,
+                    background: isActive ? t.hover : 'transparent',
+                    transition: 'background 0.15s',
+                  }}>
+                    <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {label}
                     </div>
                     <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>
@@ -504,15 +493,14 @@ export default function FormClient() {
                 boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.12)',
                 zIndex: 100,
               }}>
-                <button onClick={() => { setSettingsOpen(false); setView('settings') }} style={{
+                <button onClick={() => { setSettingsOpen(false); setView('settings'); closeSidebarOnMobile() }} style={{
                   width: '100%', padding: '11px 14px',
                   display: 'flex', alignItems: 'center', gap: 10,
                   background: 'transparent', border: 'none',
                   color: t.text, fontSize: 13, cursor: 'pointer',
                   fontFamily: 'inherit', textAlign: 'left',
                 }}>
-                  {Icons.settings(t.muted)}
-                  <span>설정</span>
+                  {Icons.settings(t.muted)} <span>설정</span>
                 </button>
                 <div style={{ height: 1, background: t.border }} />
                 <button onClick={handleLogout} style={{
@@ -522,8 +510,7 @@ export default function FormClient() {
                   color: '#f87171', fontSize: 13, cursor: 'pointer',
                   fontFamily: 'inherit', textAlign: 'left',
                 }}>
-                  {Icons.logout('#f87171')}
-                  <span>로그아웃</span>
+                  {Icons.logout('#f87171')} <span>로그아웃</span>
                 </button>
               </div>
             )}
@@ -553,8 +540,8 @@ export default function FormClient() {
         </div>
       )}
 
-      {/* ── 사이드바 (닫힘) ── */}
-      {!sidebarOpen && (
+      {/* ── 사이드바 (닫힘) — 데스크탑에서만 미니바 표시 ── */}
+      {!sidebarOpen && !isMobile && (
         <div style={{
           width: 52, flexShrink: 0,
           borderRight: `1px solid ${t.border}`,
@@ -590,7 +577,12 @@ export default function FormClient() {
       )}
 
       {/* ── 메인 영역 ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* [FIX] minWidth: 0 → flex child가 제대로 줄어들게 */}
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0,
+        transform: isMobile && sidebarOpen ? 'translateX(260px)' : 'translateX(0)',
+        transition: 'transform 0.25s ease',
+      }}>
 
         {/* 헤더 */}
         <div style={{
@@ -599,18 +591,14 @@ export default function FormClient() {
           background: t.bg, flexShrink: 0,
         }}>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+            background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0,
           }}>{Icons.menu(t.muted)}</button>
 
-          <span style={{ fontSize: 14, color: t.muted, flex: 1 }}>
-            {view === 'settings' ? '설정'
-              : view === 'dashboard' ? '대시보드'
-              : sessionEnded ? '대화 종료'
-              : isLoading ? '답변 생성 중...'
-              : '감정 대화'}
+          <span style={{ fontSize: 14, color: t.muted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {view === 'settings' ? '설정' : view === 'dashboard' ? '대시보드' : sessionEnded ? '대화 종료' : isLoading ? '답변 생성 중...' : '감정 대화'}
           </span>
 
-          {view === 'chat' && hasUserMessage && !sessionEnded && (
+          {view === 'chat' && hasUserMessage && !sessionEnded && !(isMobile && sidebarOpen) && (
             <button onClick={handleEndSession} disabled={isLoading} style={{
               padding: '6px 14px', borderRadius: 8,
               background: 'transparent',
@@ -619,16 +607,11 @@ export default function FormClient() {
               fontSize: 12, cursor: isLoading ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
               display: 'flex', alignItems: 'center', gap: 6,
-              transition: 'opacity 0.2s',
+              flexShrink: 0,
             }}>
-              {Icons.stop(isLoading ? t.muted : '#f87171')} 대화 종료
+              {Icons.stop(isLoading ? t.muted : '#f87171')}
+              <span>대화 종료</span>
             </button>
-          )}
-
-          {view !== 'chat' && (
-            <button onClick={() => setView('chat')} style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-            }}>{Icons.back(t.muted)}</button>
           )}
         </div>
 
@@ -636,31 +619,32 @@ export default function FormClient() {
         {view === 'chat' && (
           <>
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px 0', background: t.bg }}>
-              <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 24px' }}>
+              {/* [FIX] 모바일 패딩 줄임 */}
+              <div style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
 
                 {messages.map((msg, i) => (
                   <div key={i} style={{ marginBottom: 20 }}>
                     {msg.role === 'ai' ? (
                       <div style={{ display: 'flex', gap: 12 }}>
                         <AIAvatar />
+                        {/* [FIX] wordBreak 추가 */}
                         <div style={{
-                          background: t.aiMsg,
-                          borderRadius: '4px 16px 16px 16px',
-                          padding: '12px 16px',
-                          fontSize: 14, lineHeight: 1.7, color: t.text,
+                          background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
+                          padding: '12px 16px', fontSize: 14, lineHeight: 1.7, color: t.text,
                           maxWidth: '80%', whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word', overflowWrap: 'break-word',
                         }}>
                           {msg.content}
                         </div>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        {/* [FIX] wordBreak 추가 */}
                         <div style={{
-                          background: '#7c3aed',
-                          borderRadius: '16px 4px 16px 16px',
-                          padding: '12px 16px',
-                          fontSize: 14, lineHeight: 1.7, color: '#fff',
+                          background: '#7c3aed', borderRadius: '16px 4px 16px 16px',
+                          padding: '12px 16px', fontSize: 14, lineHeight: 1.7, color: '#fff',
                           maxWidth: '80%', whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word', overflowWrap: 'break-word',
                         }}>
                           {msg.content}
                         </div>
@@ -672,16 +656,9 @@ export default function FormClient() {
                 {isLoading && (
                   <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                     <AIAvatar />
-                    <div style={{
-                      background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
-                      padding: '14px 18px', display: 'flex', gap: 5, alignItems: 'center',
-                    }}>
+                    <div style={{ background: t.aiMsg, borderRadius: '4px 16px 16px 16px', padding: '14px 18px', display: 'flex', gap: 5, alignItems: 'center' }}>
                       {[0, 0.3, 0.6].map((delay, i) => (
-                        <span key={i} style={{
-                          width: 7, height: 7, borderRadius: '50%',
-                          background: t.muted, display: 'inline-block',
-                          animation: `pulse 1.2s ${delay}s infinite`,
-                        }} />
+                        <span key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: t.muted, display: 'inline-block', animation: `pulse 1.2s ${delay}s infinite` }} />
                       ))}
                     </div>
                   </div>
@@ -690,10 +667,7 @@ export default function FormClient() {
                 {isExtracting && (
                   <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                     <AIAvatar />
-                    <div style={{
-                      background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
-                      padding: '12px 16px', fontSize: 13, color: t.muted,
-                    }}>
+                    <div style={{ background: t.aiMsg, borderRadius: '4px 16px 16px 16px', padding: '12px 16px', fontSize: 13, color: t.muted }}>
                       오늘 대화를 정리하고 있어요...
                     </div>
                   </div>
@@ -702,29 +676,16 @@ export default function FormClient() {
                 {extractedData && !isExtracting && (
                   <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                     <AIAvatar />
-                    <div style={{
-                      background: t.aiMsg, borderRadius: '4px 16px 16px 16px',
-                      padding: '16px 20px', maxWidth: '80%',
-                    }}>
-                      <p style={{ fontSize: 13, color: t.muted, marginBottom: 12, letterSpacing: '0.04em' }}>
-                        오늘의 감정 기록
-                      </p>
+                    <div style={{ background: t.aiMsg, borderRadius: '4px 16px 16px 16px', padding: '16px 20px', maxWidth: '80%' }}>
+                      <p style={{ fontSize: 13, color: t.muted, marginBottom: 12, letterSpacing: '0.04em' }}>오늘의 감정 기록</p>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
                         <span style={{ fontSize: 20, fontWeight: 600, color: t.text }}>{extractedData.emotion}</span>
                         <span style={{ fontSize: 12, color: t.muted }}>강도</span>
                         <span style={{ fontSize: 15, fontWeight: 600, color: '#a78bfa' }}>{extractedData.intensity}</span>
                       </div>
                       <IntensityBar value={extractedData.intensity} />
-                      {extractedData.trigger && (
-                        <p style={{ fontSize: 13, color: t.muted, marginTop: 12, lineHeight: 1.6 }}>
-                          {extractedData.trigger}
-                        </p>
-                      )}
-                      {extractedData.summary && (
-                        <p style={{ fontSize: 14, color: t.text, marginTop: 10, lineHeight: 1.7 }}>
-                          {extractedData.summary}
-                        </p>
-                      )}
+                      {extractedData.trigger && <p style={{ fontSize: 13, color: t.muted, marginTop: 12, lineHeight: 1.6 }}>{extractedData.trigger}</p>}
+                      {extractedData.summary && <p style={{ fontSize: 14, color: t.text, marginTop: 10, lineHeight: 1.7 }}>{extractedData.summary}</p>}
                       <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button onClick={handleNewChat} style={{
                           padding: '8px 16px', borderRadius: 20,
@@ -755,16 +716,13 @@ export default function FormClient() {
 
             {!sessionEnded && (
               <div style={{
-                padding: '12px 24px 16px',
-                background: t.bg,
-                borderTop: `1px solid ${t.border}`,
-                flexShrink: 0,
+                padding: isMobile ? '10px 12px 12px' : '12px 24px 16px',
+                background: t.bg, borderTop: `1px solid ${t.border}`, flexShrink: 0,
               }}>
                 <div style={{ maxWidth: 680, margin: '0 auto' }}>
                   <div style={{
                     display: 'flex', gap: 10, alignItems: 'flex-end',
-                    background: t.input,
-                    border: `1px solid ${t.border}`,
+                    background: t.input, border: `1px solid ${t.border}`,
                     borderRadius: 14, padding: '10px 12px',
                   }}>
                     <textarea
@@ -778,36 +736,33 @@ export default function FormClient() {
                         flex: 1, background: 'transparent', border: 'none',
                         color: t.text, fontSize: 14, lineHeight: 1.6,
                         resize: 'none', outline: 'none',
-                        fontFamily: 'inherit', overflowY: 'hidden',
-                        minHeight: 24,
+                        fontFamily: 'inherit', overflowY: 'hidden', minHeight: 24,
                       }}
                       onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        // [FIX] 모바일 소프트 키보드 Enter 충돌 방지
+                        if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
                           e.preventDefault()
                           handleSend()
                         }
                       }}
                     />
-                    <button
-                      onClick={handleSend}
-                      disabled={!input.trim() || isLoading}
-                      style={{
-                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                        background: input.trim() && !isLoading
-                          ? 'linear-gradient(135deg, #a78bfa, #60a5fa)'
-                          : t.border,
-                        border: 'none',
-                        cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'background 0.2s',
-                      }}
-                    >
+                    <button onClick={handleSend} disabled={!input.trim() || isLoading} style={{
+                      width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                      background: input.trim() && !isLoading ? 'linear-gradient(135deg, #a78bfa, #60a5fa)' : t.border,
+                      border: 'none',
+                      cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'background 0.2s',
+                    }}>
                       {Icons.send(input.trim() && !isLoading ? '#fff' : t.muted)}
                     </button>
                   </div>
-                  <p style={{ fontSize: 11, color: t.muted, textAlign: 'center', marginTop: 8 }}>
-                    Enter로 전송 · Shift+Enter 줄바꿈 · 대화가 끝나면 "대화 종료"를 눌러주세요
-                  </p>
+                  {/* [FIX] 모바일에서 힌트 숨김 */}
+                  {!isMobile && (
+                    <p style={{ fontSize: 11, color: t.muted, textAlign: 'center', marginTop: 8 }}>
+                      Enter로 전송 · Shift+Enter 줄바꿈 · 대화가 끝나면 "대화 종료"를 눌러주세요
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -817,7 +772,7 @@ export default function FormClient() {
         {/* ── 설정 뷰 ── */}
         {view === 'settings' && (
           <div style={{ flex: 1, overflowY: 'auto', background: t.bg }}>
-            <div style={{ maxWidth: 560, margin: '0 auto', padding: '32px 24px' }}>
+            <div style={{ maxWidth: 560, margin: '0 auto', padding: isMobile ? '24px 16px' : '32px 24px' }}>
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>화면</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -839,7 +794,6 @@ export default function FormClient() {
                   </button>
                 </div>
               </div>
-
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>계정</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -872,19 +826,13 @@ export default function FormClient() {
         {/* ── 대시보드 뷰 ── */}
         {view === 'dashboard' && (
           <div style={{ flex: 1, overflowY: 'auto', background: t.bg }}>
-            <div style={{ padding: '28px 32px' }}>
+            {/* [FIX] 모바일 패딩 줄임 */}
+            <div style={{ padding: isMobile ? '16px 12px' : '28px 32px' }}>
               {dashboardLoading ? (
                 <p style={{ color: t.muted, fontSize: 14 }}>불러오는 중...</p>
               ) : dashboardData.length === 0 ? (
-                <div style={{
-                  height: '80vh', display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 16,
-                }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #a78bfa22, #60a5fa22)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
+                <div style={{ height: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa22, #60a5fa22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {Icons.chart(t.muted)}
                   </div>
                   <div style={{ textAlign: 'center' }}>
@@ -909,51 +857,54 @@ export default function FormClient() {
                 const avgIntensity = (dashboardData.reduce((s, e) => s + e.intensity, 0) / total).toFixed(1)
                 const barData = Object.entries(freq).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }))
 
-                // 이번주 vs 지난주
                 const now = new Date()
                 const startOfThisWeek = new Date(now); startOfThisWeek.setDate(now.getDate() - now.getDay())
                 const startOfLastWeek = new Date(startOfThisWeek); startOfLastWeek.setDate(startOfThisWeek.getDate() - 7)
                 const thisWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfThisWeek)
                 const lastWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfLastWeek && new Date(e.created_at) < startOfThisWeek)
-                const thisWeekAvg = thisWeekData.length ? (thisWeekData.reduce((s, e) => s + e.intensity, 0) / thisWeekData.length) : null
-                const lastWeekAvg = lastWeekData.length ? (lastWeekData.reduce((s, e) => s + e.intensity, 0) / lastWeekData.length) : null
-                const weekDiff = thisWeekAvg !== null && lastWeekAvg !== null ? (thisWeekAvg - lastWeekAvg) : null
+                const thisWeekAvg = thisWeekData.length ? thisWeekData.reduce((s, e) => s + e.intensity, 0) / thisWeekData.length : null
+                const lastWeekAvg = lastWeekData.length ? lastWeekData.reduce((s, e) => s + e.intensity, 0) / lastWeekData.length : null
+                const weekDiff = thisWeekAvg !== null && lastWeekAvg !== null ? thisWeekAvg - lastWeekAvg : null
 
-                // 타임라인 데이터 — Y축: 감정 종류, X축: 날짜 인덱스, 크기: 강도
                 const emotionList = [...new Set(dashboardData.map(e => e.raw_emotion))]
                 const timelineData = dashboardData.map((e, i) => ({
-                  x: i,
-                  y: emotionList.indexOf(e.raw_emotion),
+                  x: i, y: emotionList.indexOf(e.raw_emotion),
                   z: e.intensity * 15 + 30,
-                  emotion: e.raw_emotion,
-                  intensity: e.intensity,
+                  emotion: e.raw_emotion, intensity: e.intensity,
                   date: new Date(e.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
                   color: emotionColors[e.raw_emotion] ?? '#a78bfa',
                 }))
 
-                // 인사이트 문장
                 const insightText = (() => {
-                  const highIntensity = dashboardData.filter(e => e.intensity >= 4).length
+                  const high = dashboardData.filter(e => e.intensity >= 4).length
                   if (weekDiff !== null && weekDiff > 0.5) return `이번 주 감정 강도가 지난 주보다 높아졌어요. ${topEmotion[0]}이 많이 느껴지고 있네요.`
                   if (weekDiff !== null && weekDiff < -0.5) return `이번 주는 지난 주보다 조금 가라앉은 것 같아요. ${topEmotion[0]}이 주를 이루고 있어요.`
-                  if (highIntensity > total * 0.6) return `요즘 감정 강도가 높은 편이에요. ${topEmotion[0]}을(를) 가장 자주 느끼고 있어요.`
+                  if (high > total * 0.6) return `요즘 감정 강도가 높은 편이에요. ${topEmotion[0]}을(를) 가장 자주 느끼고 있어요.`
                   return `${total}번의 기록 중 ${topEmotion[0]}을(를) 가장 많이 느꼈어요.`
                 })()
 
-                return (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                // [FIX] 모바일: 1열 / 데스크탑: 3열 — 인라인 스타일로 확실하게
+                const cols = isMobile ? '1fr' : '1fr 1fr 1fr'
+                const gap = isMobile ? 12 : 16
+                const fullSpan = isMobile ? undefined : '1 / 4'
+                const halfSpan = isMobile ? undefined : '1 / 3'
 
-                    {/* ① 인사이트 + CTA */}
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: cols, gap }}>
+
+                    {/* ① 인사이트 */}
                     <div style={{
-                      gridColumn: '1 / 4',
+                      gridColumn: fullSpan,
                       background: 'linear-gradient(135deg, #7c3aed22, #3b82f622)',
-                      border: `1px solid #a78bfa33`,
-                      borderRadius: 20, padding: '24px 28px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+                      border: '1px solid #a78bfa33', borderRadius: 20,
+                      padding: isMobile ? '20px' : '24px 28px',
+                      display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+                      alignItems: isMobile ? 'flex-start' : 'center',
+                      justifyContent: 'space-between', gap: 16,
                     }}>
                       <div>
                         <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>이번 달 요약</p>
-                        <p style={{ fontSize: 17, color: t.text, fontWeight: 600, lineHeight: 1.5 }}>{insightText}</p>
+                        <p style={{ fontSize: isMobile ? 15 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5 }}>{insightText}</p>
                       </div>
                       <button onClick={() => { setView('chat'); handleNewChat() }} style={{
                         flexShrink: 0, padding: '11px 22px', borderRadius: 20,
@@ -987,11 +938,7 @@ export default function FormClient() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {top3.map(([emotion, count], i) => (
                           <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{
-                              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                              background: emotionColors[emotion] ?? '#a78bfa',
-                              opacity: 1 - i * 0.25,
-                            }} />
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: emotionColors[emotion] ?? '#a78bfa', opacity: 1 - i * 0.25 }} />
                             <span style={{ fontSize: 14, color: t.text, fontWeight: i === 0 ? 600 : 400 }}>{emotion}</span>
                             <span style={{ fontSize: 12, color: t.muted, marginLeft: 'auto' }}>{count}회</span>
                           </div>
@@ -1002,9 +949,9 @@ export default function FormClient() {
                     {/* ⑤ 이번주 vs 지난주 */}
                     {weekDiff !== null && (
                       <div style={{
-                        gridColumn: '1 / 4',
+                        gridColumn: fullSpan,
                         background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
-                        display: 'flex', alignItems: 'center', gap: 40,
+                        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: isMobile ? 20 : 40,
                       }}>
                         <div>
                           <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>이번 주 평균 강도</p>
@@ -1020,7 +967,7 @@ export default function FormClient() {
                           </p>
                         </div>
                         <div style={{
-                          marginLeft: 'auto', padding: '8px 16px', borderRadius: 20,
+                          marginLeft: isMobile ? 0 : 'auto', padding: '8px 16px', borderRadius: 20,
                           background: weekDiff > 0 ? '#f8717122' : '#6ee7b722',
                           color: weekDiff > 0 ? '#f87171' : '#6ee7b7',
                           fontSize: 13, fontWeight: 600,
@@ -1031,52 +978,34 @@ export default function FormClient() {
                     )}
 
                     {/* ⑥ 감정 타임라인 */}
-                    <div style={{ gridColumn: '1 / 3', background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                    <div style={{ gridColumn: halfSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
                       <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 4 }}>감정 타임라인</p>
                       <p style={{ fontSize: 11, color: t.muted, marginBottom: 16 }}>점 크기 = 감정 강도</p>
                       <ResponsiveContainer width="100%" height={160}>
                         <ScatterChart margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
-                          <XAxis
-                            dataKey="x"
-                            type="number"
-                            domain={[-0.5, dashboardData.length - 0.5]}
-                            tick={false} axisLine={false} tickLine={false}
-                          />
-                          <YAxis
-                            dataKey="y"
-                            type="number"
-                            domain={[-0.5, emotionList.length - 0.5]}
+                          <XAxis dataKey="x" type="number" domain={[-0.5, dashboardData.length - 0.5]} tick={false} axisLine={false} tickLine={false} />
+                          <YAxis dataKey="y" type="number" domain={[-0.5, emotionList.length - 0.5]}
                             ticks={emotionList.map((_, i) => i)}
-                            tickFormatter={(v) => emotionList[v] ?? ''}
+                            tickFormatter={v => emotionList[v] ?? ''}
                             tick={{ fontSize: 11, fill: t.muted }}
-                            axisLine={false} tickLine={false} width={36}
-                          />
+                            axisLine={false} tickLine={false} width={36} />
                           <ZAxis dataKey="z" range={[40, 160]} />
                           {hoveredPoint && (
                             <foreignObject x={hoveredPoint.cx + 10} y={hoveredPoint.cy - 20} width={140} height={50}>
-                              <div style={{
-                                background: t.popup, border: `1px solid ${t.border}`,
-                                borderRadius: 8, padding: '6px 10px', fontSize: 12, color: t.text,
-                                whiteSpace: 'nowrap',
-                              }}>
+                              <div style={{ background: t.popup, border: `1px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, color: t.text, whiteSpace: 'nowrap' }}>
                                 <div style={{ fontWeight: 600 }}>{hoveredPoint.emotion} · 강도 {hoveredPoint.intensity}</div>
                                 <div style={{ color: t.muted }}>{hoveredPoint.date}</div>
                               </div>
                             </foreignObject>
                           )}
-                          <Scatter
-                            data={timelineData}
+                          <Scatter data={timelineData}
                             shape={(props: any) => {
                               const { cx, cy, payload } = props
                               return (
-                                <circle
-                                  cx={cx} cy={cy}
-                                  r={Math.sqrt(payload.z) * 1.0}
-                                  fill={payload.color} fillOpacity={0.8}
-                                  style={{ cursor: 'pointer' }}
+                                <circle cx={cx} cy={cy} r={Math.sqrt(payload.z) * 1.0}
+                                  fill={payload.color} fillOpacity={0.8} style={{ cursor: 'pointer' }}
                                   onMouseEnter={() => setHoveredPoint({ ...payload, cx, cy })}
-                                  onMouseLeave={() => setHoveredPoint(null)}
-                                />
+                                  onMouseLeave={() => setHoveredPoint(null)} />
                               )
                             }}
                           />
@@ -1095,8 +1024,7 @@ export default function FormClient() {
                             contentStyle={{ background: t.popup, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12 }}
                             formatter={(value) => [`${value}회`]}
                           />
-                          <Bar
-                            dataKey="count"
+                          <Bar dataKey="count"
                             shape={(props: any) => {
                               const { x, y, width, height, payload } = props
                               return <rect x={x} y={y} width={width} height={height} fill={emotionColors[payload.name] ?? '#a78bfa'} rx={4} ry={4} />
@@ -1107,14 +1035,15 @@ export default function FormClient() {
                     </div>
 
                     {/* ⑧ 최근 기록 */}
-                    <div style={{ gridColumn: '1 / 4', background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, overflow: 'hidden' }}>
+                    <div style={{ gridColumn: fullSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, overflow: 'hidden' }}>
                       <p style={{ fontSize: 13, color: t.text, fontWeight: 500, padding: '20px 24px 12px' }}>최근 기록</p>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                      {/* [FIX] 모바일: 1열 / 데스크탑: 2열 */}
+                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr' }}>
                         {[...dashboardData].reverse().slice(0, 6).map((e, i) => (
                           <div key={e.id} style={{
                             padding: '14px 24px',
                             borderTop: `1px solid ${t.border}`,
-                            borderRight: i % 2 === 0 ? `1px solid ${t.border}` : 'none',
+                            borderRight: !isMobile && i % 2 === 0 ? `1px solid ${t.border}` : 'none',
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                               <div style={{ width: 8, height: 8, borderRadius: '50%', background: emotionColors[e.raw_emotion] ?? '#a78bfa', flexShrink: 0 }} />
@@ -1158,8 +1087,8 @@ export default function FormClient() {
 // ─── 테마 ────────────────────────────────────────────────────────────────────
 
 const dark = {
-  bg: '#0a0a0a', sidebar: '#0f0f0f', text: '#e8e8e8', muted: '#555',
-  border: '#1e1e1e', aiMsg: '#161616', input: '#111', hover: '#1a1a1a', popup: '#161616',
+  bg: '#0a0a0a', sidebar: '#0f0f0f', text: '#e8e8e8', muted: '#888',
+  border: '#2a2a2a', aiMsg: '#161616', input: '#111', hover: '#1e1e1e', popup: '#161616',
 }
 const light = {
   bg: '#ffffff', sidebar: '#f9f9f9', text: '#111', muted: '#999',
