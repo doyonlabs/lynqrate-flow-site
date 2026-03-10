@@ -457,31 +457,33 @@ export default function FormClient() {
           </div>
 
           {/* 최근 기록 */}
-          <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+          <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', minHeight: 0 }}>
             <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>최근 기록</p>
-            {sessions.length === 0 ? (
-              <p style={{ fontSize: 12, color: t.muted, padding: '8px 12px' }}>아직 대화 기록이 없어요</p>
-            ) : (
-              sessions.map(s => {
-                const label = s.title ?? new Date(s.started_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
-                const isActive = activeSessionId === s.id
-                return (
-                  <div key={s.id} onClick={() => handleLoadSession(s)} style={{
-                    padding: '9px 12px', borderRadius: 8,
-                    cursor: 'pointer', marginBottom: 2,
-                    background: isActive ? t.hover : 'transparent',
-                    transition: 'background 0.15s',
-                  }}>
-                    <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {label}
+            <div style={{ minHeight: '100%' }}>
+              {sessions.length === 0 ? (
+                <p style={{ fontSize: 12, color: t.muted, padding: '8px 12px' }}>아직 대화 기록이 없어요</p>
+              ) : (
+                sessions.map(s => {
+                  const label = s.title ?? new Date(s.started_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+                  const isActive = activeSessionId === s.id
+                  return (
+                    <div key={s.id} onClick={() => handleLoadSession(s)} style={{
+                      padding: '9px 12px', borderRadius: 8,
+                      cursor: 'pointer', marginBottom: 2,
+                      background: isActive ? t.hover : 'transparent',
+                      transition: 'background 0.15s',
+                    }}>
+                      <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {label}
+                      </div>
+                      <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>
+                        {s.ended_at ? '완료' : '진행 중'}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>
-                      {s.ended_at ? '완료' : '진행 중'}
-                    </div>
-                  </div>
-                )
-              })
-            )}
+                  )
+                })
+              )}
+            </div>
           </div>
 
           {/* 하단 유저/설정 */}

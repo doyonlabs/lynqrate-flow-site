@@ -28,7 +28,7 @@ export default async function RootLayout({
   const bgColor = defaultTheme === 'dark' ? '#0a0a0a' : '#ffffff'
 
   return (
-    <html lang="ko" data-theme={defaultTheme} style={{ background: bgColor }}>
+    <html lang="ko" data-theme={defaultTheme} className={defaultTheme === 'dark' ? 'dark' : ''} style={{ background: bgColor }}>
       <body style={{
         margin: 0,
         padding: 0,
