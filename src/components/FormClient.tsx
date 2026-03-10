@@ -593,8 +593,12 @@ export default function FormClient() {
           background: t.bg, flexShrink: 0,
         }}>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0,
-          }}>{Icons.menu(t.muted)}</button>
+            background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', flexShrink: 0,
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            {Icons.menu(t.muted)}
+            {isMobile && <span style={{ fontSize: 12, color: t.muted }}>메뉴</span>}
+          </button>
 
           <span style={{ fontSize: 14, color: t.muted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {view === 'settings' ? '설정' : view === 'dashboard' ? '대시보드' : sessionEnded ? '대화 종료' : isLoading ? '답변 생성 중...' : '감정 대화'}
@@ -776,7 +780,7 @@ export default function FormClient() {
         {/* ── 설정 뷰 ── */}
         {view === 'settings' && (
           <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg, minHeight: 0 }}>
-            <div style={{ maxWidth: 560, margin: '0 auto', padding: isMobile ? '24px 16px' : '32px 24px', minHeight: '100%' }}>
+            <div style={{ maxWidth: 560, margin: '0 auto', padding: isMobile ? '24px 16px' : '32px 24px', minHeight: '110vh' }}>
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>화면</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
