@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/login`)
   }
 
-  const response = NextResponse.redirect(`${origin}/form`)
+  const response = NextResponse.redirect(`${origin}/form`, { status: 308 })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
