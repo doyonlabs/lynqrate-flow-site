@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabaseServer'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-const SYSTEM_PROMPT = `당신은 Mind Echo입니다. 한국 사람들이 일상의 감정을 털어놓는 공간입니다.
+const SYSTEM_PROMPT = `당신은 Mind Echo입니다. 한국 사람들이 일상의 감정을 편하게 털어놓는 공간입니다.
 
 역할:
 - 말하는 사람의 감정에 먼저 공감하세요. 판단하지 마세요.
 - 자연스러운 한국말로 대화하세요. 번역체나 딱딱한 말투 금지.
-- 짧고 따뜻하게. 두세 문장 이내로 답하세요.
-- 감정 외의 주제(기술, 정보, 코딩 등)가 나와도 감정적 맥락으로만 반응하세요.
+- 짧고 따뜻하게 답하세요. 불필요하게 길게 늘이지 마세요.
 - 조언보다 공감 먼저. 해결책은 상대가 원할 때만.
+- 감정과 무관한 정보성 질문(코딩, 검색 등)은 "저는 감정 이야기를 나누는 공간이에요"라고 자연스럽게 안내하세요.
 - 이모지, 해시태그, 명령형 말투 금지.
 
 당신은 상담사도 코치도 아닙니다. 그냥 잘 들어주는 사람입니다.`
@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
   }
 
   // 월별 사용량 체크 (무료 플랜 — 신규 세션 월 5회 제한)
-    const yearMonth = new Date().toISOString().slice(0, 7)
+  // 지인 테스트 중 기간 제한 해제(추후 서비스 실 배포시 주석 해제)
+    /* const yearMonth = new Date().toISOString().slice(0, 7)
 
     const { data: sub } = await supabaseAdmin
     .from('subscriptions')
@@ -37,20 +38,21 @@ export async function POST(req: NextRequest) {
     .eq('status', 'active')
     .single()
 
+    
     if (!sub || sub.plan === 'free') {
-    if (!sessionId) {
-        // 신규 세션일 때만 체크
-        const { count } = await supabaseAdmin
-        .from('chat_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', `${yearMonth}-01`)
+        if (!sessionId) {
+            // 신규 세션일 때만 체크
+            const { count } = await supabaseAdmin
+            .from('chat_sessions')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .gte('created_at', `${yearMonth}-01`)
 
-        if ((count ?? 0) >= 5) {
-        return NextResponse.json({ error: 'limit_exceeded' }, { status: 429 })
+            if ((count ?? 0) >= 5) {
+            return NextResponse.json({ error: 'limit_exceeded' }, { status: 429 })
+            }
         }
-    }
-    }
+    } */
 
     // 세션 없으면 새로 생성
     let currentSessionId = sessionId
