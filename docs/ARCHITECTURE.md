@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-09
+> 마지막 업데이트: 2026-03-10
 
 ---
 
@@ -47,7 +47,7 @@
 | `/login` | Google 소셜 로그인 | ❌ |
 | `/form` | 채팅 + 대시보드 뷰 | ✅ |
 
-> `/result`, `/feedback`, `/dashboard` 별도 페이지 없음 — `/form` 내부 view 상태로 전환
+> `/result`, `/feedback`, `/dashboard` 별도 페이지 없음 — `/form` 내부 view 상태로 전환  
 > 로그인 상태에서 `/` 접근 시 `/form`으로 자동 리다이렉트
 
 ---
@@ -56,9 +56,9 @@
 
 ```
 Google 로그인 클릭
-→ supabase.auth.signInWithOAuth({ provider: 'google' })
+→ supabase.auth.signInWithOAuth({ provider: 'google', prompt: 'select_account' })
 → Google 인증 완료
-→ /auth/callback?code=... 리다이렉트
+→ /auth/callback?code=... 리다이렉트 (308)
 → exchangeCodeForSession(code) → Supabase 세션 생성 (response에 쿠키 직접 set)
 → public.users upsert (없으면 생성 + subscriptions free 플랜 생성, 있으면 updated_at 업데이트)
 → /form으로 이동
@@ -98,11 +98,26 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 
 ```
 최초 방문 → 쿠키 없음 → 기본값 dark
-테마 토글 → setThemeCookie() → 쿠키 저장
-페이지 로드 → layout.tsx에서 쿠키 읽기 → SSR 단계에서 테마 결정
+테마 토글 → setThemeCookie() + document.documentElement.classList.toggle('dark') → 즉시 반영
+페이지 로드 → layout.tsx에서 쿠키 읽기 → SSR 단계에서 테마 결정 + html className 세팅
 → 깜빡임(flash) 없음
 로그아웃 시 → 테마 쿠키 유지 (로그인 후 마지막 설정 유지)
 ```
+
+---
+
+## 모바일 대응
+
+```
+레이아웃: position: fixed (top/left/right/bottom: 0) → iOS Safari 주소창 높이 이슈 해결
+스크롤: overscrollBehavior: 'none' → pull-to-refresh 차단
+사이드바: 모바일에서 fixed overlay + 백드롭 dimmed, 데스크탑은 inline
+safe-area: env(safe-area-inset-top/bottom) → 노치/홈바 영역 대응
+iOS 확대 방지: textarea fontSize 16px 이상 유지
+```
+
+> iOS Safari theme-color 동적 변경은 브라우저 제한으로 페이지 로드 시에만 반영됨.
+> PWA 설치 시 브라우저 UI가 제거되어 문제 해소 예정.
 
 ---
 
@@ -130,7 +145,7 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 
 **처리 순서**:
 1. 로그인 유저 확인
-2. 무료 플랜 월별 사용량 체크 (신규 세션 시 chat_sessions 카운트, 5회 초과 시 429 반환)
+2. 무료 플랜 월별 사용량 체크 (신규 세션 시 chat_sessions 카운트, 5회 초과 시 429 반환) ← 지인 테스트 기간 비활성화
 3. sessionId 없으면 chat_sessions 신규 생성 (title: 첫 메시지 30자)
 4. 유저 메시지 chat_messages 저장
 5. GPT-4o-mini 호출 (최근 10개 메시지만 전달)
@@ -255,7 +270,7 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 
 ---
 
-## 다음 작업 예정
+## 작업 이력
 
 - [x] 채팅형 UI 전환 (FormClient.tsx 재설계)
 - [x] 채팅 API Route (/api/chat)
@@ -269,13 +284,24 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] 대시보드 뷰 구현 (감정 타임라인 + 빈도 차트 + 이번주 vs 지난주 비교)
 - [x] 월별 사용량 체크 로직 (chat_sessions 카운트 방식)
 - [x] 랜딩페이지 (서비스 소개 + 기술 스택 + 테마 연동)
-- [x] 시스템 프롬프트 개선 (감정 외 주제 차단, 두세 문장 이내)
+- [x] 시스템 프롬프트 개선 (감정 외 주제 차단, 공감 우선)
 - [x] auth callback 세션 쿠키 처리 수정
 - [x] sessionId 저장 누락 버그 수정
 - [x] 개발 서버 배포 (dev.lynqrateflow.com)
+- [x] 모바일 iOS Safari 최적화 (viewport, overscroll, safe-area, pull-to-refresh 차단)
+- [x] 모바일 사이드바 fixed overlay + 백드롭
+- [x] 사이드바 터치 이벤트 전파 차단 (stopPropagation)
+- [x] 사이드바 스크롤 containment
+- [x] 감정 컬러 범례 카드 추가 (대시보드)
+- [x] 스캐터 차트 강도별 크기 지수 계산으로 변경
+- [x] 테마 토글 dark 클래스 즉시 동기화
+- [x] auth callback 308 리다이렉트 (Google OAuth 히스토리 방지)
+- [x] 지인 테스트용 사용량 제한 비활성화
 - [ ] 운영 Supabase 생성 + schema.sql 실행
 - [ ] 운영 배포 (app.lynqrateflow.com)
+- [ ] 지인 테스트 후 사용량 제한 복구
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
 - [ ] 레거시 코드 제거
 - [ ] standard_emotions 매칭 로직 활성화
+- [ ] PWA manifest.json 추가
