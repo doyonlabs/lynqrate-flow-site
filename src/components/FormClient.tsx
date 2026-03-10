@@ -775,7 +775,7 @@ export default function FormClient() {
 
         {/* ── 설정 뷰 ── */}
         {view === 'settings' && (
-          <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg, height: 0 }}>
+          <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg, minHeight: 0 }}>
             <div style={{ maxWidth: 560, margin: '0 auto', padding: isMobile ? '24px 16px' : '32px 24px', minHeight: '100%' }}>
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>화면</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
@@ -840,8 +840,8 @@ export default function FormClient() {
                     {Icons.chart(t.muted)}
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: 16, color: t.text, fontWeight: 600, marginBottom: 8 }}>아직 감정 기록이 없어요</p>
-                    <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>대화를 마치면 감정이 여기 쌓여요.<br />데이터가 쌓일수록 패턴이 보이기 시작해요.</p>
+                    <p style={{ fontSize: 16, color: t.text, fontWeight: 600, marginBottom: 8 }}>오늘 어떤 하루였나요?</p>
+                    <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>기쁘든 힘들든, 오늘 느낀 감정을 편하게 털어놓아 보세요.<br />대화가 쌓일수록 내 감정 패턴이 보이기 시작해요.</p>
                   </div>
                   <button onClick={() => { setView('chat'); handleNewChat() }} style={{
                     marginTop: 8, padding: '12px 28px', borderRadius: 24,
@@ -849,7 +849,7 @@ export default function FormClient() {
                     border: 'none', color: '#fff', fontSize: 14, fontWeight: 600,
                     cursor: 'pointer', fontFamily: 'inherit',
                   }}>
-                    첫 대화 시작하기
+                    지금 시작하기
                   </button>
                 </div>
               ) : (() => {
