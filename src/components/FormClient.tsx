@@ -54,7 +54,7 @@ const supabase = createBrowserClient(
 
 const Icons = {
   menu: (color: string) => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
       <line x1="3" y1="6" x2="21" y2="6" />
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="18" x2="21" y2="18" />
@@ -412,7 +412,7 @@ export default function FormClient() {
 
       {/* ── 사이드바 (열림) ── */}
       {sidebarOpen && (
-        <div style={{
+        <div onClick={e => e.stopPropagation()} style={{
           width: 260, flexShrink: 0,
           borderRight: `1px solid ${t.border}`,
           display: 'flex', flexDirection: 'column',
@@ -593,12 +593,8 @@ export default function FormClient() {
           background: t.bg, flexShrink: 0,
         }}>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', flexShrink: 0,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            {Icons.menu(t.muted)}
-            {isMobile && <span style={{ fontSize: 12, color: t.muted }}>메뉴</span>}
-          </button>
+            background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0,
+          }}>{Icons.menu(isMobile ? t.text : t.muted)}</button>
 
           <span style={{ fontSize: 14, color: t.muted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {view === 'settings' ? '설정' : view === 'dashboard' ? '대시보드' : sessionEnded ? '대화 종료' : isLoading ? '답변 생성 중...' : '감정 대화'}
