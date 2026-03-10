@@ -776,7 +776,7 @@ export default function FormClient() {
         {/* ── 설정 뷰 ── */}
         {view === 'settings' && (
           <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg }}>
-            <div style={{ maxWidth: 560, margin: '0 auto', padding: isMobile ? '24px 16px' : '32px 24px' }}>
+            <div style={{ maxWidth: 560, margin: '0 auto', padding: isMobile ? '24px 16px' : '32px 24px', minHeight: '100%' }}>
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>화면</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
