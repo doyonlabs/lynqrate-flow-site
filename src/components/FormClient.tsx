@@ -388,12 +388,13 @@ export default function FormClient() {
   return (
     // [FIX] height: 100dvh → iOS Safari 주소창 포함 실제 뷰포트 높이
     <div style={{
-      display: 'flex', height: '100dvh',
+      display: 'flex',
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
       background: t.bg, color: t.text,
       fontFamily: "'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       transition: 'background 0.3s, color 0.3s',
       overflow: 'hidden',
-      position: 'relative',
     }}>
 
       {/* [FIX] 모바일 사이드바 백드롭 */}
