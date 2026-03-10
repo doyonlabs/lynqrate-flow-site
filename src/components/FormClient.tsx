@@ -1091,7 +1091,7 @@ export default function FormClient() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.4); border-radius: 2px; }
         textarea::placeholder { color: #555; }
         button { font-family: inherit; }
         @keyframes pulse {
