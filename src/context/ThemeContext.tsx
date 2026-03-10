@@ -35,6 +35,11 @@ export function ThemeProvider({
     document.documentElement.style.background = next === 'dark' ? '#0a0a0a' : '#ffffff'
     document.body.style.background = next === 'dark' ? '#0a0a0a' : '#ffffff'
     document.documentElement.classList.toggle('dark', next === 'dark')
+
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', next === 'dark' ? '#0a0a0a' : '#ffffff')
+    }
   }
 
   return (

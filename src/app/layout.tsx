@@ -6,6 +6,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Mind Echo',
   description: '나의 감정을 기록하고 AI 피드백을 받아보세요',
+  other: {
+    'theme-color': '#0a0a0a',
+  },
 }
 
 export const viewport = {
