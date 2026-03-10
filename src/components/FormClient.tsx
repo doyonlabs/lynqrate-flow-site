@@ -585,8 +585,9 @@ export default function FormClient() {
 
         {/* 헤더 */}
         <div style={{
-          height: 52, borderBottom: `1px solid ${t.border}`,
+          minHeight: 52, borderBottom: `1px solid ${t.border}`,
           display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12,
+          paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
           background: t.bg, flexShrink: 0,
         }}>
           <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
@@ -828,7 +829,7 @@ export default function FormClient() {
         {view === 'dashboard' && (
           <div style={{ flex: 1, overflowY: 'auto', background: t.bg }}>
             {/* [FIX] 모바일 패딩 줄임 */}
-            <div style={{ padding: isMobile ? '16px 12px 40px' : '28px 32px 40px' }}>
+            <div style={{ padding: isMobile ? '16px 12px 60px' : '28px 32px 40px', minHeight: '100%', background: t.bg }}>
               {dashboardLoading ? (
                 <p style={{ color: t.muted, fontSize: 14 }}>불러오는 중...</p>
               ) : dashboardData.length === 0 ? (
@@ -919,7 +920,7 @@ export default function FormClient() {
 
                     {/* ② 총 기록 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 11, color: t.muted, marginBottom: 12 }}>총 기록</p>
+                      <p style={{ fontSize: 12, color: t.muted, marginBottom: 12 }}>총 기록</p>
                       <p style={{ fontSize: 36, fontWeight: 700, color: t.text, lineHeight: 1 }}>
                         {total}<span style={{ fontSize: 14, color: t.muted, marginLeft: 4 }}>회</span>
                       </p>
@@ -927,7 +928,7 @@ export default function FormClient() {
 
                     {/* ③ 평균 강도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 11, color: t.muted, marginBottom: 12 }}>평균 강도</p>
+                      <p style={{ fontSize: 12, color: t.muted, marginBottom: 12 }}>평균 강도</p>
                       <p style={{ fontSize: 36, fontWeight: 700, color: '#a78bfa', lineHeight: 1 }}>
                         {avgIntensity}<span style={{ fontSize: 14, color: t.muted, marginLeft: 4 }}>/5</span>
                       </p>
@@ -935,7 +936,7 @@ export default function FormClient() {
 
                     {/* ④ 자주 느낀 감정 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 11, color: t.muted, marginBottom: 12 }}>자주 느낀 감정</p>
+                      <p style={{ fontSize: 12, color: t.muted, marginBottom: 12 }}>자주 느낀 감정</p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {top3.map(([emotion, count], i) => (
                           <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1054,7 +1055,7 @@ export default function FormClient() {
                                 {new Date(e.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
                               </span>
                             </div>
-                            {e.summary && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.6, marginLeft: 16 }}>{e.summary}</p>}
+                            {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, marginLeft: 16 }}>{e.summary}</p>}
                           </div>
                         ))}
                       </div>
