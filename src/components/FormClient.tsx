@@ -340,6 +340,7 @@ export default function FormClient() {
         .select('raw_emotion, intensity, trigger_text, summary')
         .eq('chat_session_id', session.id)
         .single()
+      scrollInstant.current = true
       setExtractedData(entry ? {
         emotion: entry.raw_emotion,
         intensity: entry.intensity,
