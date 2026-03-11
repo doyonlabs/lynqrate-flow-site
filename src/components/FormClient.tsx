@@ -332,6 +332,24 @@ export default function FormClient() {
     setSessionEnded(!!session.ended_at)
     setExtractedData(null)
     setIsExtracting(false)
+
+    // 종료된 세션이면 emotion_entry 가져오기
+    if (session.ended_at) {
+      const { data: entry } = await supabase
+        .from('emotion_entries')
+        .select('raw_emotion, intensity, trigger_text, summary')
+        .eq('chat_session_id', session.id)
+        .single()
+      setExtractedData(entry ? {
+        emotion: entry.raw_emotion,
+        intensity: entry.intensity,
+        trigger: entry.trigger_text ?? '',
+        summary: entry.summary ?? '',
+      } : null)
+    } else {
+      setExtractedData(null)
+    }
+    
     setView('chat')
     closeSidebarOnMobile()
   }
