@@ -33,38 +33,23 @@ export async function GET(request: NextRequest) {
   const { data } = await supabase.auth.exchangeCodeForSession(code)
 
   if (data.user) {
-    // users/subscriptions 처리 기존 코드 그대로
-    const { data: existingUser } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('id', data.user.id)
-      .single()
-
-    if (existingUser) {
-      await supabaseAdmin
+    await supabaseAdmin
         .from('users')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', data.user.id)
-    } else {
-      await supabaseAdmin
-        .from('users')
-        .insert({
-          id: data.user.id,
-          email: data.user.email,
-          display_name: data.user.user_metadata?.full_name ?? null,
-          avatar_url: data.user.user_metadata?.avatar_url ?? null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .upsert({
+            id: data.user.id,
+            email: data.user.email,
+            display_name: data.user.user_metadata?.full_name ?? null,
+            avatar_url: data.user.user_metadata?.avatar_url ?? null,
+            updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' })
 
-      await supabaseAdmin
+        await supabaseAdmin
         .from('subscriptions')
-        .insert({
-          user_id: data.user.id,
-          plan: 'free',
-          status: 'active',
-        })
-    }
+        .upsert({
+            user_id: data.user.id,
+            plan: 'free',
+            status: 'active',
+        }, { onConflict: 'user_id', ignoreDuplicates: true })
   }
 
   return response
