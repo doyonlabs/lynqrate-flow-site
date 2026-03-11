@@ -6,7 +6,6 @@ import { createServerClient } from '@supabase/ssr';
 const protectedRoutes = ['/form', '/result', '/dashboard', '/settings'];
 
 export async function middleware(req: NextRequest) {
-  //console.log('미들웨어 실행됨:', req.nextUrl.pathname);
   const host = req.headers.get('host')?.toLowerCase() || '';
 
   // 1. 루트/WWW에서만 app.으로 리다이렉트
@@ -94,11 +93,6 @@ export async function middleware(req: NextRequest) {
     );
 
     const { data: { user }, error } = await supabase.auth.getUser();
-
-console.log('pathname:', req.nextUrl.pathname)
-console.log('cookies:', req.cookies.getAll().map(c => c.name))
-console.log('user:', user?.id ?? null)
-console.log('error:', error?.message ?? null)
 
     if (!user) {
       const loginUrl = req.nextUrl.clone();
