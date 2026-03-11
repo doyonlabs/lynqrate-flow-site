@@ -82,5 +82,3 @@ OPENAI_API_KEY=
 
 Vercel CI/CD — GitHub 연동 자동 배포  
 개발 서버: [dev.lynqrateflow.com](https://dev.lynqrateflow.com)
-
-Vercel CI/CD — GitHub 연동 자동 배포
