@@ -469,7 +469,7 @@ export default function FormClient() {
               icon={Icons.chart(view === 'dashboard' ? t.text : t.muted)}
               label="대시보드"
               active={view === 'dashboard'}
-              onClick={() => { setView('dashboard'); closeSidebarOnMobile() }}
+              onClick={() => { setView('dashboard'); setActiveSessionId(null); closeSidebarOnMobile() }}
             />
             <div style={{ height: 1, background: t.border, margin: '8px 4px' }} />
           </div>

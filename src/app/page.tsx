@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 
 export default function Landing() {
   const { isDark } = useTheme()
+  const [modalSrc, setModalSrc] = useState<string | null>(null)
 
   const t = isDark ? {
     bg: '#0d0d1a',
@@ -211,6 +213,49 @@ export default function Landing() {
         .step-title { font-size: 15px; font-weight: 600; color: ${t.text}; margin-bottom: 10px; margin-top: 8px; }
         .step-desc { font-size: 13px; color: ${t.muted}; line-height: 1.8; }
 
+        /* 스크린샷 카드 */
+        .screenshot-card {
+          background: ${t.surface};
+          border: 1px solid ${t.border};
+          border-radius: 20px;
+          overflow: hidden;
+          cursor: pointer;
+          position: relative;
+          transition: border-color 0.3s, transform 0.3s;
+        }
+        .screenshot-card:hover {
+          border-color: ${t.cardHoverBorder};
+          transform: translateY(-4px);
+        }
+        .screenshot-hint {
+          position: absolute; bottom: 0; left: 0; right: 0;
+          padding: 24px 12px 12px;
+          background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);
+          font-size: 12px; color: #fff; text-align: center;
+          opacity: 0; transition: opacity 0.2s;
+        }
+        .screenshot-card:hover .screenshot-hint { opacity: 1; }
+
+        /* 모달 */
+        .modal-overlay {
+          position: fixed; inset: 0; z-index: 200;
+          background: rgba(0,0,0,0.85);
+          display: flex; align-items: center; justify-content: center;
+          padding: 24px; cursor: pointer;
+        }
+        .modal-img {
+          max-width: 90vw; max-height: 90vh;
+          border-radius: 16px; object-fit: contain;
+          cursor: default;
+        }
+        .modal-close {
+          position: absolute; top: 20px; right: 24px;
+          width: 36px; height: 36px; border-radius: 50%;
+          background: rgba(255,255,255,0.15); border: none;
+          color: #fff; font-size: 18px; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+        }
+
         .tech { max-width: 1100px; margin: 0 auto; padding: 0 24px 100px; position: relative; z-index: 1; }
 
         .tech-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 40px; }
@@ -277,13 +322,26 @@ export default function Landing() {
         }
       `}</style>
 
+      {/* 모달 */}
+      {modalSrc && (
+        <div className="modal-overlay" onClick={() => setModalSrc(null)}>
+          <button className="modal-close" onClick={() => setModalSrc(null)}>✕</button>
+          <img
+            src={modalSrc}
+            alt="서비스 화면"
+            className="modal-img"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       <div className="landing" style={{ background: t.bg }}>
         <nav>
           <a href="/" className="nav-logo">
             <div className="nav-logo-mark">✦</div>
             Mind Echo
           </a>
-          <a href="/form" className="nav-cta">무료로 시작하기</a>
+          <a href="/form" className="nav-cta">지금 시작하기</a>
         </nav>
 
         <section className="hero">
@@ -295,7 +353,7 @@ export default function Landing() {
           </h1>
           <p className="hero-sub">
             ChatGPT처럼 대화하되, 대화가 끝나면 감정 데이터가 쌓입니다.<br />
-            시간이 지날수록 내가 어떤 상황에서 힘든지 보이기 시작해요.
+            시간이 지날수록 나를 더 잘 알게 돼요.
           </p>
           <div className="hero-actions">
             <a href="/form" className="btn-primary">지금 털어놓기</a>
@@ -348,6 +406,35 @@ export default function Landing() {
           </div>
         </section>
 
+        <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 100px', position: 'relative', zIndex: 1 }}>
+          <div className="section-label">서비스 화면</div>
+          <h2 className="section-title">이렇게 생겼어요</h2>
+          <p style={{ fontSize: 13, color: t.muted, marginTop: 8, marginBottom: 40 }}>
+            이미지를 클릭하시면 크게 보실 수 있어요
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            {[
+              '/screenshots/chat.png',
+              '/screenshots/emotion-card.png',
+              '/screenshots/dashboard.png',
+            ].map((src) => (
+              <div
+                key={src}
+                className="screenshot-card"
+                onClick={() => setModalSrc(src)}
+              >
+                <img src={src} alt="서비스 화면" style={{ width: '100%', display: 'block' }} />
+                <div style={{ padding: '14px 16px', fontSize: 13, color: t.muted }}>
+                  {src.includes('chat') ? 'AI와 감정 대화'
+                    : src.includes('emotion') ? '대화 종료 후 자동 감정 추출'
+                    : '감정 패턴 대시보드'}
+                </div>
+                <div className="screenshot-hint">클릭하시면 크게 보실 수 있어요</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="tech">
           <div className="section-label">기술 스택</div>
           <h2 className="section-title">1인 풀스택 개발</h2>
@@ -373,13 +460,13 @@ export default function Landing() {
             <h2 className="cta-title">오늘 하루 어땠나요?</h2>
             <p className="cta-sub">잘 모르겠다면, 그냥 털어놔 보세요.<br />AI가 먼저 들어드릴게요.</p>
             <a href="/form" className="btn-primary" style={{ display: 'inline-block', position: 'relative' }}>
-              무료로 시작하기
+              지금 시작하기
             </a>
           </div>
         </section>
 
         <footer>
-          <div className="footer-text">© 2026 Mind Echo · Lynqrate</div>
+          <div className="footer-text">© {new Date().getFullYear()} Mind Echo · Lynqrate</div>
           <div className="footer-stack">Next.js · Supabase · GPT-4o-mini · Vercel</div>
         </footer>
       </div>
