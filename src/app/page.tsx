@@ -443,7 +443,7 @@ export default function Landing() {
             <span className="tech-tag highlight">Next.js 15</span>
             <span className="tech-tag highlight">TypeScript</span>
             <span className="tech-tag highlight">Supabase</span>
-            <span className="tech-tag highlight">GPT-4o-mini</span>
+            <span className="tech-tag highlight">GPT-4o</span>
             <span className="tech-tag">Tailwind CSS v4</span>
             <span className="tech-tag">Supabase Auth</span>
             <span className="tech-tag">Google OAuth</span>
@@ -467,7 +467,7 @@ export default function Landing() {
 
         <footer>
           <div className="footer-text">© {new Date().getFullYear()} Mind Echo · Lynqrate</div>
-          <div className="footer-stack">Next.js · Supabase · GPT-4o-mini · Vercel</div>
+          <div className="footer-stack">Next.js · Supabase · GPT-4o · Vercel</div>
         </footer>
       </div>
     </>

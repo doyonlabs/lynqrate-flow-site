@@ -12,7 +12,7 @@
 - **백엔드**: Next.js API Routes
 - **DB**: Supabase (PostgreSQL)
 - **인증**: Supabase Auth (Google OAuth)
-- **AI**: GPT-4o-mini API
+- **AI**: GPT-4o API
 - **배포**: Vercel
 
 ---
@@ -297,6 +297,7 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] 테마 토글 dark 클래스 즉시 동기화
 - [x] auth callback 308 리다이렉트 (Google OAuth 히스토리 방지)
 - [x] 지인 테스트용 사용량 제한 비활성화
+- [x] 랜딩페이지 스크린샷 섹션 + 모달 뷰어
 - [ ] 운영 Supabase 생성 + schema.sql 실행
 - [ ] 운영 배포 (app.lynqrateflow.com)
 - [ ] 지인 테스트 후 사용량 제한 복구
