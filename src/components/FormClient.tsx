@@ -39,6 +39,7 @@ interface EmotionEntry {
   intensity: number
   created_at: string
   summary: string | null
+  trigger_text?: string
 }
 
 type View = 'chat' | 'settings' | 'dashboard' | 'records'
@@ -227,7 +228,7 @@ export default function FormClient() {
     setDashboardLoading(true)
     const [{ data: entries }, { data: emotions }] = await Promise.all([
       supabase.from('emotion_entries')
-        .select('id, raw_emotion, intensity, created_at, summary')
+        .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
         .order('created_at', { ascending: true }).limit(50),
       supabase.from('standard_emotions').select('name, color_code'),
     ])
@@ -726,13 +727,13 @@ export default function FormClient() {
                       <IntensityBar value={extractedData.intensity} />
                       {extractedData.trigger && <p style={{ fontSize: 13, color: t.muted, marginTop: 12, lineHeight: 1.6 }}>{extractedData.trigger}</p>}
                       {extractedData.summary && <p style={{ fontSize: 14, color: t.text, marginTop: 10, lineHeight: 1.7 }}>{extractedData.summary}</p>}
-                      <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
                         <button onClick={handleNewChat} style={{
                           padding: '8px 16px', borderRadius: 20,
                           background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                           border: 'none', color: '#fff', fontSize: 12,
                           cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
-                          display: 'flex', alignItems: 'center', gap: 6,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                         }}>
                           {Icons.plus('#fff')} 새 대화 시작
                         </button>
@@ -741,7 +742,7 @@ export default function FormClient() {
                           background: 'transparent', border: `1px solid ${t.border}`,
                           color: t.muted, fontSize: 12,
                           cursor: 'pointer', fontFamily: 'inherit',
-                          display: 'flex', alignItems: 'center', gap: 6,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                         }}>
                           {Icons.chart(t.muted)} 대시보드 보기
                         </button>
@@ -1175,6 +1176,7 @@ export default function FormClient() {
                                           <span style={{ fontSize: 15, fontWeight: 600, color: t.text }}>{e.raw_emotion}</span>
                                           <span style={{ fontSize: 12, color: '#a78bfa', marginLeft: 4 }}>강도 {e.intensity}</span>
                                         </div>
+                                        {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, marginLeft: 16, opacity: 0.7 }}>{e.trigger_text}</p>}
                                         {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, marginLeft: 16 }}>{e.summary}</p>}
                                       </div>
                                     ))}
