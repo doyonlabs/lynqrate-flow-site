@@ -67,16 +67,16 @@ const Icons = {
     </svg>
   ),
   chart: (color: string) => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
       <rect x="3" y="12" width="4" height="9" />
       <rect x="10" y="7" width="4" height="14" />
       <rect x="17" y="3" width="4" height="18" />
     </svg>
   ),
   settings: (color: string) => (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
       <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   ),
   logout: (color: string) => (
@@ -139,6 +139,12 @@ export default function FormClient() {
   const [dashboardData, setDashboardData] = useState<EmotionEntry[]>([])
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [emotionColors, setEmotionColors] = useState<Record<string, string>>({})
+
+  const [calMonth, setCalMonth] = useState(new Date())
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+
+  const [calModalOpen, setCalModalOpen] = useState(false)
+
   const [hoveredPoint, setHoveredPoint] = useState<any>(null)
 
   const settingsRef = useRef<HTMLDivElement>(null)
@@ -463,7 +469,7 @@ export default function FormClient() {
             <div style={{ height: 1, background: t.border, margin: '8px 4px' }} />
           </div>
 
-          {/* 최근 기록 */}
+          {/* 대화 목록 */}
           <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', minHeight: 0 }}>
             <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>최근 기록</p>
             <div style={{ minHeight: '100%' }}>
@@ -475,16 +481,23 @@ export default function FormClient() {
                   const isActive = activeSessionId === s.id
                   return (
                     <div key={s.id} onClick={() => handleLoadSession(s)} style={{
-                      padding: '9px 12px', borderRadius: 8,
+                      padding: '11px 12px', borderRadius: 8,  // 9px → 11px
                       cursor: 'pointer', marginBottom: 2,
                       background: isActive ? t.hover : 'transparent',
                       transition: 'background 0.15s',
                     }}>
-                      <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {label}
-                      </div>
-                      <div style={{ fontSize: 11, color: t.muted, marginTop: 2 }}>
-                        {s.ended_at ? '완료' : '진행 중'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                        <span style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                          {label}
+                        </span>
+                        <span style={{
+                          fontSize: 10, flexShrink: 0,
+                          padding: '2px 7px', borderRadius: 10,
+                          background: s.ended_at ? (isDark ? '#a78bfa22' : '#a78bfa33') : (isDark ? '#6ee7b722' : '#6ee7b733'),
+                          color: s.ended_at ? '#a78bfa' : (isDark ? '#6ee7b7' : '#059669'),
+                        }}>
+                          {s.ended_at ? '완료' : '진행 중'}
+                        </span>
                       </div>
                     </div>
                   )
@@ -861,16 +874,23 @@ export default function FormClient() {
                   const isActive = activeSessionId === s.id
                   return (
                     <div key={s.id} onClick={() => handleLoadSession(s)} style={{
-                      padding: '12px 16px', borderRadius: 12, marginBottom: 4,
+                      padding: '12px 16px', borderRadius: 12, marginBottom: 8,
                       background: isActive ? t.hover : t.sidebar,
                       border: `1px solid ${t.border}`,
                       cursor: 'pointer',
                     }}>
-                      <div style={{ fontSize: 14, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {label}
-                      </div>
-                      <div style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>
-                        {s.ended_at ? '완료' : '진행 중'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                        <span style={{ fontSize: 14, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                          {label}
+                        </span>
+                        <span style={{
+                          fontSize: 10, flexShrink: 0,
+                          padding: '2px 7px', borderRadius: 10,
+                          background: s.ended_at ? (isDark ? '#a78bfa22' : '#a78bfa33') : (isDark ? '#6ee7b722' : '#6ee7b733'),
+                          color: s.ended_at ? '#a78bfa' : (isDark ? '#6ee7b7' : '#059669'),
+                        }}>
+                          {s.ended_at ? '완료' : '진행 중'}
+                        </span>
                       </div>
                     </div>
                   )
@@ -894,7 +914,11 @@ export default function FormClient() {
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: 16, color: t.text, fontWeight: 600, marginBottom: 8 }}>오늘 어떤 하루였나요?</p>
-                    <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>기쁘든 힘들든, 오늘 느낀 감정을 편하게 털어놓아 보세요.<br />대화가 쌓일수록 내 감정 패턴이 보이기 시작해요.</p>
+                    <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>
+                      기쁘든 힘들든, 오늘 느낀 감정을 편하게 털어놓아 보세요.<br />
+                      대화가 쌓일수록 내 감정 패턴이 보이기 시작해요.<br />
+                      대화를 종료하면 감정이 자동으로 기록돼요.
+                    </p>
                   </div>
                   <button onClick={() => { setView('chat'); handleNewChat() }} style={{
                     marginTop: 8, padding: '12px 28px', borderRadius: 24,
@@ -934,10 +958,10 @@ export default function FormClient() {
 
                 const insightText = (() => {
                   const high = dashboardData.filter(e => e.intensity >= 4).length
-                  if (weekDiff !== null && weekDiff > 0.5) return `이번 주 감정 강도가 지난 주보다 높아졌어요. ${topEmotion[0]}이 많이 느껴지고 있네요.`
-                  if (weekDiff !== null && weekDiff < -0.5) return `이번 주는 지난 주보다 조금 가라앉은 것 같아요. ${topEmotion[0]}이 주를 이루고 있어요.`
-                  if (high > total * 0.6) return `요즘 감정 강도가 높은 편이에요. ${topEmotion[0]}을(를) 가장 자주 느끼고 있어요.`
-                  return `${total}번의 기록 중 ${topEmotion[0]}을(를) 가장 많이 느꼈어요.`
+                  if (weekDiff !== null && weekDiff > 0.5) return `이번 주 ${topEmotion[0]}이 유독 많이 느껴지고 있어요. 요즘 좀 버거운 시간을 보내고 있는 것 같아요.`
+                  if (weekDiff !== null && weekDiff < -0.5) return `지난 주보다 마음이 조금 가라앉은 것 같아요. ${topEmotion[0]}이 주를 이루고 있네요.`
+                  if (high > total * 0.6) return `요즘 감정의 무게가 꽤 있는 편이에요. ${topEmotion[0]}을(를) 자주 느끼고 있어요.`
+                  return `${total}번의 기록 중 ${topEmotion[0]}을(를) 가장 많이 느꼈어요. 털어놓아줘서 고마워요.`
                 })()
 
                 // [FIX] 모바일: 1열 / 데스크탑: 3열 — 인라인 스타일로 확실하게
@@ -975,33 +999,191 @@ export default function FormClient() {
 
                     {/* ② 총 기록 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 12, color: t.muted, marginBottom: 12 }}>총 기록</p>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 12 }}>총 기록</p>
                       <p style={{ fontSize: 36, fontWeight: 700, color: t.text, lineHeight: 1 }}>
                         {total}<span style={{ fontSize: 14, color: t.muted, marginLeft: 4 }}>회</span>
                       </p>
                     </div>
 
-                    {/* ③ 평균 강도 */}
+                    {/* ③ 감정별 평균 강도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 12, color: t.muted, marginBottom: 12 }}>평균 강도</p>
-                      <p style={{ fontSize: 36, fontWeight: 700, color: '#a78bfa', lineHeight: 1 }}>
-                        {avgIntensity}<span style={{ fontSize: 14, color: t.muted, marginLeft: 4 }}>/5</span>
-                      </p>
-                    </div>
-
-                    {/* ④ 자주 느낀 감정 */}
-                    <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 12, color: t.muted, marginBottom: 12 }}>자주 느낀 감정</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {top3.map(([emotion, count], i) => (
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정별 평균 강도</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {Object.entries(
+                          dashboardData.reduce((acc, e) => {
+                            if (!acc[e.raw_emotion]) acc[e.raw_emotion] = { sum: 0, count: 0 }
+                            acc[e.raw_emotion].sum += e.intensity
+                            acc[e.raw_emotion].count += 1
+                            return acc
+                          }, {} as Record<string, { sum: number; count: number }>)
+                        )
+                        .map(([emotion, { sum, count }]) => ({ emotion, avg: sum / count }))
+                        .sort((a, b) => b.avg - a.avg)
+                        .map(({ emotion, avg }) => (
                           <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: emotionColors[emotion] ?? '#a78bfa', opacity: 1 - i * 0.25 }} />
-                            <span style={{ fontSize: 14, color: t.text, fontWeight: i === 0 ? 600 : 400 }}>{emotion}</span>
-                            <span style={{ fontSize: 12, color: t.muted, marginLeft: 'auto' }}>{count}회</span>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: emotionColors[emotion] ?? '#a78bfa' }} />
+                            <span style={{ fontSize: 13, color: t.text, width: 36, flexShrink: 0 }}>{emotion}</span>
+                            <div style={{ flex: 1, height: 6, borderRadius: 3, background: t.border }}>
+                              <div style={{ width: `${(avg / 5) * 100}%`, height: '100%', borderRadius: 3, background: emotionColors[emotion] ?? '#a78bfa' }} />
+                            </div>
+                            <span style={{ fontSize: 12, color: t.muted, width: 28, textAlign: 'right', flexShrink: 0 }}>{avg.toFixed(1)}</span>
                           </div>
                         ))}
                       </div>
                     </div>
+
+                    {/* 4. 감정 빈도 */}
+                    <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 8 }}>감정 빈도</p>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={barData} barSize={20} layout="vertical">
+                          <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: t.text }} axisLine={false} tickLine={false} width={36} />
+                          <Bar dataKey="count"
+                            shape={(props: any) => {
+                              const { x, y, width, height, payload } = props
+                              return <rect x={x} y={y} width={width} height={height} fill={emotionColors[payload.name] ?? '#a78bfa'} rx={4} ry={4} />
+                            }}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* ⑥ 감정 캘린더 */}
+                    {(() => {
+                      const year = calMonth.getFullYear()
+                      const month = calMonth.getMonth()
+                      const firstDay = new Date(year, month, 1).getDay()
+                      const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+                      // 날짜별 감정 그룹
+                      const byDate: Record<string, typeof dashboardData> = {}
+                      dashboardData.forEach(e => {
+                        const d = new Date(e.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                        if (!byDate[d]) byDate[d] = []
+                        byDate[d].push(e)
+                      })
+
+                      const cells = []
+                      for (let i = 0; i < firstDay; i++) cells.push(null)
+                      for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+                      const selectedKey = selectedDay
+                      const selectedEntries = selectedKey ? (byDate[selectedKey] ?? []) : []
+
+                      return (
+                        <div style={{ gridColumn: fullSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                          {/* 헤더 */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                            <div>
+                              <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>감정 캘린더</p>
+                              <p style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>날짜를 눌러 기록을 확인하세요 · 대화 종료 시 자동 기록돼요</p>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <button onClick={() => setCalMonth(new Date(year, month - 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>‹</button>
+                              <span style={{ fontSize: 13, color: t.text }}>{year}년 {month + 1}월</span>
+                              <button onClick={() => setCalMonth(new Date(year, month + 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>›</button>
+                            </div>
+                          </div>
+
+                          {/* 요일 헤더 */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 4 }}>
+                            {['일', '월', '화', '수', '목', '금', '토'].map(d => (
+                              <div key={d} style={{ textAlign: 'center', fontSize: 11, color: t.muted, padding: '4px 0' }}>{d}</div>
+                            ))}
+                          </div>
+
+                          {/* 날짜 셀 */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, justifyItems: 'center' }}>
+                            {cells.map((day, i) => {
+                              if (!day) return <div key={`empty-${i}`} />
+                              const dateKey = new Date(year, month, day).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                              const entries = byDate[dateKey] ?? []
+                              const isSelected = selectedDay === dateKey
+                              const isToday = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) === dateKey
+
+                              return (
+                                <div key={day} onClick={() => {
+                                  if (entries.length) {
+                                    setSelectedDay(dateKey)
+                                    setCalModalOpen(true)
+                                  }
+                                }} style={{
+                                  width: 56, height: 56,  // aspectRatio 대신 고정 크기
+                                  maxWidth: 56,
+                                  borderRadius: 8, cursor: entries.length ? 'pointer' : 'default',
+                                  background: isSelected ? '#a78bfa33'
+                                            : entries.length ? `${emotionColors[entries.sort((a, b) => b.intensity - a.intensity)[0].raw_emotion] ?? '#a78bfa'}22`
+                                            : 'transparent',
+                                  border: isToday ? `1px solid #a78bfa` : `1px solid transparent`,
+                                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', 
+                                  justifyContent: 'flex-start', padding: '3px 4px', gap: 1,
+                                  transition: 'background 0.15s',
+                                }}>
+                                  <span style={{ fontSize: 12, color: entries.length ? t.text : t.muted, lineHeight: 1 }}>{day}</span>
+                                  {entries.length > 0 && (
+                                    <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', maxWidth: 36 }}>
+                                      {entries.slice(0, 3).map((e, idx) => (
+                                        <div key={idx} style={{ width: 5, height: 5, borderRadius: '50%', background: emotionColors[e.raw_emotion] ?? '#a78bfa' }} />
+                                      ))}
+                                      {entries.length > 3 && <span style={{ fontSize: 8, color: t.muted }}>+{entries.length - 3}</span>}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {/* 캘린더 날짜 모달 */}
+                          {calModalOpen && selectedDay && (() => {
+                            const entries = byDate[selectedDay] ?? []
+                            const dateLabel = new Date(selectedDay.replace(/\. /g, '-').replace('.', '')).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+                            return (
+                              <div
+                                onClick={() => setCalModalOpen(false)}
+                                style={{
+                                  position: 'fixed', inset: 0,
+                                  background: 'rgba(0,0,0,0.5)',
+                                  zIndex: 200,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  padding: 24,
+                                }}
+                              >
+                                <div
+                                  onClick={e => e.stopPropagation()}
+                                  style={{
+                                    background: t.popup, border: `1px solid ${t.border}`,
+                                    borderRadius: 20, padding: '24px 28px',
+                                    width: '100%', maxWidth: 360,
+                                    boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                                    <span style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{dateLabel}</span>
+                                    <button
+                                      onClick={() => setCalModalOpen(false)}
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 20, lineHeight: 1, padding: 4 }}
+                                    >×</button>
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
+                                    {entries.map(e => (
+                                      <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: emotionColors[e.raw_emotion] ?? '#a78bfa', flexShrink: 0 }} />
+                                          <span style={{ fontSize: 15, fontWeight: 600, color: t.text }}>{e.raw_emotion}</span>
+                                          <span style={{ fontSize: 12, color: '#a78bfa', marginLeft: 4 }}>강도 {e.intensity}</span>
+                                        </div>
+                                        {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, marginLeft: 16 }}>{e.summary}</p>}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )
+                    })()}
 
                     {/* ⑤ 이번주 vs 지난주 */}
                     {weekDiff !== null && (
@@ -1033,102 +1215,6 @@ export default function FormClient() {
                         </div>
                       </div>
                     )}
-
-                    {/* ⑥ 감정 타임라인 */}
-                    <div style={{ gridColumn: halfSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 4 }}>감정 타임라인</p>
-                      <p style={{ fontSize: 11, color: t.muted, marginBottom: 16 }}>점 크기 = 감정 강도</p>
-                      <ResponsiveContainer width="100%" height={160}>
-                        <ScatterChart margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
-                          <XAxis dataKey="x" type="number" domain={[-0.5, dashboardData.length - 0.5]} tick={false} axisLine={false} tickLine={false} />
-                          <YAxis dataKey="y" type="number" domain={[-0.5, emotionList.length - 0.5]}
-                            ticks={emotionList.map((_, i) => i)}
-                            tickFormatter={v => emotionList[v] ?? ''}
-                            tick={{ fontSize: 11, fill: t.muted }}
-                            axisLine={false} tickLine={false} width={36} />
-                          <ZAxis dataKey="z" range={[40, 160]} />
-                          {hoveredPoint && (
-                            <foreignObject x={hoveredPoint.cx + 10} y={hoveredPoint.cy - 20} width={140} height={50}>
-                              <div style={{ background: t.popup, border: `1px solid ${t.border}`, borderRadius: 8, padding: '6px 10px', fontSize: 12, color: t.text, whiteSpace: 'nowrap' }}>
-                                <div style={{ fontWeight: 600 }}>{hoveredPoint.emotion} · 강도 {hoveredPoint.intensity}</div>
-                                <div style={{ color: t.muted }}>{hoveredPoint.date}</div>
-                              </div>
-                            </foreignObject>
-                          )}
-                          <Scatter data={timelineData}
-                            shape={(props: any) => {
-                              const { cx, cy, payload } = props
-                              return (
-                                <circle cx={cx} cy={cy} r={Math.sqrt(payload.z) * 1.0}
-                                  fill={payload.color} fillOpacity={0.8} style={{ cursor: 'pointer' }}
-                                  onMouseEnter={() => setHoveredPoint({ ...payload, cx, cy })}
-                                  onMouseLeave={() => setHoveredPoint(null)} />
-                              )
-                            }}
-                          />
-                        </ScatterChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    {/* ⑦ 감정 빈도 */}
-                    <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정 빈도</p>
-                      <ResponsiveContainer width="100%" height={160}>
-                        <BarChart data={barData} barSize={20} layout="vertical">
-                          <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
-                          <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: t.muted }} axisLine={false} tickLine={false} width={36} />
-                          <Tooltip
-                            contentStyle={{ background: t.popup, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 12 }}
-                            formatter={(value) => [`${value}회`]}
-                          />
-                          <Bar dataKey="count"
-                            shape={(props: any) => {
-                              const { x, y, width, height, payload } = props
-                              return <rect x={x} y={y} width={width} height={height} fill={emotionColors[payload.name] ?? '#a78bfa'} rx={4} ry={4} />
-                            }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    {/* ⑦-1 감정 컬러 범례 */}
-                    <div style={{ gridColumn: fullSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '20px 28px' }}>
-                      <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정 색상 범례</p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                        {Object.entries(emotionColors).map(([name, color]) => (
-                          <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                            <span style={{ fontSize: 13, color: t.text }}>{name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* ⑧ 최근 기록 */}
-                    <div style={{ gridColumn: fullSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, overflow: 'hidden' }}>
-                      <p style={{ fontSize: 13, color: t.text, fontWeight: 500, padding: '20px 24px 12px' }}>최근 기록</p>
-                      {/* [FIX] 모바일: 1열 / 데스크탑: 2열 */}
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr' }}>
-                        {[...dashboardData].reverse().slice(0, 6).map((e, i) => (
-                          <div key={e.id} style={{
-                            padding: '14px 24px',
-                            borderTop: `1px solid ${t.border}`,
-                            borderRight: !isMobile && i % 2 === 0 ? `1px solid ${t.border}` : 'none',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                              <div style={{ width: 8, height: 8, borderRadius: '50%', background: emotionColors[e.raw_emotion] ?? '#a78bfa', flexShrink: 0 }} />
-                              <span style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{e.raw_emotion}</span>
-                              <span style={{ fontSize: 11, color: '#a78bfa' }}>강도 {e.intensity}</span>
-                              <span style={{ fontSize: 11, color: t.muted, marginLeft: 'auto' }}>
-                                {new Date(e.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
-                              </span>
-                            </div>
-                            {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, marginLeft: 16 }}>{e.summary}</p>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
                   </div>
                 )
               })()}
@@ -1184,11 +1270,11 @@ export default function FormClient() {
             return (
               <button key={tab.id} onClick={tab.onClick} style={{
                 flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 4,
-                background: 'none', border: 'none', cursor: 'pointer',
+                justifyContent: 'center', gap: 4, height: 56,
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
               }}>
                 {tab.icon(color)}
-                <span style={{ fontSize: 10, color }}>{tab.label}</span>
+                <span style={{ fontSize: 10, color: active ? '#a78bfa' : t.muted, lineHeight: 1 }}>{tab.label}</span>
               </button>
             )
           })}
@@ -1214,10 +1300,10 @@ export default function FormClient() {
 // ─── 테마 ────────────────────────────────────────────────────────────────────
 
 const dark = {
-  bg: '#0a0a0a', sidebar: '#0f0f0f', text: '#e8e8e8', muted: '#888',
+  bg: '#0a0a0a', sidebar: '#0f0f0f', text: '#e8e8e8', muted: '#aaa',
   border: '#2a2a2a', aiMsg: '#161616', input: '#111', hover: '#1e1e1e', popup: '#161616',
 }
 const light = {
-  bg: '#ffffff', sidebar: '#f9f9f9', text: '#111', muted: '#999',
+  bg: '#ffffff', sidebar: '#f9f9f9', text: '#111', muted: '#666',
   border: '#e5e5e5', aiMsg: '#f4f4f4', input: '#f9f9f9', hover: '#f0f0f0', popup: '#ffffff',
 }
