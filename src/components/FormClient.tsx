@@ -1095,7 +1095,7 @@ export default function FormClient() {
                           </div>
 
                           {/* 날짜 셀 */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, justifyItems: 'center' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, justifyItems: 'center', overflow: 'hidden' }}>
                             {cells.map((day, i) => {
                               if (!day) return <div key={`empty-${i}`} />
                               const dateKey = new Date(year, month, day).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -1110,8 +1110,7 @@ export default function FormClient() {
                                     setCalModalOpen(true)
                                   }
                                 }} style={{
-                                  width: 56, height: 56,  // aspectRatio 대신 고정 크기
-                                  maxWidth: 56,
+                                  width: '100%', aspectRatio: '1', maxWidth: 52,
                                   borderRadius: 8, cursor: entries.length ? 'pointer' : 'default',
                                   background: isSelected ? '#a78bfa33'
                                             : entries.length ? `${emotionColors[entries.sort((a, b) => b.intensity - a.intensity)[0].raw_emotion] ?? '#a78bfa'}22`
