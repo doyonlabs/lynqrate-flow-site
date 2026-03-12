@@ -41,7 +41,7 @@ interface EmotionEntry {
   summary: string | null
 }
 
-type View = 'chat' | 'settings' | 'dashboard'
+type View = 'chat' | 'settings' | 'dashboard' | 'records'
 
 // ─── Supabase ────────────────────────────────────────────────────────────────
 
@@ -151,7 +151,7 @@ export default function FormClient() {
   // [FIX] mount 후 뷰포트 감지 → SSR hydration 불일치 없음
   useEffect(() => {
     const checkViewport = () => {
-      const mobile = window.innerWidth < 768
+      const mobile = window.innerWidth < 1024
       setIsMobile(mobile)
       setSidebarOpen(!mobile) // 데스크탑: 열림 / 모바일: 닫힘
     }
@@ -417,20 +417,8 @@ export default function FormClient() {
       overflow: 'hidden',
     }}>
 
-      {/* [FIX] 모바일 사이드바 백드롭 */}
-      {isMobile && sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 40,
-          }}
-        />
-      )}
-
       {/* ── 사이드바 (열림) ── */}
-      {sidebarOpen && (
+      {sidebarOpen && !isMobile && (
         <div onClick={e => e.stopPropagation()} style={{
           width: 260, flexShrink: 0,
           borderRight: `1px solid ${t.border}`,
@@ -600,11 +588,7 @@ export default function FormClient() {
 
       {/* ── 메인 영역 ── */}
       {/* [FIX] minWidth: 0 → flex child가 제대로 줄어들게 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0,
-        transform: isMobile && sidebarOpen ? 'translateX(260px)' : 'translateX(0)',
-        transition: 'transform 0.25s ease',
-        pointerEvents: isMobile && sidebarOpen ? 'none' : 'auto',
-      }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, }}>
 
         {/* 헤더 */}
         <div style={{
@@ -613,13 +597,29 @@ export default function FormClient() {
           paddingTop: isMobile ? 'env(safe-area-inset-top, 0px)' : 0,
           background: t.bg, flexShrink: 0,
         }}>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0,
-          }}>{Icons.menu(isMobile ? t.text : t.muted)}</button>
+          {!isMobile && (
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0,
+            }}>{Icons.menu(isMobile ? t.text : t.muted)}</button>
+          )}
 
-          <span style={{ fontSize: 14, color: t.muted, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {view === 'settings' ? '설정' : view === 'dashboard' ? '대시보드' : sessionEnded ? '대화 종료' : isLoading ? '답변 생성 중...' : '감정 대화'}
-          </span>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+            <span style={{ fontSize: 14, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {view === 'settings' ? '설정'
+                : view === 'dashboard' ? '대시보드'
+                : view === 'records' ? '기록'
+                : sessions.find(s => s.id === activeSessionId)?.title ?? '새 대화'}
+            </span>
+            {view === 'chat' && activeSessionId && (
+              <span style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 10, flexShrink: 0,
+                background: sessionEnded ? '#a78bfa22' : '#6ee7b722',
+                color: sessionEnded ? '#a78bfa' : '#6ee7b7',
+              }}>
+                {sessionEnded ? '완료' : '진행 중'}
+              </span>
+            )}
+          </div>
 
           {view === 'chat' && hasUserMessage && !sessionEnded && !(isMobile && sidebarOpen) && (
             <button onClick={handleEndSession} disabled={isLoading} style={{
@@ -741,7 +741,7 @@ export default function FormClient() {
 
             {!sessionEnded && (
               <div style={{
-                padding: isMobile ? '10px 12px env(safe-area-inset-bottom, 12px)' : '12px 24px 16px',
+                padding: isMobile ? '10px 12px calc(56px + env(safe-area-inset-bottom, 0px))' : '12px 24px 16px',
                 background: t.bg, borderTop: `1px solid ${t.border}`, flexShrink: 0,
               }}>
                 <div style={{ maxWidth: 680, margin: '0 auto' }}>
@@ -848,11 +848,43 @@ export default function FormClient() {
           </div>
         )}
 
+        {/* ── 기록 뷰 ── */}
+        {view === 'records' && (
+          <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg, minHeight: 0 }}>
+            <div style={{ padding: '16px 12px 80px' }}>
+              <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 12, letterSpacing: '0.06em' }}>최근 기록</p>
+              {sessions.length === 0 ? (
+                <p style={{ fontSize: 13, color: t.muted, padding: '8px 12px' }}>아직 대화 기록이 없어요</p>
+              ) : (
+                sessions.map(s => {
+                  const label = s.title ?? new Date(s.started_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+                  const isActive = activeSessionId === s.id
+                  return (
+                    <div key={s.id} onClick={() => handleLoadSession(s)} style={{
+                      padding: '12px 16px', borderRadius: 12, marginBottom: 4,
+                      background: isActive ? t.hover : t.sidebar,
+                      border: `1px solid ${t.border}`,
+                      cursor: 'pointer',
+                    }}>
+                      <div style={{ fontSize: 14, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {label}
+                      </div>
+                      <div style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>
+                        {s.ended_at ? '완료' : '진행 중'}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── 대시보드 뷰 ── */}
         {view === 'dashboard' && (
           <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg }}>
             {/* [FIX] 모바일 패딩 줄임 */}
-            <div style={{ padding: isMobile ? '16px 12px 60px' : '28px 32px 40px', minHeight: '100%', background: t.bg }}>
+            <div style={{ padding: isMobile ? '16px 12px 80px' : '28px 32px 40px', minHeight: '100%', background: t.bg }}>
               {dashboardLoading ? (
                 <p style={{ color: t.muted, fontSize: 14 }}>불러오는 중...</p>
               ) : dashboardData.length === 0 ? (
@@ -1105,6 +1137,63 @@ export default function FormClient() {
         )}
 
       </div>
+      
+      {/* ── 모바일 하단 탭바 ── */}
+      {isMobile && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          height: `calc(56px + env(safe-area-inset-bottom, 0px))`,
+          background: t.bg, borderTop: `1px solid ${t.border}`,
+          display: 'flex', zIndex: 30,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}>
+          {[
+            {
+              id: 'chat', label: '대화',
+              icon: (color: string) => (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              ),
+              onClick: () => { setView('chat'); if (!sessionId) handleNewChat() },
+            },
+            {
+              id: 'records', label: '기록',
+              icon: (color: string) => (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              ),
+              onClick: () => setView('records'),
+            },
+            {
+              id: 'dashboard', label: '대시보드',
+              icon: Icons.chart,
+              onClick: () => setView('dashboard'),
+            },
+            {
+              id: 'settings', label: '설정',
+              icon: Icons.settings,
+              onClick: () => setView('settings'),
+            },
+          ].map(tab => {
+            const active = view === tab.id
+            const color = active ? '#a78bfa' : t.muted
+            return (
+              <button key={tab.id} onClick={tab.onClick} style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', gap: 4,
+                background: 'none', border: 'none', cursor: 'pointer',
+              }}>
+                {tab.icon(color)}
+                <span style={{ fontSize: 10, color }}>{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
