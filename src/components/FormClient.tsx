@@ -371,6 +371,18 @@ export default function FormClient() {
     window.location.href = '/login'
   }
 
+  // ─── 탈퇴하기 ────────────────────────────────────────────────────────────
+  const handleDeleteAccount = async () => {
+    if (!confirm('정말 탈퇴하시겠어요? 모든 기록이 삭제되며 복구할 수 없어요.')) return
+    const res = await fetch('/api/user/delete', { method: 'DELETE' })
+    if (res.ok) {
+      await supabase.auth.signOut()
+      window.location.href = '/'
+    } else {
+      alert('탈퇴 처리 중 오류가 발생했어요. 다시 시도해주세요.')
+    }
+  }
+
   // ─── 서브 컴포넌트 ───────────────────────────────────────────────────────
 
   const AIAvatar = () => (
@@ -858,6 +870,16 @@ export default function FormClient() {
                   fontFamily: 'inherit', textAlign: 'left',
                 }}>
                   {Icons.logout('#f87171')} 로그아웃
+                </button>
+                <div style={{ height: 1, background: t.border }} />
+                <button onClick={handleDeleteAccount} style={{
+                  width: '100%', padding: '14px 16px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: 'transparent', border: 'none',
+                  color: '#f87171', fontSize: 14, cursor: 'pointer',
+                  fontFamily: 'inherit', textAlign: 'left', opacity: 0.6,
+                }}>
+                  회원 탈퇴
                 </button>
               </div>
             </div>
