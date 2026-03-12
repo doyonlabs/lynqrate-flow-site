@@ -656,7 +656,7 @@ export default function FormClient() {
         {/* ── 채팅 뷰 ── */}
         {view === 'chat' && (
           <>
-            <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', padding: '24px 0', background: t.bg, minHeight: 0 }}>
+            <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', padding: isMobile ? '24px 0 80px' : '24px 0', background: t.bg, minHeight: 0 }}>
               {/* [FIX] 모바일 패딩 줄임 */}
               <div style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px', minHeight: '100%' }}>
 
@@ -1075,16 +1075,16 @@ export default function FormClient() {
                       return (
                         <div style={{ gridColumn: fullSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
                           {/* 헤더 */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                            <div>
+                          <div style={{ marginBottom: 16 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                               <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>감정 캘린더</p>
-                              <p style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>날짜를 눌러 기록을 확인하세요 · 대화 종료 시 자동 기록돼요</p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <button onClick={() => setCalMonth(new Date(year, month - 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>‹</button>
+                                <span style={{ fontSize: 13, color: t.text }}>{year}년 {month + 1}월</span>
+                                <button onClick={() => setCalMonth(new Date(year, month + 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>›</button>
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                              <button onClick={() => setCalMonth(new Date(year, month - 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>‹</button>
-                              <span style={{ fontSize: 13, color: t.text }}>{year}년 {month + 1}월</span>
-                              <button onClick={() => setCalMonth(new Date(year, month + 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>›</button>
-                            </div>
+                            <p style={{ fontSize: 12, color: t.muted }}>날짜 클릭 시 기록 확인 · 대화 종료 시 자동 저장</p>
                           </div>
 
                           {/* 요일 헤더 */}
@@ -1223,7 +1223,26 @@ export default function FormClient() {
         )}
 
       </div>
-      
+
+      {/* ── 모바일 새 대화 플로팅 버튼 ── */}
+      {isMobile && view === 'chat' && !sessionEnded && (
+        <button onClick={handleNewChat} style={{
+          position: 'fixed',
+          right: 16,
+          bottom: `calc(56px + env(safe-area-inset-bottom, 0px) + 72px)`,
+          height: 44, borderRadius: 22,
+          padding: '0 16px',
+          background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+          border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6,
+          boxShadow: '0 4px 16px rgba(124, 58, 237, 0.4)',
+          zIndex: 20,
+        }}>
+          {Icons.plus('#fff')}
+          <span style={{ fontSize: 13, color: '#fff', fontWeight: 500 }}>새 대화</span>
+        </button>
+      )}
+
       {/* ── 모바일 하단 탭바 ── */}
       {isMobile && (
         <div style={{
@@ -1241,7 +1260,11 @@ export default function FormClient() {
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               ),
-              onClick: () => { setView('chat'); if (!sessionId) handleNewChat() },
+              onClick: () => { 
+                scrollInstant.current = true
+                setView('chat')
+                setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior }), 0)
+              },
             },
             {
               id: 'records', label: '기록',
