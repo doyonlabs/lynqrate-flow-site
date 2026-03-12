@@ -727,7 +727,7 @@ export default function FormClient() {
                       <IntensityBar value={extractedData.intensity} />
                       {extractedData.trigger && <p style={{ fontSize: 13, color: t.muted, marginTop: 12, lineHeight: 1.6 }}>{extractedData.trigger}</p>}
                       {extractedData.summary && <p style={{ fontSize: 14, color: t.text, marginTop: 10, lineHeight: 1.7 }}>{extractedData.summary}</p>}
-                      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                      <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button onClick={handleNewChat} style={{
                           padding: '8px 16px', borderRadius: 20,
                           background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
