@@ -35,7 +35,8 @@ create table public.subscriptions (
   started_at timestamptz not null default now(),
   expires_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint subscriptions_user_id_key unique (user_id)
 );
 
 alter table public.subscriptions enable row level security;

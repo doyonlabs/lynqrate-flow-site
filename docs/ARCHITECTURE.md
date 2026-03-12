@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-10
+> 마지막 업데이트: 2026-03-12
 
 ---
 
@@ -30,7 +30,7 @@
         ↓
 [채팅 /form] ← 로그인 필수 (기본 뷰: dashboard)
         ↓ 메시지 전송마다
-[POST /api/chat] → GPT-4o-mini 호출 → chat_messages 저장
+[POST /api/chat] → GPT-4o 호출 → chat_messages 저장
         ↓ 대화 종료 버튼
 [POST /api/chat/extract] → GPT 감정 추출 → emotion_entries 저장
         ↓
@@ -79,6 +79,7 @@ Google 로그인 클릭
 | `src/components/FormClient.tsx` | 채팅 UI + 대시보드 뷰 (기본값: dashboard) |
 | `src/app/api/chat/route.ts` | 채팅 API Route (GPT 대화 + chat_messages 저장) |
 | `src/app/api/chat/extract/route.ts` | 대화 종료 시 감정 추출 + emotion_entries 저장 |
+| `src/app/api/user/delete/route.ts` | 회원 탈퇴 (auth.users 삭제 → cascade로 전체 삭제) |
 | `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login, / 접근 시 /form 리다이렉트 |
 
 ---
@@ -111,7 +112,8 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 ```
 레이아웃: position: fixed (top/left/right/bottom: 0) → iOS Safari 주소창 높이 이슈 해결
 스크롤: overscrollBehavior: 'none' → pull-to-refresh 차단
-사이드바: 모바일에서 fixed overlay + 백드롭 dimmed, 데스크탑은 inline
+사이드바: 데스크탑(1024px 이상)에서만 표시, 모바일은 하단 탭바로 대체
+탭바: 대화 / 기록 / 대시보드 / 설정 4탭, 높이 calc(56px + safe-area-inset-bottom)
 safe-area: env(safe-area-inset-top/bottom) → 노치/홈바 영역 대응
 iOS 확대 방지: textarea fontSize 16px 이상 유지
 ```
@@ -125,7 +127,7 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 ### POST /api/chat
 
-**역할**: 대화 히스토리 누적 → GPT-4o-mini 호출 → chat_messages 저장 → 답변 반환
+**역할**: 대화 히스토리 누적 → GPT-4o 호출 → chat_messages 저장 → 답변 반환
 
 **요청 바디**:
 ```json
@@ -145,10 +147,10 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 **처리 순서**:
 1. 로그인 유저 확인
-2. 무료 플랜 월별 사용량 체크 (신규 세션 시 chat_sessions 카운트, 5회 초과 시 429 반환) ← 지인 테스트 기간 비활성화
+2. 무료 플랜 월별 사용량 체크 (신규 세션 시 chat_sessions 카운트, 5회 초과 시 429 반환) ← 베타 기간 비활성화
 3. sessionId 없으면 chat_sessions 신규 생성 (title: 첫 메시지 30자)
 4. 유저 메시지 chat_messages 저장
-5. GPT-4o-mini 호출 (최근 10개 메시지만 전달)
+5. GPT-4o 호출 (최근 10개 메시지만 전달)
 6. AI 답변 chat_messages 저장
 7. reply + sessionId 반환
 
@@ -178,9 +180,20 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 **처리 순서**:
 1. 로그인 유저 확인
-2. GPT-4o-mini 호출 (JSON 추출, temperature 0.3)
+2. GPT-4o 호출 (JSON 추출, temperature 0.3)
 3. emotion_entries 저장 (감정은 standard_emotions 10개 중 하나로 고정)
 4. chat_sessions.ended_at 업데이트
+
+---
+
+### DELETE /api/user/delete
+
+**역할**: 회원 탈퇴 — auth.users 삭제 → cascade로 모든 데이터 삭제
+
+**처리 순서**:
+1. 로그인 유저 확인
+2. supabaseAdmin.auth.admin.deleteUser(userId) 호출
+3. cascade로 users, subscriptions, chat_sessions, chat_messages, emotion_entries 전체 삭제
 
 ---
 
@@ -193,7 +206,7 @@ auth.users (Supabase 관리)
     ↓ id 연동 (로그인 시 자동)
 public.users
     ↓
-subscriptions (구독 관리)
+subscriptions (구독 관리, user_id unique)
 monthly_usage (현재 미사용 — chat_sessions 카운트로 대체)
 chat_sessions (대화 세션)
     ↓
@@ -207,9 +220,9 @@ standard_emotions (표준 감정 분류 10개)
 | 테이블 | 역할 |
 |--------|------|
 | `public.users` | 서비스 사용자 정보 |
-| `subscriptions` | 구독 관리 (free/pro, active/cancelled/expired) |
+| `subscriptions` | 구독 관리 (free/pro, active/cancelled/expired), user_id unique 제약 |
 | `monthly_usage` | 현재 미사용 — 무료 플랜 사용량은 chat_sessions 카운트로 체크 |
-| `chat_sessions` | 대화 세션 단위 (사이드바 목록) |
+| `chat_sessions` | 대화 세션 단위 (사이드바/기록 탭 목록) |
 | `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
 | `emotion_entries` | 대화 종료 시 GPT 추출 감정 데이터 (대시보드 분석 원천) |
 | `standard_emotions` | 표준 감정 10개: 불안/무기력/분노/슬픔/외로움/두려움/설렘/기쁨/감사/평온 |
@@ -227,7 +240,7 @@ supabase/
 
 | 플랜 | 내용 |
 |------|------|
-| 무료 | 채팅 + 기본 피드백 월 5회 |
+| 무료 | 채팅 + 기본 피드백 월 5회 (베타 기간 무제한) |
 | Pro | 대시보드 패턴 분석 + 무제한 기록 + 감정 리포트 |
 
 - 월 4,900원 내외 구독료 검토 중
@@ -265,7 +278,7 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 | 환경 | 도메인 | 브랜치 | DB |
 |------|--------|--------|-----|
 | 로컬 | localhost:3000 | - | 개발 Supabase |
-| 개발 | dev.lynqrateflow.com | hotfix/prod-flow-dev-env | 개발 Supabase |
+| 개발 | dev.lynqrateflow.com | dev | 개발 Supabase |
 | 운영 | app.lynqrateflow.com | main | 운영 Supabase (배포 시 생성 예정) |
 
 ---
@@ -292,15 +305,20 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] 모바일 사이드바 fixed overlay + 백드롭
 - [x] 사이드바 터치 이벤트 전파 차단 (stopPropagation)
 - [x] 사이드바 스크롤 containment
-- [x] 감정 컬러 범례 카드 추가 (대시보드)
-- [x] 스캐터 차트 강도별 크기 지수 계산으로 변경
 - [x] 테마 토글 dark 클래스 즉시 동기화
 - [x] auth callback 308 리다이렉트 (Google OAuth 히스토리 방지)
-- [x] 지인 테스트용 사용량 제한 비활성화
 - [x] 랜딩페이지 스크린샷 섹션 + 모달 뷰어
+- [x] GPT 모델 gpt-4o 업그레이드
+- [x] 모바일 하단 탭바 (대화/기록/대시보드/설정, 브레이크포인트 1024px)
+- [x] 대시보드 개편 (감정 캘린더, 감정별 평균 강도 카드, 감정 빈도 범례 통합)
+- [x] 감정 캘린더 날짜 클릭 모달 (trigger_text + summary 표시)
+- [x] 모바일 UI 버그 수정 (캘린더 셀 반응형, 탭 전환 스크롤, 채팅 패딩)
+- [x] 회원 탈퇴 기능 (/api/user/delete, cascade 전체 삭제)
+- [x] subscriptions 테이블 user_id unique 제약 추가
+- [x] 베타 기간 사용량 제한 비활성화
 - [ ] 운영 Supabase 생성 + schema.sql 실행
 - [ ] 운영 배포 (app.lynqrateflow.com)
-- [ ] 지인 테스트 후 사용량 제한 복구
+- [ ] 베타 종료 후 사용량 제한 복구
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
 - [ ] 레거시 코드 제거
