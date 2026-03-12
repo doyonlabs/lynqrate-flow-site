@@ -358,6 +358,8 @@ export default function FormClient() {
     }
     
     setView('chat')
+    scrollInstant.current = true
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior }), 0)
     closeSidebarOnMobile()
   }
 
