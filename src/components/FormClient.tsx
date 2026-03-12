@@ -733,7 +733,7 @@ export default function FormClient() {
                           background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                           border: 'none', color: '#fff', fontSize: 12,
                           cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 38,
                         }}>
                           {Icons.plus('#fff')} 새 대화 시작
                         </button>
@@ -742,7 +742,7 @@ export default function FormClient() {
                           background: 'transparent', border: `1px solid ${t.border}`,
                           color: t.muted, fontSize: 12,
                           cursor: 'pointer', fontFamily: 'inherit',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 38,
                         }}>
                           {Icons.chart(t.muted)} 대시보드 보기
                         </button>
