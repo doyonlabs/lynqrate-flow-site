@@ -981,17 +981,18 @@ export default function FormClient() {
                       padding: isMobile ? '20px' : '24px 28px',
                       display: 'flex', flexDirection: isMobile ? 'column' : 'row',
                       alignItems: isMobile ? 'flex-start' : 'center',
-                      justifyContent: 'space-between', gap: 16,
+                      justifyContent: 'space-between', gap: 12,
                     }}>
-                      <div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>이번 달 요약</p>
-                        <p style={{ fontSize: isMobile ? 15 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5 }}>{insightText}</p>
+                        <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }}>{insightText}</p>
                       </div>
                       <button onClick={() => { setView('chat'); handleNewChat() }} style={{
                         flexShrink: 0, padding: '11px 22px', borderRadius: 20,
                         background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                         border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
                         cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                        alignSelf: isMobile ? 'flex-start' : 'center',
                       }}>
                         오늘 털어놓기
                       </button>
