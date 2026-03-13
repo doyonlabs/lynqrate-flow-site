@@ -12,7 +12,7 @@
 - **백엔드**: Next.js API Routes
 - **DB**: Supabase (PostgreSQL)
 - **인증**: Supabase Auth (Google OAuth)
-- **AI**: GPT-4o-mini API
+- **AI**: GPT-4o API
 - **배포**: Vercel
 
 ---
@@ -127,7 +127,7 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 ### POST /api/chat
 
-**역할**: 대화 히스토리 누적 → GPT-4o-mini 호출 → chat_messages 저장 → 답변 반환
+**역할**: 대화 히스토리 누적 → GPT-4o 호출 → chat_messages 저장 → 답변 반환
 
 **요청 바디**:
 ```json
@@ -150,7 +150,7 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 2. 무료 플랜 월별 사용량 체크 (신규 세션 시 chat_sessions 카운트, 5회 초과 시 429 반환) ← 베타 기간 비활성화
 3. sessionId 없으면 chat_sessions 신규 생성 (title: 첫 메시지 30자)
 4. 유저 메시지 chat_messages 저장
-5. GPT-4o-mini 호출 (최근 20개 메시지만 전달)
+5. GPT-4o 호출 (최근 20개 메시지만 전달)
 6. AI 답변 chat_messages 저장
 7. reply + sessionId 반환
 
@@ -180,7 +180,7 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 **처리 순서**:
 1. 로그인 유저 확인
-2. GPT-4o-mini 호출 (JSON 추출, temperature 0.3)
+2. GPT-4o 호출 (JSON 추출, temperature 0.3)
 3. emotion_entries 저장 (감정은 standard_emotions 10개 중 하나로 고정)
 4. chat_sessions.ended_at 업데이트
 
@@ -308,7 +308,7 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] 테마 토글 dark 클래스 즉시 동기화
 - [x] auth callback 308 리다이렉트 (Google OAuth 히스토리 방지)
 - [x] 랜딩페이지 스크린샷 섹션 + 모달 뷰어
-- [x] GPT 모델 gpt-4o-mini로 변경, 히스토리 20개 제한
+- [x] GPT 모델 gpt-4o로 변경, 히스토리 20개 제한
 - [x] 세션 간 맥락 유지 구조 설계 (최근 emotion_entries 5개 시스템 프롬프트 주입)
 - [x] 운영 Supabase 생성 + schema.sql 실행- [x] 모바일 하단 탭바 (대화/기록/대시보드/설정, 브레이크포인트 1024px)
 - [x] 대시보드 개편 (감정 캘린더, 감정별 평균 강도 카드, 감정 빈도 범례 통합)

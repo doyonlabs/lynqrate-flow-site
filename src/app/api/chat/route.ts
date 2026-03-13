@@ -106,8 +106,7 @@ export async function POST(req: NextRequest) {
             `- ${e.raw_emotion} (강도 ${e.intensity})${e.trigger_text ? `: ${e.trigger_text}` : ''}`
         ).join('\n')
         : ''
-/* console.log('[SYSTEM_PROMPT]', SYSTEM_PROMPT + contextPrompt)
-console.log('[MESSAGES]', messages.slice(-20)) */
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -115,7 +114,7 @@ console.log('[MESSAGES]', messages.slice(-20)) */
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
             { role: 'system', content: SYSTEM_PROMPT + contextPrompt },
             ...messages.slice(-20),
