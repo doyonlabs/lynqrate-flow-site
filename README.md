@@ -4,7 +4,7 @@
 
 채팅으로 감정을 털어놓으면 GPT가 공감하고, 대화 종료 시 감정 데이터를 자동 추출해 대시보드에서 패턴을 시각화하는 서비스입니다.
 
-🔗 [dev.lynqrateflow.com](https://dev.lynqrateflow.com)
+🔗 [app.lynqrateflow.com](https://app.lynqrateflow.com)
 
 ---
 
@@ -81,4 +81,4 @@ OPENAI_API_KEY=
 ## 배포
 
 Vercel CI/CD — GitHub 연동 자동 배포  
-개발 서버: [dev.lynqrateflow.com](https://dev.lynqrateflow.com)
+서비스 URL: [app.lynqrateflow.com](https://app.lynqrateflow.com)
