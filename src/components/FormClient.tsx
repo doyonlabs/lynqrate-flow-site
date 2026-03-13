@@ -327,7 +327,7 @@ export default function FormClient() {
   // ─── 과거 세션 불러오기 ──────────────────────────────────────────────────
 
   const handleLoadSession = async (session: ChatSession) => {
-    if (activeSessionId === session.id) { closeSidebarOnMobile(); return }
+    if (activeSessionId === session.id) { setView('chat'); closeSidebarOnMobile(); return }
     const { data } = await supabase
       .from('chat_messages').select('role, content')
       .eq('chat_session_id', session.id).order('created_at', { ascending: true })
