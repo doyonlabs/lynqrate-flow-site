@@ -1243,9 +1243,11 @@ export default function FormClient() {
                       <div style={{
                         gridColumn: fullSpan,
                         background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
-                        display: 'flex', alignItems: 'center', gap: 40, flexWrap: 'wrap',
+                        display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', 
+                        flexDirection: isMobile ? 'column' : 'row',
+                        gap: isMobile ? 20 : 40,
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 24, width: isMobile ? '100%' : 'auto' }}>
                           <div>
                             <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>이번 주 최다 감정</p>
                             <p style={{ fontSize: 24, fontWeight: 700, color: t.text }}>
@@ -1261,9 +1263,10 @@ export default function FormClient() {
                           </div>
                         </div>
                         {/* 구분선 */}
-                        <div style={{ width: 1, height: 40, background: t.border, flexShrink: 0 }} />
+                        {!isMobile && <div style={{ width: 1, height: 40, background: t.border, flexShrink: 0 }} />}
+                        <div style={{ height: isMobile ? 1 : 0, width: isMobile ? '100%' : 0, background: t.border }} />
                         {/* 대화 횟수 */}
-                        <div>
+                        <div style={{ marginLeft: isMobile ? 0 : 'auto' }}>
                           <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>대화 횟수</p>
                           <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
                           <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
