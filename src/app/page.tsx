@@ -356,7 +356,7 @@ export default function Landing() {
             시간이 지날수록 나를 더 잘 알게 돼요.
           </p>
           <p style={{ fontSize: 12, color: t.muted, marginBottom: 48, fontFamily: "'SF Mono', 'Fira Code', monospace", opacity: 0.7 }}>
-            Next.js 15 · TypeScript · Supabase · GPT-4o · Vercel
+            Next.js 15 · TypeScript · Supabase · GPT-4.1 · Vercel
           </p>
           <div className="hero-actions">
             <a href="/form" className="btn-primary">지금 털어놓기</a>
@@ -448,7 +448,7 @@ export default function Landing() {
             <span className="tech-tag highlight">Next.js 15</span>
             <span className="tech-tag highlight">TypeScript</span>
             <span className="tech-tag highlight">Supabase</span>
-            <span className="tech-tag highlight">GPT-4o</span>
+            <span className="tech-tag highlight">GPT-4.1</span>
             <span className="tech-tag">Tailwind CSS v4</span>
             <span className="tech-tag">Supabase Auth</span>
             <span className="tech-tag">Google OAuth</span>

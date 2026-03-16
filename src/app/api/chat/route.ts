@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4.1',
         messages: [
             { role: 'system', content: SYSTEM_PROMPT + contextPrompt },
             ...messages.slice(-20),
