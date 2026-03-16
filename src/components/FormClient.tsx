@@ -985,10 +985,17 @@ export default function FormClient() {
                 const startOfLastWeek = new Date(startOfThisWeek); startOfLastWeek.setDate(startOfThisWeek.getDate() - 7)
                 const thisWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfThisWeek)
                 const lastWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfLastWeek && new Date(e.created_at) < startOfThisWeek)
-                const thisWeekAvg = thisWeekData.length ? thisWeekData.reduce((s, e) => s + e.intensity, 0) / thisWeekData.length : null
-                const lastWeekAvg = lastWeekData.length ? lastWeekData.reduce((s, e) => s + e.intensity, 0) / lastWeekData.length : null
-                const weekDiff = thisWeekAvg !== null && lastWeekAvg !== null ? thisWeekAvg - lastWeekAvg : null
 
+                // 가장 많이 느낀 감정
+                const getTopEmotion = (data: typeof dashboardData) => {
+                  if (!data.length) return null
+                  const count: Record<string, number> = {}
+                  data.forEach(e => { count[e.raw_emotion] = (count[e.raw_emotion] || 0) + 1 })
+                  return Object.entries(count).sort((a, b) => b[1] - a[1])[0]
+                }
+                const thisWeekTop = getTopEmotion(thisWeekData)
+                const lastWeekTop = getTopEmotion(lastWeekData)
+                
                 const emotionList = [...new Set(dashboardData.map(e => e.raw_emotion))]
                 const timelineData = dashboardData.map((e, i) => ({
                   x: i, y: emotionList.indexOf(e.raw_emotion),
@@ -1000,9 +1007,12 @@ export default function FormClient() {
 
                 const insightText = (() => {
                   const high = dashboardData.filter(e => e.intensity >= 4).length
-                  if (weekDiff !== null && weekDiff > 0.5) return `이번 주 ${topEmotion[0]}이 유독 많이 느껴지고 있어요. 요즘 좀 버거운 시간을 보내고 있는 것 같아요.`
-                  if (weekDiff !== null && weekDiff < -0.5) return `지난 주보다 마음이 조금 가라앉은 것 같아요. ${topEmotion[0]}이 주를 이루고 있네요.`
-                  if (high > total * 0.6) return `요즘 감정의 무게가 꽤 있는 편이에요. ${topEmotion[0]}을(를) 자주 느끼고 있어요.`
+                  if (thisWeekTop && lastWeekTop && thisWeekTop[0] !== lastWeekTop[0]) 
+                    return `지난 주 ${lastWeekTop[0]}에서 이번 주 ${thisWeekTop[0]}으로 감정이 바뀌었어요.`
+                  if (thisWeekTop && thisWeekData.length > lastWeekData.length) 
+                    return `이번 주 대화가 늘었어요. ${thisWeekTop[0]}이 주를 이루고 있네요.`
+                  if (high > total * 0.6) 
+                    return `요즘 감정의 무게가 꽤 있는 편이에요. ${topEmotion[0]}을(를) 자주 느끼고 있어요.`
                   return `${total}번의 기록 중 ${topEmotion[0]}을(를) 가장 많이 느꼈어요. 털어놓아줘서 고마워요.`
                 })()
 
@@ -1229,32 +1239,34 @@ export default function FormClient() {
                     })()}
 
                     {/* ⑤ 이번주 vs 지난주 */}
-                    {weekDiff !== null && (
+                    {(thisWeekTop || lastWeekTop) && (
                       <div style={{
                         gridColumn: fullSpan,
                         background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
-                        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: isMobile ? 20 : 40,
+                        display: 'flex', alignItems: 'center', gap: 40, flexWrap: 'wrap',
                       }}>
-                        <div>
-                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>이번 주 평균 강도</p>
-                          <p style={{ fontSize: 28, fontWeight: 700, color: t.text }}>
-                            {thisWeekAvg!.toFixed(1)}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>/5</span>
-                          </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 24, flex: 1 }}>
+                          <div>
+                            <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>이번 주 최다 감정</p>
+                            <p style={{ fontSize: 24, fontWeight: 700, color: t.text }}>
+                              {thisWeekTop ? <>{thisWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{thisWeekTop[1]}회</span></> : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
+                            </p>
+                          </div>
+                          <div style={{ fontSize: 16, color: t.muted }}>vs</div>
+                          <div>
+                            <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>지난 주 최다 감정</p>
+                            <p style={{ fontSize: 24, fontWeight: 700, color: t.text }}>
+                              {lastWeekTop ? <>{lastWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{lastWeekTop[1]}회</span></> : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
+                            </p>
+                          </div>
                         </div>
-                        <div style={{ fontSize: 20, color: t.muted }}>vs</div>
+                        {/* 구분선 */}
+                        <div style={{ width: 1, height: 40, background: t.border, flexShrink: 0 }} />
+                        {/* 대화 횟수 */}
                         <div>
-                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>지난 주 평균 강도</p>
-                          <p style={{ fontSize: 28, fontWeight: 700, color: t.text }}>
-                            {lastWeekAvg!.toFixed(1)}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>/5</span>
-                          </p>
-                        </div>
-                        <div style={{
-                          marginLeft: isMobile ? 0 : 'auto', padding: '8px 16px', borderRadius: 20,
-                          background: weekDiff > 0 ? '#f8717122' : '#6ee7b722',
-                          color: weekDiff > 0 ? '#f87171' : '#6ee7b7',
-                          fontSize: 13, fontWeight: 600,
-                        }}>
-                          {weekDiff > 0 ? `▲ ${weekDiff.toFixed(1)} 상승` : `▼ ${Math.abs(weekDiff).toFixed(1)} 하락`}
+                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>대화 횟수</p>
+                          <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
+                          <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
                         </div>
                       </div>
                     )}
