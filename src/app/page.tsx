@@ -355,6 +355,9 @@ export default function Landing() {
             ChatGPT처럼 대화하되, 대화가 끝나면 감정 데이터가 쌓입니다.<br />
             시간이 지날수록 나를 더 잘 알게 돼요.
           </p>
+          <p style={{ fontSize: 12, color: t.muted, marginBottom: 48, fontFamily: "'SF Mono', 'Fira Code', monospace", opacity: 0.7 }}>
+            Next.js 15 · TypeScript · Supabase · GPT-4o · Vercel
+          </p>
           <div className="hero-actions">
             <a href="/form" className="btn-primary">지금 털어놓기</a>
             <a href="#features" className="btn-secondary">어떻게 다른가요?</a>
@@ -412,11 +415,12 @@ export default function Landing() {
           <p style={{ fontSize: 13, color: t.muted, marginTop: 8, marginBottom: 40 }}>
             이미지를 클릭하시면 크게 보실 수 있어요
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             {[
               '/screenshots/chat.png',
               '/screenshots/emotion-card.png',
               '/screenshots/dashboard.png',
+              '/screenshots/dashboard-modal.png',
             ].map((src) => (
               <div
                 key={src}
@@ -427,7 +431,8 @@ export default function Landing() {
                 <div style={{ padding: '14px 16px', fontSize: 13, color: t.muted }}>
                   {src.includes('chat') ? 'AI와 감정 대화'
                     : src.includes('emotion') ? '대화 종료 후 자동 감정 추출'
-                    : '감정 패턴 대시보드'}
+                    : src.includes('dashboard-modal') ? '날짜별 감정 상세 보기'
+                    : '감정 패턴 대시보드' }
                 </div>
                 <div className="screenshot-hint">클릭하시면 크게 보실 수 있어요</div>
               </div>
@@ -467,7 +472,6 @@ export default function Landing() {
 
         <footer>
           <div className="footer-text">© {new Date().getFullYear()} Mind Echo · Lynqrate</div>
-          <div className="footer-stack">Next.js · Supabase · GPT-4o · Vercel</div>
         </footer>
       </div>
     </>
