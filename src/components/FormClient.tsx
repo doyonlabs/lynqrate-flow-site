@@ -882,6 +882,23 @@ export default function FormClient() {
                   회원 탈퇴
                 </button>
               </div>
+              {/* 피드백 섹션 */}
+              <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12, marginTop: 32 }}>피드백</p>
+              <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
+                <a
+                  href="https://tally.so/r/aQG2jX"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '14px 16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    color: t.text, fontSize: 14, textDecoration: 'none',
+                  }}
+                >
+                  <span>사용 후기 남기기</span>
+                  <span style={{ color: t.muted, fontSize: 12 }}>→</span>
+                </a>
+              </div>
             </div>
           </div>
         )}
