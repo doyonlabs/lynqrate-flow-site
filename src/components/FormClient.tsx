@@ -218,6 +218,13 @@ export default function FormClient() {
     return () => { document.body.style.overscrollBehavior = '' }
   }, [])
 
+  useEffect(() => {
+    const preventPullToRefresh = (e: TouchEvent) => {
+      if (window.scrollY === 0) e.preventDefault()
+    }
+    document.addEventListener('touchmove', preventPullToRefresh, { passive: false })
+    return () => document.removeEventListener('touchmove', preventPullToRefresh)
+  }, [])
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
   const fetchSessions = async () => {
