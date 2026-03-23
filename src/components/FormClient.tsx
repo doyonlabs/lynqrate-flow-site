@@ -234,19 +234,13 @@ export default function FormClient() {
     if (view === 'dashboard') fetchDashboardData()
   }, [view])
 
+  //풀 스크롤 방지
   useEffect(() => {
     document.body.style.overscrollBehavior = 'none'
     return () => { document.body.style.overscrollBehavior = '' }
   }, [])
 
-  useEffect(() => {
-    const preventPullToRefresh = (e: TouchEvent) => {
-      if (window.scrollY === 0) e.preventDefault()
-    }
-    document.addEventListener('touchmove', preventPullToRefresh, { passive: false })
-    return () => document.removeEventListener('touchmove', preventPullToRefresh)
-  }, [])
-
+  //탭 전환 / 앱 전환 / 화면 잠금 시 세션 추출
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && hasNewMessage && sessionId) {
