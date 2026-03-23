@@ -1142,7 +1142,7 @@ export default function FormClient() {
                     {/* 4. 감정 빈도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
                       <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 8 }}>감정 빈도</p>
-                      <ResponsiveContainer width="100%" height={160}>
+                      <ResponsiveContainer width="100%" height={Math.max(160, barData.length * 32)}>
                         <BarChart data={barData} barSize={20} layout="vertical">
                           <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
                           <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: t.text }} axisLine={false} tickLine={false} width={36} />
