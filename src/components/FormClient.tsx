@@ -115,7 +115,7 @@ export default function FormClient() {
 
   // 채팅 상태
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.' },
+    { role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요. 대화가 쌓이면 내 감정 패턴을 볼 수 있어요.' },
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -376,7 +376,7 @@ export default function FormClient() {
       })
     }
 
-    setMessages([{ role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.' }])
+    setMessages([{ role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요. 대화가 쌓이면 내 감정 패턴을 볼 수 있어요.' }])
     setInput('')
     setSessionEnded(false)
     setHasNewMessage(false)
