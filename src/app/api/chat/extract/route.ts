@@ -28,16 +28,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { messages, sessionId } = await req.json()
+  const { sessionId } = await req.json()
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return NextResponse.json({ error: 'messages required' }, { status: 400 })
+  if (!sessionId) {
+    return NextResponse.json({ error: 'sessionId required' }, { status: 400 })
   }
 
-  const conversationText = messages
-    .map((m: { role: string; content: string }) =>
-      `${m.role === 'assistant' ? 'AI' : '사용자'}: ${m.content}`
-    )
+  // last_extracted_at 이후 메시지만 가져오기
+  const { data: sessionData } = await supabaseAdmin
+    .from('chat_sessions')
+    .select('last_extracted_at')
+    .eq('id', sessionId)
+    .single()
+
+  const lastExtractedAt = sessionData?.last_extracted_at
+
+  let query = supabaseAdmin
+    .from('chat_messages')
+    .select('role, content, created_at')
+    .eq('chat_session_id', sessionId)
+    .order('created_at', { ascending: true })
+
+  if (lastExtractedAt) {
+    query = query.gt('created_at', lastExtractedAt)
+  }
+
+  const { data: newMessages } = await query
+
+  if (!newMessages || newMessages.length === 0) {
+    return NextResponse.json({ error: 'no new messages' }, { status: 400 })
+  }
+
+  const conversationText = newMessages
+    .map(m => `${m.role === 'assistant' ? 'AI' : '사용자'}: ${m.content}`)
     .join('\n')
 
   try {
@@ -50,14 +73,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'gpt-4.1',
         messages: [
-          {
-            role: 'system',
-            content: EXTRACT_PROMPT,
-          },
-          {
-            role: 'user',
-            content: `다음 대화를 분석해주세요:\n\n---\n${conversationText}\n---`,
-          },
+          { role: 'system', content: EXTRACT_PROMPT },
+          { role: 'user', content: `다음 대화를 분석해주세요:\n\n---\n${conversationText}\n---` },
         ],
         max_tokens: 400,
         temperature: 0.3,
@@ -75,25 +92,26 @@ export async function POST(req: NextRequest) {
       extracted = { emotion: '알 수 없음', intensity: 3, trigger: '', summary: '오늘 대화를 나눠줘서 고마워요.' }
     }
 
-    // emotion_entries DB 저장
+    // emotion_entries 저장
     await supabaseAdmin
       .from('emotion_entries')
       .insert({
         user_id: user.id,
-        chat_session_id: sessionId ?? null,
+        chat_session_id: sessionId,
         raw_emotion: extracted.emotion,
         intensity: extracted.intensity,
         trigger_text: extracted.trigger ?? null,
         summary: extracted.summary ?? null,
       })
 
-    // chat_sessions.ended_at 업데이트
-    if (sessionId) {
-      await supabaseAdmin
-        .from('chat_sessions')
-        .update({ ended_at: new Date().toISOString() })
-        .eq('id', sessionId)
-    }
+    // last_extracted_at + ended_at 업데이트
+    await supabaseAdmin
+      .from('chat_sessions')
+      .update({
+        last_extracted_at: new Date().toISOString(),
+        ended_at: new Date().toISOString(),
+      })
+      .eq('id', sessionId)
 
     return NextResponse.json(extracted)
   } catch (err) {

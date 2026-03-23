@@ -14,13 +14,6 @@ interface Message {
   content: string
 }
 
-interface ExtractedData {
-  emotion: string
-  intensity: number
-  trigger: string
-  summary: string
-}
-
 interface ChatSession {
   id: string
   title: string | null
@@ -127,8 +120,6 @@ export default function FormClient() {
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [sessionEnded, setSessionEnded] = useState(false)
-  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
-  const [isExtracting, setIsExtracting] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
 
   // 사이드바 데이터
@@ -145,6 +136,12 @@ export default function FormClient() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
   const [calModalOpen, setCalModalOpen] = useState(false)
+
+  const [todayEntries, setTodayEntries] = useState<EmotionEntry[]>([])
+
+  const [lastEntry, setLastEntry] = useState<EmotionEntry | null>(null)
+
+  const [hasNewMessage, setHasNewMessage] = useState(false)
 
   const [hoveredPoint, setHoveredPoint] = useState<any>(null)
 
@@ -183,7 +180,7 @@ export default function FormClient() {
       behavior: scrollInstant.current ? 'instant' as ScrollBehavior : 'smooth'
     })
     scrollInstant.current = false
-  }, [messages, isLoading, isExtracting, extractedData])
+  }, [messages, isLoading])
 
   // textarea 자동 높이
   useEffect(() => {
@@ -207,6 +204,7 @@ export default function FormClient() {
         .from('users').select('display_name, email').eq('id', user.id).single()
       if (userData) setUserInfo(userData)
       await fetchSessions()
+      await fetchTodayEntries()
     }
     load()
   }, [])
@@ -222,6 +220,34 @@ export default function FormClient() {
       .from('chat_sessions').select('id, title, started_at, ended_at')
       .order('created_at', { ascending: false }).limit(30)
     if (data) setSessions(data)
+  }
+
+  const fetchTodayEntries = async () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const [{ data: entries }, { data: emotions }, { data: lastData }] = await Promise.all([
+      supabase
+        .from('emotion_entries')
+        .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
+        .gte('created_at', today.toISOString())
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('standard_emotions')
+        .select('name, color_code'),
+      supabase
+        .from('emotion_entries')
+        .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
+        .lt('created_at', today.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1),
+    ])
+    if (entries) setTodayEntries(entries)
+    if (lastData && lastData.length > 0) setLastEntry(lastData[0])
+    if (emotions) {
+      const map: Record<string, string> = {}
+      emotions.forEach(e => { map[e.name] = e.color_code })
+      setEmotionColors(map)
+    }
   }
 
   const fetchDashboardData = async () => {
@@ -251,7 +277,7 @@ export default function FormClient() {
 
   const handleSend = async () => {
     const trimmed = input.trim()
-    if (!trimmed || isLoading || sessionEnded) return
+    if (!trimmed || isLoading) return
     const userMessage: Message = { role: 'user', content: trimmed }
     const newMessages = [...messages, userMessage]
     setMessages(newMessages)
@@ -274,6 +300,7 @@ export default function FormClient() {
         return
       }
       setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
+      setHasNewMessage(true)
       if (data.sessionId && !sessionId) {
         setSessionId(data.sessionId)
         setActiveSessionId(data.sessionId)
@@ -284,49 +311,53 @@ export default function FormClient() {
       setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 다시 시도해주세요.' }])
     }
   }
-
-  // ─── 대화 종료 ───────────────────────────────────────────────────────────
-
-  const handleEndSession = async () => {
-    if (!hasUserMessage || isLoading || sessionEnded) return
-    setSessionEnded(true)
-    setIsExtracting(true)
-    try {
-      const res = await fetch('/api/chat/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })),
-          sessionId,
-        }),
-      })
-      const data = await res.json()
-      setExtractedData(data)
-      await fetchSessions()
-    } catch {
-      setExtractedData({ emotion: '알 수 없음', intensity: 0, trigger: '추출 실패', summary: '감정 데이터를 추출하지 못했어요.' })
-    } finally {
-      setIsExtracting(false)
-    }
-  }
-
   // ─── 새 대화 ────────────────────────────────────────────────────────────
 
   const handleNewChat = useCallback(() => {
+    // 현재 세션에 유저 메시지 있으면 백그라운드 extract
+    //console.log('handleNewChat 진입, sessionId:', sessionId, 'hasUser:', messages.some(m => m.role === 'user'))
+    if (hasNewMessage && sessionId) {
+      //console.log('handleNewChat sessionId:', sessionId, 'messages:', messages.length)
+      const snapshot = messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))
+      const sid = sessionId
+      fetch('/api/chat/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid }),
+      }).then(() => {
+        fetchSessions()
+        fetchTodayEntries()
+      })
+    }
+
     setMessages([{ role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요.' }])
     setInput('')
     setSessionEnded(false)
-    setExtractedData(null)
-    setIsExtracting(false)
+    setHasNewMessage(false)
     setView('chat')
     setSessionId(null)
     setActiveSessionId(null)
     closeSidebarOnMobile()
-  }, [closeSidebarOnMobile])
+  }, [messages, sessionEnded, sessionId, closeSidebarOnMobile])
 
   // ─── 과거 세션 불러오기 ──────────────────────────────────────────────────
 
   const handleLoadSession = async (session: ChatSession) => {
+    // 현재 세션에 새 메시지 있으면 백그라운드 extract
+    if (hasNewMessage && sessionId && sessionId !== session.id) {
+      const snapshot = messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))
+      const sid = sessionId
+      fetch('/api/chat/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sid }),
+      }).then(() => {
+        fetchSessions()
+        fetchTodayEntries()
+      })
+    }
+    setHasNewMessage(false)
+
     if (activeSessionId === session.id) { setView('chat'); closeSidebarOnMobile(); return }
     const { data } = await supabase
       .from('chat_messages').select('role, content')
@@ -337,27 +368,7 @@ export default function FormClient() {
     setSessionId(session.id)
     setActiveSessionId(session.id)
     setSessionEnded(!!session.ended_at)
-    setExtractedData(null)
-    setIsExtracting(false)
-
-    // 종료된 세션이면 emotion_entry 가져오기
-    if (session.ended_at) {
-      const { data: entry } = await supabase
-        .from('emotion_entries')
-        .select('raw_emotion, intensity, trigger_text, summary')
-        .eq('chat_session_id', session.id)
-        .single()
-      scrollInstant.current = true
-      setExtractedData(entry ? {
-        emotion: entry.raw_emotion,
-        intensity: entry.intensity,
-        trigger: entry.trigger_text ?? '',
-        summary: entry.summary ?? '',
-      } : null)
-    } else {
-      setExtractedData(null)
-    }
-    
+    setHasNewMessage(false)
     setView('chat')
     scrollInstant.current = true
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior }), 0)
@@ -505,14 +516,6 @@ export default function FormClient() {
                         <span style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
                           {label}
                         </span>
-                        <span style={{
-                          fontSize: 10, flexShrink: 0,
-                          padding: '2px 7px', borderRadius: 10,
-                          background: s.ended_at ? (isDark ? '#a78bfa22' : '#a78bfa33') : (isDark ? '#6ee7b722' : '#6ee7b733'),
-                          color: s.ended_at ? '#a78bfa' : (isDark ? '#6ee7b7' : '#059669'),
-                        }}>
-                          {s.ended_at ? '완료' : '진행 중'}
-                        </span>
                       </div>
                     </div>
                   )
@@ -638,34 +641,7 @@ export default function FormClient() {
                 : view === 'records' ? '기록'
                 : sessions.find(s => s.id === activeSessionId)?.title ?? '새 대화'}
             </span>
-            {view === 'chat' && activeSessionId && (
-              <span style={{
-                fontSize: 11, padding: '2px 8px', borderRadius: 10, flexShrink: 0,
-                background: sessionEnded ? '#a78bfa22' : '#6ee7b722',
-                color: sessionEnded ? '#a78bfa' : '#6ee7b7',
-              }}>
-                {sessionEnded ? '완료' : '진행 중'}
-              </span>
-            )}
           </div>
-
-          {view === 'chat' && hasUserMessage && !sessionEnded && !(isMobile && sidebarOpen) && (
-            <button onClick={handleEndSession} disabled={isLoading} style={{
-              padding: '6px 14px', borderRadius: 8,
-              background: 'transparent',
-              border: `1px solid ${isLoading ? t.border : '#f87171'}`,
-              color: isLoading ? t.muted : '#f87171',
-              fontSize: 12, cursor: isLoading ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 6,
-              flexShrink: 0,
-            }}>
-              {Icons.stop(isLoading ? t.muted : '#f87171')}
-              <span>대화 종료</span>
-            </button>
-          )}
-
-
         </div>
 
         {/* ── 채팅 뷰 ── */}
@@ -717,61 +693,84 @@ export default function FormClient() {
                   </div>
                 )}
 
-                {isExtracting && (
-                  <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-                    <AIAvatar />
-                    <div style={{ background: t.aiMsg, borderRadius: '4px 16px 16px 16px', padding: '12px 16px', fontSize: 13, color: t.muted }}>
-                      오늘 대화를 정리하고 있어요...
-                    </div>
-                  </div>
-                )}
-
-                {extractedData && !isExtracting && (
-                  <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-                    <AIAvatar />
-                    <div style={{ background: t.aiMsg, borderRadius: '4px 16px 16px 16px', padding: '16px 20px', maxWidth: '80%' }}>
-                      <p style={{ fontSize: 13, color: t.muted, marginBottom: 12, letterSpacing: '0.04em' }}>오늘의 감정 기록</p>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontSize: 20, fontWeight: 600, color: t.text }}>{extractedData.emotion}</span>
-                        <span style={{ fontSize: 12, color: t.muted }}>강도</span>
-                        <span style={{ fontSize: 15, fontWeight: 600, color: '#a78bfa' }}>{extractedData.intensity}</span>
-                      </div>
-                      <IntensityBar value={extractedData.intensity} />
-                      {extractedData.trigger && <p style={{ fontSize: 13, color: t.muted, marginTop: 12, lineHeight: 1.6 }}>{extractedData.trigger}</p>}
-                      {extractedData.summary && <p style={{ fontSize: 14, color: t.text, marginTop: 10, lineHeight: 1.7 }}>{extractedData.summary}</p>}
-                      <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch' }}>
-                        <button onClick={handleNewChat} style={{
-                          padding: '8px 16px', borderRadius: 20,
-                          background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-                          border: 'none', color: '#fff', fontSize: 12,
-                          cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 38,
-                        }}>
-                          {Icons.plus('#fff')} 새 대화 시작
-                        </button>
-                        <button onClick={() => setView('dashboard')} style={{
-                          padding: '8px 16px', borderRadius: 20,
-                          background: 'transparent', border: `1px solid ${t.border}`,
-                          color: t.muted, fontSize: 12,
-                          cursor: 'pointer', fontFamily: 'inherit',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 38,
-                        }}>
-                          {Icons.chart(t.muted)} 대시보드 보기
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div ref={bottomRef} />
               </div>
             </div>
 
-            {!sessionEnded && (
               <div style={{
                 padding: isMobile ? '10px 12px calc(56px + env(safe-area-inset-bottom, 0px))' : '12px 24px 16px',
                 background: t.bg, borderTop: `1px solid ${t.border}`, flexShrink: 0,
               }}>
+              {(() => {
+                const RatingDots = ({ value, color }: { value: number; color: string }) => (
+                  <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    {[1,2,3,4,5].map(n => (
+                      <span key={n} style={{ width: 5, height: 5, borderRadius: '50%', display: 'inline-block',
+                        background: n <= value ? color : t.border }} />
+                    ))}
+                  </span>
+                )
+                const hasToday = todayEntries.length > 0
+
+                if (!hasToday && !lastEntry) return null
+
+                // 오늘 감정 그룹핑 (빈도 + 평균강도)
+                const grouped = todayEntries.reduce((acc, e) => {
+                  if (!acc[e.raw_emotion]) acc[e.raw_emotion] = { count: 0, totalIntensity: 0 }
+                  acc[e.raw_emotion].count += 1
+                  acc[e.raw_emotion].totalIntensity += e.intensity
+                  return acc
+                }, {} as Record<string, { count: number; totalIntensity: number }>)
+
+                const groupedList = Object.entries(grouped).map(([emotion, { count, totalIntensity }]) => ({
+                  emotion, count, avgIntensity: Math.round(totalIntensity / count),
+                }))
+
+                // 마지막 기록 며칠 전인지
+                const daysAgo = lastEntry ? Math.floor(
+                  (Date.now() - new Date(lastEntry.created_at).getTime()) / (1000 * 60 * 60 * 24)
+                ) : 0
+
+                return (
+                  <div
+                    onClick={() => setView('dashboard')}
+                    style={{
+                      maxWidth: 680, margin: '0 auto 6px',
+                      padding: '8px 14px', borderRadius: 10,
+                      background: t.hover, border: `1px solid ${t.border}`,
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ fontSize: 11, color: t.muted, flexShrink: 0 }}>
+                      {hasToday ? `오늘 ${todayEntries.length}회 기록` : `${daysAgo === 0 ? '어제' : `${daysAgo}일 전`} 마지막 기록`}
+                    </span>
+                    <div style={{ display: 'flex', gap: 8, flex: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {hasToday ? (
+                        <>
+                          {groupedList.slice(0, 3).map((g, i) => (
+                            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: t.text }}>
+                              {g.emotion}
+                              {g.count > 1 && <span style={{ fontSize: 10, color: t.muted }}>{g.count}회</span>}
+                              <RatingDots value={g.avgIntensity} color={emotionColors[g.emotion] ?? '#a78bfa'} />
+                            </span>
+                          ))}
+                          {groupedList.length > 3 && (
+                            <span style={{ fontSize: 11, color: t.muted }}>+{groupedList.length - 3}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: t.text }}>
+                          
+                          {lastEntry!.raw_emotion}
+                          <RatingDots value={lastEntry!.intensity} color={emotionColors[lastEntry!.raw_emotion] ?? '#a78bfa'} />
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 11, color: t.muted, flexShrink: 0 }}>대시보드 보기 →</span>
+                  </div>
+                )
+              })()}
                 <div style={{ maxWidth: 680, margin: '0 auto' }}>
                   <div style={{
                     display: 'flex', gap: 10, alignItems: 'flex-end',
@@ -813,12 +812,11 @@ export default function FormClient() {
                   {/* [FIX] 모바일에서 힌트 숨김 */}
                   {!isMobile && (
                     <p style={{ fontSize: 11, color: t.muted, textAlign: 'center', marginTop: 8 }}>
-                      Enter로 전송 · Shift+Enter 줄바꿈 · 대화가 끝나면 "대화 종료"를 눌러주세요
+                      Enter로 전송 · Shift+Enter 줄바꿈 · 새 대화 시작 시 자동으로 기록돼요
                     </p>
                   )}
                 </div>
               </div>
-            )}
           </>
         )}
 
@@ -924,14 +922,6 @@ export default function FormClient() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
                         <span style={{ fontSize: 14, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
                           {label}
-                        </span>
-                        <span style={{
-                          fontSize: 10, flexShrink: 0,
-                          padding: '2px 7px', borderRadius: 10,
-                          background: s.ended_at ? (isDark ? '#a78bfa22' : '#a78bfa33') : (isDark ? '#6ee7b722' : '#6ee7b733'),
-                          color: s.ended_at ? '#a78bfa' : (isDark ? '#6ee7b7' : '#059669'),
-                        }}>
-                          {s.ended_at ? '완료' : '진행 중'}
                         </span>
                       </div>
                     </div>
@@ -1287,7 +1277,7 @@ export default function FormClient() {
         <button onClick={handleNewChat} style={{
           position: 'fixed',
           right: 16,
-          bottom: `calc(56px + env(safe-area-inset-bottom, 0px) + 72px)`,
+          bottom: `calc(56px + env(safe-area-inset-bottom, 0px) + 116px)`,
           height: 44, borderRadius: 22,
           padding: '0 16px',
           background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
