@@ -67,13 +67,15 @@ create policy "본인만 조회" on public.monthly_usage
 
 -- ── 4. chat_sessions ──────────────────────────────────────────
 -- 사이드바 대화 목록 단위
-
+-- ended_at: 자동 추출 시 업데이트
+-- last_extracted_at: 다음 추출 시 신규 메시지 필터링 기준
 create table public.chat_sessions (
   id         uuid        primary key default gen_random_uuid(),
   user_id    uuid        not null references public.users(id) on delete cascade,
   title      text,                    -- 첫 메시지 기반으로 자동 생성 (nullable)
   started_at timestamptz not null default now(),
-  ended_at   timestamptz,             -- 대화 종료 버튼 누를 때 업데이트
+  ended_at   timestamptz,
+  last_extracted_at  timestamptz,             -- 마지막 감정 추출 시점
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

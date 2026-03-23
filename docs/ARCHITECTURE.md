@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-13
+> 마지막 업데이트: 2026-03-23
 
 ---
 
@@ -12,7 +12,7 @@
 - **백엔드**: Next.js API Routes
 - **DB**: Supabase (PostgreSQL)
 - **인증**: Supabase Auth (Google OAuth)
-- **AI**: GPT-4o API
+- **AI**: GPT-4.1 API
 - **배포**: Vercel
 
 ---
@@ -27,11 +27,11 @@
 [Google OAuth → Supabase Auth]
         ↓ 인증 완료
 [/auth/callback] → public.users + subscriptions 자동 생성
-        ↓
+        ↓ 로그인 시 미완료 세션 자동 extract
 [채팅 /form] ← 로그인 필수 (기본 뷰: dashboard)
         ↓ 메시지 전송마다
-[POST /api/chat] → GPT-4o 호출 → chat_messages 저장
-        ↓ 대화 종료 버튼
+[POST /api/chat] → GPT-4.1 호출 → chat_messages 저장
+        ↓ 새 대화 시작 / 세션 이동 / 탭 전환(visibilitychange) 시 자동 트리거
 [POST /api/chat/extract] → GPT 감정 추출 → emotion_entries 저장
         ↓
 [대시보드 /form 내 dashboard 뷰] ← 사이드바에서 뷰 전환
@@ -61,6 +61,7 @@ Google 로그인 클릭
 → /auth/callback?code=... 리다이렉트 (308)
 → exchangeCodeForSession(code) → Supabase 세션 생성 (response에 쿠키 직접 set)
 → public.users upsert (없으면 생성 + subscriptions free 플랜 생성, 있으면 updated_at 업데이트)
+→ 미완료 세션(last_extracted_at = null) 자동 extract
 → /form으로 이동
 ```
 
@@ -78,7 +79,7 @@ Google 로그인 클릭
 | `src/app/login/page.tsx` | 로그인 페이지 UI |
 | `src/components/FormClient.tsx` | 채팅 UI + 대시보드 뷰 (기본값: dashboard) |
 | `src/app/api/chat/route.ts` | 채팅 API Route (GPT 대화 + chat_messages 저장) |
-| `src/app/api/chat/extract/route.ts` | 대화 종료 시 감정 추출 + emotion_entries 저장 |
+| `src/app/api/chat/extract/route.ts` | 자동 감정 추출 + emotion_entries 저장 |
 | `src/app/api/user/delete/route.ts` | 회원 탈퇴 (auth.users 삭제 → cascade로 전체 삭제) |
 | `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login, / 접근 시 /form 리다이렉트 |
 
@@ -111,11 +112,12 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 
 ```
 레이아웃: position: fixed (top/left/right/bottom: 0) → iOS Safari 주소창 높이 이슈 해결
-스크롤: overscrollBehavior: 'none' → pull-to-refresh 차단
+스크롤: overscrollBehavior: 'none' (div 레벨 + body 레벨) → pull-to-refresh 차단
 사이드바: 데스크탑(1024px 이상)에서만 표시, 모바일은 하단 탭바로 대체
 탭바: 대화 / 기록 / 대시보드 / 설정 4탭, 높이 calc(56px + safe-area-inset-bottom)
 safe-area: env(safe-area-inset-top/bottom) → 노치/홈바 영역 대응
 iOS 확대 방지: textarea fontSize 16px 이상 유지
+헤더 새 대화 버튼: 모바일에서만 표시 (대시보드 탭 제외)
 ```
 
 > iOS Safari theme-color 동적 변경은 브라우저 제한으로 페이지 로드 시에만 반영됨.
@@ -123,11 +125,29 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 ---
 
+## 감정 자동 추출 구조
+
+대화종료 버튼 없이 아래 시점에 자동으로 extract 실행:
+
+| 트리거 | 설명 |
+|--------|------|
+| 새 대화 버튼 클릭 | 현재 세션에 새 메시지(hasNewMessage=true)가 있을 때 |
+| 다른 세션 클릭 | 현재 세션에 새 메시지가 있을 때 이동 전 실행 |
+| visibilitychange | 브라우저 탭 전환 / 앱 전환 / 화면 잠금 시 |
+| 로그인 시 | last_extracted_at=null인 미완료 세션 최대 5개 일괄 처리 |
+
+### N:M 구조
+- 하나의 세션에서 여러 번 extract 가능 (대화가 여러 날에 걸칠 때)
+- `last_extracted_at` 기준으로 신규 메시지만 추출 → 데이터 중복 방지
+- emotion_entries는 extract 실행 시점 날짜로 기록 → 캘린더에 정확히 반영
+
+---
+
 ## API Route
 
 ### POST /api/chat
 
-**역할**: 대화 히스토리 누적 → GPT-4o 호출 → chat_messages 저장 → 답변 반환
+**역할**: 대화 히스토리 누적 → GPT-4.1 호출 → chat_messages 저장 → 답변 반환
 
 **요청 바디**:
 ```json
@@ -150,7 +170,7 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 2. 무료 플랜 월별 사용량 체크 (신규 세션 시 chat_sessions 카운트, 5회 초과 시 429 반환) ← 베타 기간 비활성화
 3. sessionId 없으면 chat_sessions 신규 생성 (title: 첫 메시지 30자)
 4. 유저 메시지 chat_messages 저장
-5. GPT-4o 호출 (최근 20개 메시지만 전달)
+5. GPT-4.1 호출 (최근 20개 메시지만 전달 + 최근 emotion_entries 5개 컨텍스트 주입)
 6. AI 답변 chat_messages 저장
 7. reply + sessionId 반환
 
@@ -158,12 +178,11 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 ### POST /api/chat/extract
 
-**역할**: 대화 종료 시 전체 대화에서 감정 데이터 추출 → emotion_entries 저장
+**역할**: 자동 트리거 시 last_extracted_at 이후 신규 메시지만 추출 → emotion_entries 저장
 
 **요청 바디**:
 ```json
 {
-  "messages": [{ "role": "user|assistant", "content": "..." }],
   "sessionId": "uuid"
 }
 ```
@@ -180,9 +199,12 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 **처리 순서**:
 1. 로그인 유저 확인
-2. GPT-4o 호출 (JSON 추출, temperature 0.3)
-3. emotion_entries 저장 (감정은 standard_emotions 10개 중 하나로 고정)
-4. chat_sessions.ended_at 업데이트
+2. chat_sessions에서 last_extracted_at 조회
+3. last_extracted_at 이후 신규 메시지만 chat_messages에서 조회
+4. 신규 메시지 없으면 400 반환 (종료)
+5. GPT-4.1 호출 (JSON 추출, temperature 0.3)
+6. emotion_entries 저장
+7. chat_sessions.ended_at + last_extracted_at 업데이트
 
 ---
 
@@ -211,7 +233,7 @@ monthly_usage (현재 미사용 — chat_sessions 카운트로 대체)
 chat_sessions (대화 세션)
     ↓
 chat_messages (메시지 원문)
-emotion_entries (감정 추출 데이터 — 대시보드 원천)
+emotion_entries (감정 추출 데이터 — 대시보드 원천, 세션당 N개 가능)
 standard_emotions (표준 감정 분류 10개)
 ```
 
@@ -222,9 +244,9 @@ standard_emotions (표준 감정 분류 10개)
 | `public.users` | 서비스 사용자 정보 |
 | `subscriptions` | 구독 관리 (free/pro, active/cancelled/expired), user_id unique 제약 |
 | `monthly_usage` | 현재 미사용 — 무료 플랜 사용량은 chat_sessions 카운트로 체크 |
-| `chat_sessions` | 대화 세션 단위 (사이드바/기록 탭 목록) |
+| `chat_sessions` | 대화 세션 단위 (사이드바/기록 탭 목록), last_extracted_at 컬럼으로 추출 시점 관리 |
 | `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
-| `emotion_entries` | 대화 종료 시 GPT 추출 감정 데이터 (대시보드 분석 원천) |
+| `emotion_entries` | 자동 추출 감정 데이터 (대시보드 분석 원천, 세션:엔트리 = N:M) |
 | `standard_emotions` | 표준 감정 10개: 불안/무기력/분노/슬픔/외로움/두려움/설렘/기쁨/감사/평온 |
 
 ### 스키마 파일
@@ -297,7 +319,7 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] 대시보드 뷰 구현 (감정 타임라인 + 빈도 차트 + 이번주 vs 지난주 비교)
 - [x] 월별 사용량 체크 로직 (chat_sessions 카운트 방식)
 - [x] 랜딩페이지 (서비스 소개 + 기술 스택 + 테마 연동)
-- [x] 시스템 프롬프트 개선 (감정 외 주제 차단, 공감 우선)
+- [x] 시스템 프롬프트 개선 (감정 외 주제 차단, 공감 우선, 질문 최소화)
 - [x] auth callback 세션 쿠키 처리 수정
 - [x] sessionId 저장 누락 버그 수정
 - [x] 개발 서버 배포 (dev.lynqrateflow.com)
@@ -308,19 +330,36 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] 테마 토글 dark 클래스 즉시 동기화
 - [x] auth callback 308 리다이렉트 (Google OAuth 히스토리 방지)
 - [x] 랜딩페이지 스크린샷 섹션 + 모달 뷰어
-- [x] GPT 모델 gpt-4o로 변경, 히스토리 20개 제한
-- [x] 세션 간 맥락 유지 구조 설계 (최근 emotion_entries 5개 시스템 프롬프트 주입)
-- [x] 운영 Supabase 생성 + schema.sql 실행- [x] 모바일 하단 탭바 (대화/기록/대시보드/설정, 브레이크포인트 1024px)
-- [x] 대시보드 개편 (감정 캘린더, 감정별 평균 강도 카드, 감정 빈도 범례 통합)
+- [x] GPT 모델 gpt-4.1로 업그레이드
+- [x] 세션 간 맥락 유지 구조 (최근 emotion_entries 5개 시스템 프롬프트 주입)
+- [x] 운영 Supabase 생성 + schema.sql 실행
+- [x] 모바일 하단 탭바 (대화/기록/대시보드/설정, 브레이크포인트 1024px)
+- [x] 대시보드 개편 (감정 캘린더, 감정별 평균 강도 카드, 감정 빈도 차트)
 - [x] 감정 캘린더 날짜 클릭 모달 (trigger_text + summary 표시)
 - [x] 모바일 UI 버그 수정 (캘린더 셀 반응형, 탭 전환 스크롤, 채팅 패딩)
 - [x] 회원 탈퇴 기능 (/api/user/delete, cascade 전체 삭제)
 - [x] subscriptions 테이블 user_id unique 제약 추가
 - [x] 베타 기간 사용량 제한 비활성화
 - [x] 운영 배포 (app.lynqrateflow.com)
+- [x] 대화종료 버튼 제거 → 자동 extract 구조로 전환
+- [x] hasNewMessage 플래그 기반 extract 트리거 최적화
+- [x] last_extracted_at 기반 신규 메시지만 추출 (N:M 구조)
+- [x] chat_sessions.last_extracted_at 컬럼 추가
+- [x] 로그인 시 미완료 세션 일괄 자동 extract
+- [x] visibilitychange 이벤트로 탭/앱 전환 시 자동 extract
+- [x] 세션 종료 후에도 대화 이어서 가능 (입력창 제한 해제)
+- [x] 완료/진행중 뱃지 제거
+- [x] 요약 카드 제거
+- [x] 채팅 입력창 위 대시보드 요약바 추가 (오늘 감정 / 마지막 기록)
+- [x] 모바일 헤더 새 대화 버튼 추가 (대시보드 탭 제외)
+- [x] 기록 탭에서 동일 세션 재클릭 시 하단 즉시 이동
+- [x] 감정 빈도 차트 동적 높이 적용
+- [x] iOS Safari pull-to-refresh 방지 개선 (body 레벨 overscrollBehavior)
+- [x] 기록 탭 콘텐츠 짧을 때 pull-to-refresh 방지 (minHeight 적용)
 - [ ] 베타 종료 후 사용량 제한 복구
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
 - [ ] 레거시 코드 제거
 - [ ] standard_emotions 매칭 로직 활성화
 - [ ] PWA manifest.json 추가
+- [ ] OG 이미지 추가 (카카오톡 링크 썸네일)
