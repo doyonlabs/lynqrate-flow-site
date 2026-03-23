@@ -213,6 +213,11 @@ export default function FormClient() {
     if (view === 'dashboard') fetchDashboardData()
   }, [view])
 
+  useEffect(() => {
+    document.body.style.overscrollBehavior = 'none'
+    return () => { document.body.style.overscrollBehavior = '' }
+  }, [])
+
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
   const fetchSessions = async () => {
@@ -358,7 +363,13 @@ export default function FormClient() {
     }
     setHasNewMessage(false)
 
-    if (activeSessionId === session.id) { setView('chat'); closeSidebarOnMobile(); return }
+    if (activeSessionId === session.id) { 
+      setView('chat')
+      scrollInstant.current = true
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior }), 0)
+      closeSidebarOnMobile()
+      return 
+    }
     const { data } = await supabase
       .from('chat_messages').select('role, content')
       .eq('chat_session_id', session.id).order('created_at', { ascending: true })
@@ -642,6 +653,18 @@ export default function FormClient() {
                 : sessions.find(s => s.id === activeSessionId)?.title ?? '새 대화'}
             </span>
           </div>
+          {isMobile && view !== 'dashboard' && (
+            <button onClick={handleNewChat} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8,
+              background: 'transparent', border: `1px solid ${t.border}`,
+              color: t.text, fontSize: 13, cursor: 'pointer',
+              fontFamily: 'inherit', flexShrink: 0,
+            }}>
+              {Icons.plus(t.text)}
+              <span>새 대화</span>
+            </button>
+          )}
         </div>
 
         {/* ── 채팅 뷰 ── */}
@@ -1271,25 +1294,6 @@ export default function FormClient() {
         )}
 
       </div>
-
-      {/* ── 모바일 새 대화 플로팅 버튼 ── */}
-      {isMobile && view === 'chat' && !sessionEnded && (
-        <button onClick={handleNewChat} style={{
-          position: 'fixed',
-          right: 16,
-          bottom: `calc(56px + env(safe-area-inset-bottom, 0px) + 116px)`,
-          height: 44, borderRadius: 22,
-          padding: '0 16px',
-          background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-          border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: 6,
-          boxShadow: '0 4px 16px rgba(124, 58, 237, 0.4)',
-          zIndex: 20,
-        }}>
-          {Icons.plus('#fff')}
-          <span style={{ fontSize: 13, color: '#fff', fontWeight: 500 }}>새 대화</span>
-        </button>
-      )}
 
       {/* ── 모바일 하단 탭바 ── */}
       {isMobile && (
