@@ -968,7 +968,7 @@ export default function FormClient() {
         {/* ── 기록 뷰 ── */}
         {view === 'records' && (
           <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', background: t.bg, minHeight: 0 }}>
-            <div style={{ padding: '16px 12px 80px' }}>
+            <div style={{ padding: '16px 12px 80px', minHeight: 'calc(100% + 1px)' }}>
               <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 12, letterSpacing: '0.06em' }}>최근 기록</p>
               {sessions.length === 0 ? (
                 <p style={{ fontSize: 13, color: t.muted, padding: '8px 12px' }}>아직 대화 기록이 없어요</p>
