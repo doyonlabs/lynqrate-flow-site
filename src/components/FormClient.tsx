@@ -205,6 +205,27 @@ export default function FormClient() {
       if (userData) setUserInfo(userData)
       await fetchSessions()
       await fetchTodayEntries()
+
+      // 미완료 세션 자동 extract
+      const { data: incompleteSessions } = await supabase
+        .from('chat_sessions')
+        .select('id')
+        .is('last_extracted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (incompleteSessions?.length) {
+        incompleteSessions.forEach(s => {
+          fetch('/api/chat/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: s.id }),
+          }).then(() => {
+            fetchSessions()
+            fetchTodayEntries()
+          })
+        })
+      }
     }
     load()
   }, [])
@@ -225,6 +246,25 @@ export default function FormClient() {
     document.addEventListener('touchmove', preventPullToRefresh, { passive: false })
     return () => document.removeEventListener('touchmove', preventPullToRefresh)
   }, [])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && hasNewMessage && sessionId) {
+        const snapshot = messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))
+        const sid = sessionId
+        fetch('/api/chat/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid }),
+        }).then(() => {
+          fetchSessions()
+          fetchTodayEntries()
+        })
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [hasNewMessage, sessionId, messages])
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
   const fetchSessions = async () => {
