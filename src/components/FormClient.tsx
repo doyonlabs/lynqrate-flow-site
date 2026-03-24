@@ -261,6 +261,48 @@ export default function FormClient() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [hasNewMessage, sessionId, messages])
+
+  // 탭/앱 전환 시 자동 감정 추출 + 복귀 시 요약바 갱신
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // 탭 전환/앱 전환으로 화면이 숨겨질 때 자동 추출
+      if (document.visibilityState === 'hidden' && hasNewMessage && sessionId) {
+        const sid = sessionId
+        fetch('/api/chat/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid }),
+        }).then(() => {
+          fetchSessions()
+          fetchTodayEntries()
+        })
+      }
+      // 앱으로 돌아올 때 요약바 갱신
+      if (document.visibilityState === 'visible') {
+        fetchTodayEntries()
+      }
+    }
+
+    // iOS Safari에서 visibilitychange가 불안정할 때를 대비한 pagehide 보완
+    const handlePageHide = () => {
+      if (hasNewMessage && sessionId) {
+        const sid = sessionId
+        fetch('/api/chat/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: sid }),
+        })
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pagehide', handlePageHide)
+    }
+  }, [hasNewMessage, sessionId, messages])
+
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
   const fetchSessions = async () => {
