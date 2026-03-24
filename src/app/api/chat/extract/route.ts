@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabaseServer'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
+const STANDARD_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움', '설렘', '기쁨', '감사', '평온']
+
 const EXTRACT_PROMPT = `아래는 사용자와 AI 감정 코치의 대화 기록입니다.
 대화 전체를 분석해서 다음 항목을 JSON으로만 반환하세요.
 Markdown, 설명, 추가 텍스트 없이 JSON 객체만 반환하세요.
@@ -16,6 +18,7 @@ Markdown, 설명, 추가 텍스트 없이 JSON 객체만 반환하세요.
 
 규칙:
 - emotion은 반드시 위 10개 중 하나. 절대 다른 단어 사용 금지.
+- "공허함"→"무기력", "짜증"→"분노", "걱정"→"불안", "우울"→"슬픔", "무서움"→"두려움" 처럼 가장 가까운 감정으로 매핑.
 - 가장 핵심적인 감정 하나만 선택. 복합 감정이면 더 강한 쪽으로.
 - intensity 판단 기준: 사용자 표현의 강도, 반복성, 상황의 심각도를 종합
 - trigger는 사실 기반으로, 판단이나 평가 없이 간결하게
@@ -34,7 +37,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'sessionId required' }, { status: 400 })
   }
 
-  // last_extracted_at 이후 메시지만 가져오기
   const { data: sessionData } = await supabaseAdmin
     .from('chat_sessions')
     .select('last_extracted_at')
@@ -89,7 +91,21 @@ export async function POST(req: NextRequest) {
     try {
       extracted = JSON.parse(raw)
     } catch {
-      extracted = { emotion: '알 수 없음', intensity: 3, trigger: '', summary: '오늘 대화를 나눠줘서 고마워요.' }
+      extracted = { emotion: null, intensity: 3, trigger: '', summary: '오늘 대화를 나눠줘서 고마워요.' }
+    }
+
+    // 표준 감정 검증 — 포함 안 되면 스킵
+    if (!STANDARD_EMOTIONS.includes(extracted.emotion)) {
+      console.warn('[extract] 비표준 감정 스킵:', extracted.emotion)
+      // last_extracted_at만 업데이트 (재추출 방지)
+      await supabaseAdmin
+        .from('chat_sessions')
+        .update({
+          last_extracted_at: new Date().toISOString(),
+          ended_at: new Date().toISOString(),
+        })
+        .eq('id', sessionId)
+      return NextResponse.json({ skipped: true })
     }
 
     // emotion_entries 저장

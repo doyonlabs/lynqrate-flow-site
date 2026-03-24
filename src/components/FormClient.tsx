@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useTheme } from '@/context/ThemeContext'
-import { ScatterChart, Scatter, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ZAxis } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 
 // ─── 타입 ───────────────────────────────────────────────────────────────────
 
@@ -132,8 +132,10 @@ export default function FormClient() {
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [emotionColors, setEmotionColors] = useState<Record<string, string>>({})
 
-  const [calMonth, setCalMonth] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const [calMonth, setCalMonth] = useState(new Date())
+  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null)
+  const [holidays, setHolidays] = useState<Record<string, string>>({})
 
   const [calModalOpen, setCalModalOpen] = useState(false)
 
@@ -309,6 +311,21 @@ export default function FormClient() {
       const map: Record<string, string> = {}
       emotions.forEach(e => { map[e.name] = e.color_code })
       setEmotionColors(map)
+    }
+
+    // 공휴일 fetch
+    try {
+      const res = await fetch('https://holidays.hyunbin.page/2026.json')
+      const data = await res.json()
+      console.log('공휴일 데이터:', data)
+      const map: Record<string, string> = {}
+      Object.entries(data).forEach(([date, names]) => {
+        const [, m, d] = date.split('-')
+        map[`${parseInt(m)}-${parseInt(d)}`] = (names as string[])[0]
+      })
+      setHolidays(map)
+    } catch {
+      // 실패해도 하드코딩 fallback 유지
     }
     setDashboardLoading(false)
   }
@@ -1011,9 +1028,8 @@ export default function FormClient() {
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: 16, color: t.text, fontWeight: 600, marginBottom: 8 }}>오늘 어떤 하루였나요?</p>
                     <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>
-                      기쁘든 힘들든, 오늘 느낀 감정을 편하게 털어놓아 보세요.<br />
-                      대화가 쌓일수록 내 감정 패턴이 보이기 시작해요.<br />
-                      대화를 종료하면 감정이 자동으로 기록돼요.
+                      첫 대화를 나누면 감정이 자동으로 기록돼요.<br />
+                      일주일만 써보면 내 패턴이 보이기 시작해요.
                     </p>
                   </div>
                   <button onClick={() => { setView('chat'); handleNewChat() }} style={{
@@ -1059,15 +1075,46 @@ export default function FormClient() {
                   color: emotionColors[e.raw_emotion] ?? '#a78bfa',
                 }))
 
+                const NEGATIVE_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움']
+                const POSITIVE_EMOTIONS = ['설렘', '기쁨', '감사', '평온']
+
                 const insightText = (() => {
-                  const high = dashboardData.filter(e => e.intensity >= 4).length
-                  if (thisWeekTop && lastWeekTop && thisWeekTop[0] !== lastWeekTop[0]) 
-                    return `지난 주 ${lastWeekTop[0]}에서 이번 주 ${thisWeekTop[0]}으로 감정이 바뀌었어요.`
-                  if (thisWeekTop && thisWeekData.length > lastWeekData.length) 
-                    return `이번 주 대화가 늘었어요. ${thisWeekTop[0]}이 주를 이루고 있네요.`
-                  if (high > total * 0.6) 
-                    return `요즘 감정의 무게가 꽤 있는 편이에요. ${topEmotion[0]}을(를) 자주 느끼고 있어요.`
-                  return `${total}번의 기록 중 ${topEmotion[0]}을(를) 가장 많이 느꼈어요. 털어놓아줘서 고마워요.`
+                  const topEmotionName = topEmotion[0]
+                  const topEmotionCount = topEmotion[1]
+                  const isNegative = NEGATIVE_EMOTIONS.includes(topEmotionName)
+                  const isPositive = POSITIVE_EMOTIONS.includes(topEmotionName)
+
+                  if (thisWeekTop && lastWeekTop && thisWeekTop[0] !== lastWeekTop[0]) {
+                    const prevIsNeg = NEGATIVE_EMOTIONS.includes(lastWeekTop[0])
+                    const currIsPos = POSITIVE_EMOTIONS.includes(thisWeekTop[0])
+                    const currIsNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
+                    if (prevIsNeg && currIsPos)
+                      return `지난 주 ${lastWeekTop[0]}을 비워냈더니 이번 주엔 ${thisWeekTop[0]}이 찾아왔네요.`
+                    if (prevIsNeg && currIsNeg)
+                      return `지난 주 ${lastWeekTop[0]}에 이어 이번 주는 ${thisWeekTop[0]}이 많네요. 꺼낼수록 가벼워져요.`
+                    return `지난 주 ${lastWeekTop[0]}에서 이번 주 ${thisWeekTop[0]}으로 흘러가고 있어요.`
+                  }
+
+                  if (thisWeekTop && thisWeekData.length > lastWeekData.length) {
+                    const isNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
+                    if (isNeg)
+                      return `이번 주 ${thisWeekTop[0]}이 자주 찾아왔어요. 꺼낼수록 조금씩 비워져요.`
+                    return `이번 주 ${thisWeekTop[0]}이 가득한 한 주네요.`
+                  }
+
+                  if (isNegative) {
+                    if (topEmotionCount >= 5)
+                      return `${topEmotionName}을 ${topEmotionCount}번 꺼내놓았어요. 비울수록 가벼워져요.`
+                    return `${topEmotionName}이 자주 찾아온 시간이었어요. 꺼낼수록 조금씩 비워져요.`
+                  }
+
+                  if (isPositive) {
+                    if (topEmotionName === '평온')
+                      return `${topEmotionCount}번의 기록 중 평온이 가장 많았어요. 잔잔한 시간이 이어지고 있어요.`
+                    return `${topEmotionCount}번의 기록 중 ${topEmotionName}이 가장 많았어요. 좋은 감정이 차곡차곡 쌓이고 있어요.`
+                  }
+
+                  return `${total}번의 감정을 기록했어요. 감정을 꺼내는 것만으로도 충분해요.`
                 })()
 
                 // [FIX] 모바일: 1열 / 데스크탑: 3열 — 인라인 스타일로 확실하게
@@ -1103,6 +1150,191 @@ export default function FormClient() {
                         오늘 털어놓기
                       </button>
                     </div>
+
+                    {/* ⑥ 감정 히트맵 */}
+                    {(() => {
+                      const year = calMonth.getFullYear()
+                      const month = calMonth.getMonth()
+
+                      let displayDays: Date[]
+                      let headerLabel: string
+                      let onPrev: () => void
+                      let onNext: () => void
+
+                      if (isMobile) {
+                        const getWeekStart = (date: Date) => {
+                          const d = new Date(date)
+                          const day = d.getDay() // 0=일, 1=월 ... 6=토
+                          d.setDate(d.getDate() - day) // 일요일로 이동
+                          return d
+                        }
+                        const weekStart = getWeekStart(calMonth)
+                        displayDays = Array.from({ length: 7 }, (_, i) => {
+                          const d = new Date(weekStart)
+                          d.setDate(weekStart.getDate() + i)
+                          return d
+                        })
+                        const last = displayDays[6]
+                        headerLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${last.getMonth() + 1}/${last.getDate()}`
+                        onPrev = () => { const d = new Date(calMonth); d.setDate(d.getDate() - 7); setCalMonth(d) }
+                        onNext = () => { const d = new Date(calMonth); d.setDate(d.getDate() + 7); setCalMonth(d) }
+                      } else {
+                        const daysInMonth = new Date(year, month + 1, 0).getDate()
+                        displayDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1))
+                        headerLabel = `${year}년 ${month + 1}월`
+                        onPrev = () => setCalMonth(new Date(year, month - 1))
+                        onNext = () => setCalMonth(new Date(year, month + 1))
+                      }
+
+                      const emotionList = [...new Set(dashboardData.map(e => e.raw_emotion))]
+
+                      const heatData: Record<string, { count: number; totalIntensity: number }> = {}
+                      dashboardData.forEach(e => {
+                        const d = new Date(e.created_at)
+                        const dateKey = `${d.getMonth() + 1}-${d.getDate()}`
+                        const key = `${dateKey}__${e.raw_emotion}`
+                        if (!heatData[key]) heatData[key] = { count: 0, totalIntensity: 0 }
+                        heatData[key].count += 1
+                        heatData[key].totalIntensity += e.intensity
+                      })
+
+                      return (
+                        <div style={{ gridColumn: fullSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>감정 히트맵</p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                              <button onClick={onPrev} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>‹</button>
+                              <span style={{ fontSize: 13, color: t.text }}>{headerLabel}</span>
+                              <button onClick={onNext} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>›</button>
+                            </div>
+                          </div>
+                          <p style={{ fontSize: 12, color: t.muted, marginBottom: 16 }}>색이 진할수록 강도 높음 · 숫자는 횟수 · 셀 클릭 시 상세 보기</p>
+
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: `40px repeat(${displayDays.length}, 1fr)`,
+                            gap: 3,
+                          }}>
+                            {/* 날짜 헤더 */}
+                            <div />
+                            {displayDays.map((d, i) => {
+                              const isToday = d.toDateString() === new Date().toDateString()
+                              const isSun = d.getDay() === 0
+                              const isSat = d.getDay() === 6
+                              const holidayKey = `${d.getMonth() + 1}-${d.getDate()}`
+                              const isHoliday = !!holidays[holidayKey]
+                              const dateColor = isToday ? '#a78bfa'
+                                : (isSun || isHoliday) ? '#f87171'
+                                : isSat ? '#60a5fa'
+                                : t.muted
+                              return (
+                                <div key={i} style={{
+                                  textAlign: 'center', fontSize: 9,
+                                  color: dateColor, paddingBottom: 4,
+                                  fontWeight: isToday ? 700 : 400,
+                                }}>
+                                  {d.getDate()}
+                                </div>
+                              )
+                            })}
+
+                            {/* 감정별 행 */}
+                            {emotionList.map(emotion => {
+                              const color = emotionColors[emotion] ?? '#a78bfa'
+                              return [
+                                <div key={`label-${emotion}`} style={{ display: 'flex', alignItems: 'center', gap: 4, height: 32 }}>
+                                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                                  <span style={{ fontSize: 11, color: t.text }}>{emotion}</span>
+                                </div>,
+
+                                ...displayDays.map((d, i) => {
+                                  const isFuture = d > new Date()
+                                  const dateKey = `${d.getMonth() + 1}-${d.getDate()}`
+                                  const key = `${dateKey}__${emotion}`
+                                  const cell = heatData[key]
+                                  const avgIntensity = cell ? cell.totalIntensity / cell.count : 0
+                                  const alphaHex = cell
+                                    ? Math.round((avgIntensity / 5) * 220 + 35).toString(16).padStart(2, '0')
+                                    : '14'
+                                  const fullDateKey = d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+
+                                  return (
+                                    <div
+                                      key={i}
+                                      onClick={() => {
+                                        if (cell) {
+                                          setSelectedDay(fullDateKey)
+                                          setSelectedEmotion(emotion)
+                                          setCalModalOpen(true)
+                                        }
+                                      }}
+                                      style={{
+                                        height: 32, borderRadius: 6,
+                                        background: `${color}${alphaHex}`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 11, fontWeight: 700,
+                                        color: cell ? (avgIntensity >= 3 ? '#fff' : isDark ? '#fff' : '#333') : 'transparent',
+                                        cursor: cell ? 'pointer' : 'default',
+                                        opacity: isFuture ? 0.3 : 1,
+                                      }}
+                                    >
+                                      {cell ? cell.count : ''}
+                                    </div>
+                                  )
+                                }),
+                              ]
+                            })}
+                          </div>
+
+                          {/* 모달 */}
+                          {calModalOpen && selectedDay && selectedEmotion && (() => {
+                            const allEntries = dashboardData.filter(e =>
+                              new Date(e.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) === selectedDay
+                              && e.raw_emotion === selectedEmotion
+                            )
+                            const parts = selectedDay.split('. ')
+                            const dateLabel = `${parts[1]}월 ${parts[2]?.replace('.', '')}일`
+
+                            return (
+                              <div
+                                onClick={() => setCalModalOpen(false)}
+                                style={{
+                                  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+                                  zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+                                }}
+                              >
+                                <div
+                                  onClick={e => e.stopPropagation()}
+                                  style={{
+                                    background: t.popup, border: `1px solid ${t.border}`,
+                                    borderRadius: 20, padding: '24px 28px',
+                                    width: '100%', maxWidth: 360,
+                                    boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: emotionColors[selectedEmotion] ?? '#a78bfa' }} />
+                                      <span style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{dateLabel} · {selectedEmotion}</span>
+                                    </div>
+                                    <button onClick={() => setCalModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
+                                    {allEntries.map(e => (
+                                      <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }}>
+                                        <span style={{ fontSize: 12, color: '#a78bfa' }}>강도 {e.intensity}</span>
+                                        {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, opacity: 0.7 }}>{e.trigger_text}</p>}
+                                        {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{e.summary}</p>}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )
+                    })()}
 
                     {/* ② 총 기록 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
@@ -1145,7 +1377,7 @@ export default function FormClient() {
                       <ResponsiveContainer width="100%" height={Math.max(160, barData.length * 32)}>
                         <BarChart data={barData} barSize={20} layout="vertical">
                           <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
-                          <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: t.text }} axisLine={false} tickLine={false} width={36} />
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: t.text }} axisLine={false} tickLine={false} width={44} />
                           <Bar dataKey="count"
                             shape={(props: any) => {
                               const { x, y, width, height, payload } = props
@@ -1155,142 +1387,6 @@ export default function FormClient() {
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
-
-                    {/* ⑥ 감정 캘린더 */}
-                    {(() => {
-                      const year = calMonth.getFullYear()
-                      const month = calMonth.getMonth()
-                      const firstDay = new Date(year, month, 1).getDay()
-                      const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-                      // 날짜별 감정 그룹
-                      const byDate: Record<string, typeof dashboardData> = {}
-                      dashboardData.forEach(e => {
-                        const d = new Date(e.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-                        if (!byDate[d]) byDate[d] = []
-                        byDate[d].push(e)
-                      })
-
-                      const cells = []
-                      for (let i = 0; i < firstDay; i++) cells.push(null)
-                      for (let d = 1; d <= daysInMonth; d++) cells.push(d)
-
-                      const selectedKey = selectedDay
-                      const selectedEntries = selectedKey ? (byDate[selectedKey] ?? []) : []
-
-                      return (
-                        <div style={{ gridColumn: fullSpan, background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                          {/* 헤더 */}
-                          <div style={{ marginBottom: 16 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                              <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>감정 캘린더</p>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                <button onClick={() => setCalMonth(new Date(year, month - 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>‹</button>
-                                <span style={{ fontSize: 13, color: t.text }}>{year}년 {month + 1}월</span>
-                                <button onClick={() => setCalMonth(new Date(year, month + 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 16, padding: '0 4px' }}>›</button>
-                              </div>
-                            </div>
-                            <p style={{ fontSize: 12, color: t.muted }}>날짜 클릭 시 기록 확인 · 대화 종료 시 자동 저장</p>
-                          </div>
-
-                          {/* 요일 헤더 */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 4 }}>
-                            {['일', '월', '화', '수', '목', '금', '토'].map(d => (
-                              <div key={d} style={{ textAlign: 'center', fontSize: 11, color: t.muted, padding: '4px 0' }}>{d}</div>
-                            ))}
-                          </div>
-
-                          {/* 날짜 셀 */}
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, justifyItems: 'center', overflow: 'hidden' }}>
-                            {cells.map((day, i) => {
-                              if (!day) return <div key={`empty-${i}`} />
-                              const dateKey = new Date(year, month, day).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-                              const entries = byDate[dateKey] ?? []
-                              const isSelected = selectedDay === dateKey
-                              const isToday = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) === dateKey
-
-                              return (
-                                <div key={day} onClick={() => {
-                                  if (entries.length) {
-                                    setSelectedDay(dateKey)
-                                    setCalModalOpen(true)
-                                  }
-                                }} style={{
-                                  width: '100%', aspectRatio: '1', maxWidth: 52,
-                                  borderRadius: 8, cursor: entries.length ? 'pointer' : 'default',
-                                  background: isSelected ? '#a78bfa33'
-                                            : entries.length ? `${emotionColors[entries.sort((a, b) => b.intensity - a.intensity)[0].raw_emotion] ?? '#a78bfa'}22`
-                                            : 'transparent',
-                                  border: isToday ? `1px solid #a78bfa` : `1px solid transparent`,
-                                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', 
-                                  justifyContent: 'flex-start', padding: '3px 4px', gap: 1,
-                                  transition: 'background 0.15s',
-                                }}>
-                                  <span style={{ fontSize: 12, color: entries.length ? t.text : t.muted, lineHeight: 1 }}>{day}</span>
-                                  {entries.length > 0 && (
-                                    <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', maxWidth: 36 }}>
-                                      {entries.slice(0, 3).map((e, idx) => (
-                                        <div key={idx} style={{ width: 5, height: 5, borderRadius: '50%', background: emotionColors[e.raw_emotion] ?? '#a78bfa' }} />
-                                      ))}
-                                      {entries.length > 3 && <span style={{ fontSize: 8, color: t.muted }}>+{entries.length - 3}</span>}
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
-
-                          {/* 캘린더 날짜 모달 */}
-                          {calModalOpen && selectedDay && (() => {
-                            const entries = byDate[selectedDay] ?? []
-                            const dateLabel = new Date(selectedDay.replace(/\. /g, '-').replace('.', '')).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
-                            return (
-                              <div
-                                onClick={() => setCalModalOpen(false)}
-                                style={{
-                                  position: 'fixed', inset: 0,
-                                  background: 'rgba(0,0,0,0.5)',
-                                  zIndex: 200,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  padding: 24,
-                                }}
-                              >
-                                <div
-                                  onClick={e => e.stopPropagation()}
-                                  style={{
-                                    background: t.popup, border: `1px solid ${t.border}`,
-                                    borderRadius: 20, padding: '24px 28px',
-                                    width: '100%', maxWidth: 360,
-                                    boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                                    <span style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{dateLabel}</span>
-                                    <button
-                                      onClick={() => setCalModalOpen(false)}
-                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 20, lineHeight: 1, padding: 4 }}
-                                    >×</button>
-                                  </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
-                                    {entries.map(e => (
-                                      <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: emotionColors[e.raw_emotion] ?? '#a78bfa', flexShrink: 0 }} />
-                                          <span style={{ fontSize: 15, fontWeight: 600, color: t.text }}>{e.raw_emotion}</span>
-                                          <span style={{ fontSize: 12, color: '#a78bfa', marginLeft: 4 }}>강도 {e.intensity}</span>
-                                        </div>
-                                        {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, marginLeft: 16, opacity: 0.7 }}>{e.trigger_text}</p>}
-                                        {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, marginLeft: 16 }}>{e.summary}</p>}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          })()}
-                        </div>
-                      )
-                    })()}
 
                     {/* ⑤ 이번주 vs 지난주 */}
                     {(thisWeekTop || lastWeekTop) && (
