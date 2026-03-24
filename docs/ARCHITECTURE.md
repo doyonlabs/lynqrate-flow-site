@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-23
+> 마지막 업데이트: 2026-03-24
 
 ---
 
@@ -356,6 +356,15 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] 감정 빈도 차트 동적 높이 적용
 - [x] iOS Safari pull-to-refresh 방지 개선 (body 레벨 overscrollBehavior)
 - [x] 기록 탭 콘텐츠 짧을 때 pull-to-refresh 방지 (minHeight 적용)
+- [x] 감정 캘린더 → 히트맵으로 교체 (날짜별 강도/빈도 시각화, 월/주 네비게이션)
+- [x] 모바일 히트맵 주 단위 표시 (일요일 기준)
+- [x] 공휴일 API 연동 (holidays.hyunbin.page, 토/일/공휴일 색상 구분)
+- [x] 비표준 감정 추출 스킵 로직 추가 (extract API)
+- [x] 기존 비표준 감정 데이터 정리 (공허함/공허/답답 → 무기력)
+- [x] 인사이트 문구 개선 (비워진다 뉘앙스, 부정/긍정 분기)
+- [x] 대시보드 카드 순서 변경 (히트맵 상단)
+- [x] 운영 DB 마이그레이션 (last_extracted_at 컬럼 추가)
+- [x] schema.sql 변경 히스토리 주석 추가
 - [ ] 베타 종료 후 사용량 제한 복구
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
