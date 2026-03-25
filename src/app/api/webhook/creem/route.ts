@@ -40,11 +40,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true })
 }
-```
-
----
-
-**.env.local에 추가:**
-```
-CREEM_PRODUCT_ID=prod_19Kyhh9UYbZREGscYCRwjZ
-NEXT_PUBLIC_APP_URL=https://app.lynqrateflow.com
