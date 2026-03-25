@@ -26,6 +26,11 @@ interface UserInfo {
   email: string | null
 }
 
+interface SubscriptionInfo {
+  plan: 'free' | 'pro'
+  status: string
+}
+
 interface EmotionEntry {
   id: string
   raw_emotion: string
@@ -145,7 +150,7 @@ export default function FormClient() {
 
   const [hasNewMessage, setHasNewMessage] = useState(false)
 
-  const [hoveredPoint, setHoveredPoint] = useState<any>(null)
+  const [subscription, setSubscription] = useState<SubscriptionInfo>({ plan: 'free', status: 'active' })
 
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -205,6 +210,15 @@ export default function FormClient() {
       const { data: userData } = await supabase
         .from('users').select('display_name, email').eq('id', user.id).single()
       if (userData) setUserInfo(userData)
+      
+      const { data: subData } = await supabase
+        .from('subscriptions')
+        .select('plan, status')
+        .eq('user_id', user.id)
+        .single()
+
+      if (subData) setSubscription(subData)
+
       await fetchSessions()
       await fetchTodayEntries()
 
@@ -655,6 +669,36 @@ export default function FormClient() {
                   {Icons.settings(t.muted)} <span>설정</span>
                 </button>
                 <div style={{ height: 1, background: t.border }} />
+                {subscription.plan === 'free' ? (
+                  <button onClick={async () => {
+                    setSettingsOpen(false)
+                    const res = await fetch('/api/checkout', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.checkout_url) window.location.href = data.checkout_url
+                  }} style={{
+                    width: '100%', padding: '11px 14px',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'transparent', border: 'none',
+                    color: '#a78bfa', fontSize: 13, cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'left', fontWeight: 600,
+                  }}>
+                    ✦ Pro로 업그레이드하기
+                  </button>
+                ) : (
+                  <button onClick={() => {
+                    setSettingsOpen(false)
+                    window.open('https://www.creem.io/customer-portal', '_blank')
+                  }} style={{
+                    width: '100%', padding: '11px 14px',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'transparent', border: 'none',
+                    color: t.text, fontSize: 13, cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'left',
+                  }}>
+                    구독 관리
+                  </button>
+                )}
+                <div style={{ height: 1, background: t.border }} />
                 <button onClick={handleLogout} style={{
                   width: '100%', padding: '11px 14px',
                   display: 'flex', alignItems: 'center', gap: 10,
@@ -682,8 +726,8 @@ export default function FormClient() {
                 <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {userInfo.display_name ?? '사용자'}
                 </div>
-                <div style={{ fontSize: 11, color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {userInfo.email ?? ''}
+                <div style={{ fontSize: 11, color: subscription.plan === 'pro' ? '#a78bfa' : t.muted }}>
+                  {subscription.plan === 'pro' ? '✦ Pro' : '무료 사용자'}
                 </div>
               </div>
               <span style={{ color: t.muted, fontSize: 12 }}>···</span>

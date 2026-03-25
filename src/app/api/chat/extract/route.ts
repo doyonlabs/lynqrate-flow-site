@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     // 표준 감정 검증 — 포함 안 되면 스킵
     if (!STANDARD_EMOTIONS.includes(extracted.emotion)) {
-      console.warn('[extract] 비표준 감정 스킵:', extracted.emotion)
+      //console.warn('[extract] 비표준 감정 스킵:', extracted.emotion)
       // last_extracted_at만 업데이트 (재추출 방지)
       await supabaseAdmin
         .from('chat_sessions')
