@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       .from('subscriptions')
       .update({
         plan: 'free',
-        status: eventType === 'subscription.canceled' ? 'cancelled' : 'expired',
+        status: 'active',
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', userId)
