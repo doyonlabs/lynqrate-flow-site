@@ -685,9 +685,11 @@ export default function FormClient() {
                     ✦ Pro로 업그레이드하기
                   </button>
                 ) : (
-                  <button onClick={() => {
+                  <button onClick={async () => {
                     setSettingsOpen(false)
-                    window.open('https://www.creem.io/customer-portal', '_blank')
+                    const res = await fetch('/api/portal', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.portal_url) window.open(data.portal_url, '_blank')
                   }} style={{
                     width: '100%', padding: '11px 14px',
                     display: 'flex', alignItems: 'center', gap: 10,
