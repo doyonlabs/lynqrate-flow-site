@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-25
+> 마지막 업데이트: 2026-03-26
 
 ---
 
@@ -134,9 +134,10 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 | 트리거 | 설명 |
 |--------|------|
-| 새 대화 버튼 클릭 | 현재 세션에 새 메시지(hasNewMessage=true)가 있을 때 |
-| 다른 세션 클릭 | 현재 세션에 새 메시지가 있을 때 이동 전 실행 |
-| visibilitychange | 브라우저 탭 전환 / 앱 전환 / 화면 잠금 시 |
+| 새 대화 버튼 클릭 | 현재 세션에 새 메시지가 있고 유저 메시지 5개 이상일 때 |
+| 다른 세션 클릭 | 현재 세션에 새 메시지가 있고 유저 메시지 5개 이상일 때 이동 전 실행 |
+| visibilitychange | 브라우저 탭 전환 / 앱 전환 / 화면 잠금 시 (sendBeacon 적용 예정) |
+| 첫 세션 즉시 추출 | 가입 후 첫 세션에서 유저 메시지 5개 도달 시 즉시 추출 + 토스트 |
 | 로그인 시 | last_extracted_at=null인 미완료 세션 최대 5개 일괄 처리 |
 
 ### N:M 구조
@@ -186,7 +187,8 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 **요청 바디**:
 ```json
 {
-  "sessionId": "uuid"
+  "sessionId": "uuid",
+  "force": "boolean (첫 세션 즉시 추출 시 true)"
 }
 ```
 
@@ -204,7 +206,7 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 1. 로그인 유저 확인
 2. chat_sessions에서 last_extracted_at 조회
 3. last_extracted_at 이후 신규 메시지만 chat_messages에서 조회
-4. 신규 메시지 없으면 400 반환 (종료)
+4. 신규 메시지 없거나 유저 메시지 5개 미만이면 400 반환 (force=true면 스킵)
 5. GPT-4.1 호출 (JSON 추출, temperature 0.3)
 6. emotion_entries 저장
 7. chat_sessions.ended_at + last_extracted_at 업데이트
@@ -374,6 +376,14 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] schema.sql 변경 히스토리 주석 추가
 - [x] Creem 결제 연동 (checkout + webhook + 포털)
 - [x] 구독 상태 UI 표시 (무료/Pro)
+- [x] 첫 세션 유저 메시지 5개 즉시 자동 추출 + 토스트 알림
+- [x] extract API 최소 유저 메시지 5개 조건 추가 (force 파라미터)
+- [x] 중복 visibilitychange 핸들러 제거 (이중 추출 버그 수정)
+- [x] extract 호출 res.ok 패턴 적용 (불필요한 콘솔 에러 제거)
+- [x] 대시보드 총기록 카드 제거 → 최근 기록 5개 카드 추가 (summary + 시간 표시)
+- [x] 대시보드 이번주 vs 지난주 카드 3열 레이아웃으로 변경
+- [x] 최근 기록 날짜 레이블 개선 (오늘은 시간 포함, 어제/N일 전)
+- [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
 - [ ] 베타 종료 후 사용량 제한 복구
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
