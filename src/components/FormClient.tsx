@@ -149,6 +149,9 @@ export default function FormClient() {
   const [lastEntry, setLastEntry] = useState<EmotionEntry | null>(null)
 
   const [hasNewMessage, setHasNewMessage] = useState(false)
+  const [isFirstSession, setIsFirstSession] = useState(false)
+  const [firstSessionExtracted, setFirstSessionExtracted] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   const [subscription, setSubscription] = useState<SubscriptionInfo>({ plan: 'free', status: 'active' })
 
@@ -220,6 +223,17 @@ export default function FormClient() {
       if (subData) setSubscription(subData)
 
       await fetchSessions()
+
+      // 첫 세션 여부 체크
+      const { data: sessionCheck } = await supabase
+        .from('chat_sessions')
+        .select('id')
+        .limit(1)
+
+      if (!sessionCheck || sessionCheck.length === 0) {
+        setIsFirstSession(true)
+      }
+
       await fetchTodayEntries()
 
       // 미완료 세션 자동 extract
@@ -236,10 +250,12 @@ export default function FormClient() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId: s.id }),
-          }).then(() => {
-            fetchSessions()
-            fetchTodayEntries()
-          })
+          }).then(res => {
+            if (res.ok) {
+              fetchSessions()
+              fetchTodayEntries()
+            }
+          }).catch(() => {})
         })
       }
     }
@@ -256,26 +272,6 @@ export default function FormClient() {
     return () => { document.body.style.overscrollBehavior = '' }
   }, [])
 
-  //탭 전환 / 앱 전환 / 화면 잠금 시 세션 추출
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && hasNewMessage && sessionId) {
-        const snapshot = messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))
-        const sid = sessionId
-        fetch('/api/chat/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sid }),
-        }).then(() => {
-          fetchSessions()
-          fetchTodayEntries()
-        })
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [hasNewMessage, sessionId, messages])
-
   // 탭/앱 전환 시 자동 감정 추출 + 복귀 시 요약바 갱신
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -286,10 +282,12 @@ export default function FormClient() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: sid }),
-        }).then(() => {
-          fetchSessions()
-          fetchTodayEntries()
-        })
+        }).then(res => {
+          if (res.ok) {
+            fetchSessions()
+            fetchTodayEntries()
+          }
+        }).catch(() => {})
       }
       // 앱으로 돌아올 때 요약바 갱신
       if (document.visibilityState === 'visible') {
@@ -373,7 +371,7 @@ export default function FormClient() {
     try {
       const res = await fetch('https://holidays.hyunbin.page/2026.json')
       const data = await res.json()
-      console.log('공휴일 데이터:', data)
+      //console.log('공휴일 데이터:', data)
       const map: Record<string, string> = {}
       Object.entries(data).forEach(([date, names]) => {
         const [, m, d] = date.split('-')
@@ -420,6 +418,28 @@ export default function FormClient() {
       }
       setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
       setHasNewMessage(true)
+
+      // 첫 세션: 유저 메시지 5개 도달 시 즉시 자동 추출
+      if (isFirstSession && !firstSessionExtracted) {
+        const userCount = [...newMessages, { role: 'ai', content: data.reply }]
+          .filter(m => m.role === 'user').length
+        if (userCount >= 5 && data.sessionId) {
+          setFirstSessionExtracted(true)
+          fetch('/api/chat/extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: data.sessionId, force: true }),
+          }).then(async (res) => {
+            const result = await res.json()
+            if (res.ok && !result.skipped) {
+              await fetchTodayEntries()
+              setToast('첫 감정이 기록됐어요. 대화가 쌓이면 패턴이 보여요.')
+              setTimeout(() => setToast(null), 4000)
+            }
+          })
+        }
+      }
+
       if (data.sessionId && !sessionId) {
         setSessionId(data.sessionId)
         setActiveSessionId(data.sessionId)
@@ -443,10 +463,12 @@ export default function FormClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: sid }),
-      }).then(() => {
-        fetchSessions()
-        fetchTodayEntries()
-      })
+      }).then(res => {
+        if (res.ok) {
+          fetchSessions()
+          fetchTodayEntries()
+        }
+      }).catch(() => {})
     }
 
     setMessages([{ role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요. 대화가 쌓이면 내 감정 패턴을 볼 수 있어요.' }])
@@ -470,10 +492,12 @@ export default function FormClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: sid }),
-      }).then(() => {
-        fetchSessions()
-        fetchTodayEntries()
-      })
+      }).then(res => {
+        if (res.ok) {
+          fetchSessions()
+          fetchTodayEntries()
+        }
+      }).catch(() => {})
     }
     setHasNewMessage(false)
 
@@ -573,6 +597,29 @@ export default function FormClient() {
       transition: 'background 0.3s, color 0.3s',
       overflow: 'hidden',
     }}>
+
+      {/* 토스트 */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 9999,
+          backgroundColor: isDark ? '#1e1b2e' : '#fff',
+          border: `1px solid ${isDark ? 'rgba(167,139,250,0.3)' : 'rgba(124,58,237,0.2)'}`,
+          color: isDark ? '#c4b5fd' : '#6d28d9',
+          padding: '12px 20px',
+          borderRadius: '12px',
+          fontSize: '14px',
+          fontWeight: 500,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+          whiteSpace: 'nowrap',
+          animation: 'fadeInUp 0.3s ease',
+        }}>
+          ✦ {toast}
+        </div>
+      )}
 
       {/* ── 사이드바 (열림) ── */}
       {sidebarOpen && !isMobile && (
@@ -1424,13 +1471,72 @@ export default function FormClient() {
                       )
                     })()}
 
-                    {/* ② 총 기록 */}
-                    <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 12 }}>총 기록</p>
-                      <p style={{ fontSize: 36, fontWeight: 700, color: t.text, lineHeight: 1 }}>
-                        {total}<span style={{ fontSize: 14, color: t.muted, marginLeft: 4 }}>회</span>
-                      </p>
-                    </div>
+                    {/* ② 최근 기록 */}
+                    {(() => {
+                      const recentEntries = [...dashboardData]
+                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .slice(0, 5)
+                        .filter(e => e.summary)
+
+                      if (recentEntries.length === 0) return null
+
+                      return (
+                        <div style={{
+                          gridColumn: fullSpan,
+                          background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
+                        }}>
+                          <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>최근 기록</p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {recentEntries.map((e) => {
+                              const daysAgo = Math.floor(
+                                (Date.now() - new Date(e.created_at).getTime()) / (1000 * 60 * 60 * 24)
+                              )
+                              const createdDate = new Date(e.created_at)
+                              const timeLabel = createdDate.toLocaleTimeString('ko-KR', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true,
+                              })
+                              const dateLabel = daysAgo === 0
+                                ? `오늘 ${timeLabel}`
+                                : daysAgo === 1
+                                ? '어제'
+                                : `${daysAgo}일 전`
+                              const color = emotionColors[e.raw_emotion] ?? '#a78bfa'
+
+                              return (
+                                <div key={e.id} style={{
+                                  padding: '14px 16px',
+                                  borderRadius: 12,
+                                  background: t.bg,
+                                  border: `1px solid ${t.border}`,
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color }}>
+                                      {e.raw_emotion}
+                                    </span>
+                                    <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                      {[1,2,3,4,5].map(n => (
+                                        <span key={n} style={{
+                                          width: 4, height: 4, borderRadius: '50%', display: 'inline-block',
+                                          background: n <= e.intensity ? color : t.border,
+                                        }} />
+                                      ))}
+                                    </span>
+                                    <span style={{ fontSize: 11, color: t.muted, marginLeft: 'auto' }}>
+                                      {dateLabel}
+                                    </span>
+                                  </div>
+                                  <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, margin: 0 }}>
+                                    {e.summary}
+                                  </p>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })()}
 
                     {/* ③ 감정별 평균 강도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
@@ -1479,33 +1585,30 @@ export default function FormClient() {
                     {/* ⑤ 이번주 vs 지난주 */}
                     {(thisWeekTop || lastWeekTop) && (
                       <div style={{
-                        gridColumn: fullSpan,
                         background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
-                        display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', 
-                        flexDirection: isMobile ? 'column' : 'row',
-                        gap: isMobile ? 20 : 40,
+                        display: 'flex', flexDirection: 'column', gap: 16,
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 24, width: isMobile ? '100%' : 'auto' }}>
-                          <div>
-                            <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>이번 주 최다 감정</p>
-                            <p style={{ fontSize: 24, fontWeight: 700, color: t.text }}>
-                              {thisWeekTop ? <>{thisWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{thisWeekTop[1]}회</span></> : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
-                            </p>
-                          </div>
-                          <div style={{ fontSize: 16, color: t.muted }}>vs</div>
-                          <div>
-                            <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>지난 주 최다 감정</p>
-                            <p style={{ fontSize: 24, fontWeight: 700, color: t.text }}>
-                              {lastWeekTop ? <>{lastWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{lastWeekTop[1]}회</span></> : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
-                            </p>
-                          </div>
+                        <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>이번 주 vs 지난 주</p>
+                        <div>
+                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 최다 감정</p>
+                          <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
+                            {thisWeekTop
+                              ? <>{thisWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{thisWeekTop[1]}회</span></>
+                              : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
+                          </p>
                         </div>
-                        {/* 구분선 */}
-                        {!isMobile && <div style={{ width: 1, height: 40, background: t.border, flexShrink: 0 }} />}
-                        <div style={{ height: isMobile ? 1 : 0, width: isMobile ? '100%' : 0, background: t.border }} />
-                        {/* 대화 횟수 */}
-                        <div style={{ marginLeft: isMobile ? 0 : 'auto' }}>
-                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 8 }}>대화 횟수</p>
+                        <div style={{ height: 1, background: t.border }} />
+                        <div>
+                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>지난 주 최다 감정</p>
+                          <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
+                            {lastWeekTop
+                              ? <>{lastWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{lastWeekTop[1]}회</span></>
+                              : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
+                          </p>
+                        </div>
+                        <div style={{ height: 1, background: t.border }} />
+                        <div>
+                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>대화 횟수</p>
                           <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
                           <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
                         </div>
@@ -1591,6 +1694,10 @@ export default function FormClient() {
         @keyframes pulse {
           0%, 100% { opacity: 0.2; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
     </div>

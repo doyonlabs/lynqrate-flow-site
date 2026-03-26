@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-24
+> 마지막 업데이트: 2026-03-25
 
 ---
 
@@ -81,6 +81,9 @@ Google 로그인 클릭
 | `src/app/api/chat/route.ts` | 채팅 API Route (GPT 대화 + chat_messages 저장) |
 | `src/app/api/chat/extract/route.ts` | 자동 감정 추출 + emotion_entries 저장 |
 | `src/app/api/user/delete/route.ts` | 회원 탈퇴 (auth.users 삭제 → cascade로 전체 삭제) |
+| `src/app/api/checkout/route.ts` | Creem checkout URL 생성 |
+| `src/app/api/webhooks/creem/route.ts` | 결제/구독 webhook 처리 |
+| `src/app/api/portal/route.ts` | 고객 포털 링크 생성 |
 | `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login, / 접근 시 /form 리다이렉트 |
 
 ---
@@ -268,6 +271,7 @@ supabase/
 - 월 4,900원 내외 구독료 검토 중
 - 목표 수익: 월 100만원 (구독자 약 205명)
 - 구독 전환 트리거: 대시보드에서 패턴이 보이기 시작하는 순간
+- Creem (MerchantOfRecord, USD, 테스트 모드) — Live 전환 시 운영 키로 교체 필요
 
 ---
 
@@ -275,11 +279,14 @@ supabase/
 
 | 변수 | 용도 | 노출 |
 |------|------|------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase URL | 브라우저 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 일반 권한 키 | 브라우저 |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase URL | 브라우저 + 서버 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 일반 권한 키 | 브라우저 + 서버 |
 | `SUPABASE_URL` | Supabase URL | 서버만 |
 | `SUPABASE_SERVICE_ROLE_KEY` | 관리자 권한 키 | 서버만 |
 | `OPENAI_API_KEY` | OpenAI API 키 | 서버만 |
+| `CREEM_API_KEY` | Creem API 키 | 서버만 |
+| `CREEM_PRODUCT_ID` | Creem 상품 ID | 서버만 |
+| `NEXT_PUBLIC_APP_URL` | 앱 베이스 URL (결제 완료 후 리다이렉트용) | 브라우저 + 서버 |
 
 ---
 
@@ -365,6 +372,8 @@ src/app/api/analyze/         ← 구 5문항 폼 기반 분석 API
 - [x] 대시보드 카드 순서 변경 (히트맵 상단)
 - [x] 운영 DB 마이그레이션 (last_extracted_at 컬럼 추가)
 - [x] schema.sql 변경 히스토리 주석 추가
+- [x] Creem 결제 연동 (checkout + webhook + 포털)
+- [x] 구독 상태 UI 표시 (무료/Pro)
 - [ ] 베타 종료 후 사용량 제한 복구
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
