@@ -436,8 +436,8 @@ export default function Landing() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             {[
               { src: '/screenshots/chat.png', label: 'AI와 감정 대화' },
-              { src: '/screenshots/emotion-card.png', label: '대화 후 자동 감정 추출' },
-              { src: '/screenshots/dashboard.png', label: '감정 패턴 대시보드' },
+              { src: '/screenshots/dashboard1.png', label: '감정 패턴 대시보드' },
+              { src: '/screenshots/dashboard2.png', label: '대시보드 하단' },
               { src: '/screenshots/dashboard-modal.png', label: '날짜별 감정 상세 보기' },
             ].map(({ src, label }) => (
               <div key={src} className="screenshot-card" onClick={() => setModalSrc(src)}>
