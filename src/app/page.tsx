@@ -21,9 +21,9 @@ export default function Landing() {
     ctaBorder: '#a78bfa33',
     ctaGlow: '#a78bfa15',
     navBg: 'rgba(8, 8, 16, 0.85)',
-    statNumColor: '#f0f0f8',
     techHighlightBg: '#a78bfa11',
     techHighlightBorder: '#a78bfa44',
+    storyBg: '#0f0f20',
   } : {
     bg: '#f5f5fa',
     surface: '#ffffff',
@@ -38,9 +38,9 @@ export default function Landing() {
     ctaBorder: '#7c3aed33',
     ctaGlow: '#a78bfa10',
     navBg: 'rgba(245, 245, 250, 0.85)',
-    statNumColor: '#1a1a2e',
     techHighlightBg: '#ede9fe',
     techHighlightBorder: '#7c3aed44',
+    storyBg: '#f0eeff',
   }
 
   return (
@@ -108,8 +108,8 @@ export default function Landing() {
 
         .hero-title {
           font-family: 'Gowun Batang', serif;
-          font-size: clamp(42px, 7vw, 80px); font-weight: 700;
-          color: ${t.text}; line-height: 1.2; margin-bottom: 24px;
+          font-size: clamp(36px, 6vw, 68px); font-weight: 700;
+          color: ${t.text}; line-height: 1.4; margin-bottom: 24px;
           animation: fadeUp 0.8s 0.1s ease both;
         }
 
@@ -120,7 +120,7 @@ export default function Landing() {
 
         .hero-sub {
           font-size: clamp(15px, 2vw, 18px); color: ${t.muted};
-          line-height: 1.8; max-width: 520px; margin: 0 auto 48px;
+          line-height: 1.8; max-width: 480px; margin: 0 auto 48px;
           animation: fadeUp 0.8s 0.2s ease both;
         }
 
@@ -146,6 +146,40 @@ export default function Landing() {
           transition: border-color 0.2s, color 0.2s;
         }
         .btn-secondary:hover { border-color: ${t.accent}; color: ${t.accent}; }
+
+        /* 스토리 섹션 */
+        .story {
+          background: ${t.storyBg};
+          border-top: 1px solid ${t.border};
+          border-bottom: 1px solid ${t.border};
+          padding: 100px 24px;
+          position: relative; z-index: 1;
+        }
+
+        .story-inner {
+          max-width: 720px; margin: 0 auto;
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 64px; align-items: center;
+        }
+
+        .story-text p {
+          font-size: 15px; color: ${t.muted};
+          line-height: 2; margin-bottom: 20px;
+        }
+
+        .story-text p:last-child { margin-bottom: 0; }
+
+        .story-text strong {
+          color: ${t.text}; font-weight: 600;
+        }
+
+        .story-screenshot {
+          border-radius: 16px; overflow: hidden;
+          border: 1px solid ${t.border};
+          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+
+        .story-screenshot img { width: 100%; display: block; }
 
         .features {
           max-width: 1100px; margin: 0 auto;
@@ -213,20 +247,14 @@ export default function Landing() {
         .step-title { font-size: 15px; font-weight: 600; color: ${t.text}; margin-bottom: 10px; margin-top: 8px; }
         .step-desc { font-size: 13px; color: ${t.muted}; line-height: 1.8; }
 
-        /* 스크린샷 카드 */
         .screenshot-card {
           background: ${t.surface};
           border: 1px solid ${t.border};
-          border-radius: 20px;
-          overflow: hidden;
-          cursor: pointer;
-          position: relative;
+          border-radius: 20px; overflow: hidden;
+          cursor: pointer; position: relative;
           transition: border-color 0.3s, transform 0.3s;
         }
-        .screenshot-card:hover {
-          border-color: ${t.cardHoverBorder};
-          transform: translateY(-4px);
-        }
+        .screenshot-card:hover { border-color: ${t.cardHoverBorder}; transform: translateY(-4px); }
         .screenshot-hint {
           position: absolute; bottom: 0; left: 0; right: 0;
           padding: 24px 12px 12px;
@@ -236,7 +264,6 @@ export default function Landing() {
         }
         .screenshot-card:hover .screenshot-hint { opacity: 1; }
 
-        /* 모달 */
         .modal-overlay {
           position: fixed; inset: 0; z-index: 200;
           background: rgba(0,0,0,0.85);
@@ -245,8 +272,7 @@ export default function Landing() {
         }
         .modal-img {
           max-width: 90vw; max-height: 90vh;
-          border-radius: 16px; object-fit: contain;
-          cursor: default;
+          border-radius: 16px; object-fit: contain; cursor: default;
         }
         .modal-close {
           position: absolute; top: 20px; right: 24px;
@@ -254,24 +280,6 @@ export default function Landing() {
           background: rgba(255,255,255,0.15); border: none;
           color: #fff; font-size: 18px; cursor: pointer;
           display: flex; align-items: center; justify-content: center;
-        }
-
-        .tech { max-width: 1100px; margin: 0 auto; padding: 0 24px 100px; position: relative; z-index: 1; }
-
-        .tech-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 40px; }
-
-        .tech-tag {
-          padding: 8px 16px; border-radius: 20px;
-          background: ${t.surface}; border: 1px solid ${t.border};
-          font-size: 13px; color: ${t.muted};
-          font-family: 'SF Mono', 'Fira Code', monospace;
-          transition: border-color 0.2s, color 0.2s;
-        }
-        .tech-tag:hover { border-color: ${t.accent}; color: ${t.accent}; }
-
-        .tech-tag.highlight {
-          border-color: ${t.techHighlightBorder};
-          color: ${t.accent}; background: ${t.techHighlightBg};
         }
 
         .cta-section { max-width: 1100px; margin: 0 auto; padding: 0 24px 120px; position: relative; z-index: 1; }
@@ -307,7 +315,6 @@ export default function Landing() {
         }
 
         .footer-text { font-size: 12px; color: ${t.muted}; }
-        .footer-stack { font-size: 11px; color: ${t.muted}; font-family: 'SF Mono', 'Fira Code', monospace; }
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(20px); }
@@ -319,19 +326,14 @@ export default function Landing() {
           nav { padding: 16px 24px; }
           .step { border-right: none; border-bottom: 1px solid ${t.border}; }
           .step:last-child { border-bottom: none; }
+          .story-inner { grid-template-columns: 1fr; gap: 40px; }
         }
       `}</style>
 
-      {/* 모달 */}
       {modalSrc && (
         <div className="modal-overlay" onClick={() => setModalSrc(null)}>
           <button className="modal-close" onClick={() => setModalSrc(null)}>✕</button>
-          <img
-            src={modalSrc}
-            alt="서비스 화면"
-            className="modal-img"
-            onClick={e => e.stopPropagation()}
-          />
+          <img src={modalSrc} alt="서비스 화면" className="modal-img" onClick={e => e.stopPropagation()} />
         </div>
       )}
 
@@ -344,49 +346,66 @@ export default function Landing() {
           <a href="/form" className="nav-cta">지금 시작하기</a>
         </nav>
 
+        {/* 히어로 */}
         <section className="hero">
           <div className="hero-glow" />
           <div className="hero-label"><span>✦</span> AI 감정 대화 서비스</div>
           <h1 className="hero-title">
-            털어놓는 것만으로<br />
-            <span>패턴이 보입니다</span>
+            그냥 오늘 있었던 거<br />
+            <span>말하고 싶을 때 있잖아요.</span>
           </h1>
           <p className="hero-sub">
-            ChatGPT처럼 대화하되, 대화가 끝나면 감정 데이터가 쌓입니다.<br />
-            시간이 지날수록 나를 더 잘 알게 돼요.
-          </p>
-          <p style={{ fontSize: 12, color: t.muted, marginBottom: 48, fontFamily: "'SF Mono', 'Fira Code', monospace", opacity: 0.7 }}>
-            Next.js 15 · TypeScript · Supabase · GPT-4.1 · Vercel
+            딱히 힘들어서가 아니라, 그냥.<br />
+            Mind Echo가 들어요.<br />
+            말하다 보면 나도 몰랐던 내가 보여요.
           </p>
           <div className="hero-actions">
             <a href="/form" className="btn-primary">지금 털어놓기</a>
-            <a href="#features" className="btn-secondary">어떻게 다른가요?</a>
+            <a href="#story" className="btn-secondary">만든 이야기</a>
           </div>
         </section>
 
+        {/* 스토리 */}
+        <section className="story" id="story">
+          <div className="story-inner">
+            <div className="story-text">
+              <p>힘든 프로젝트를 끝낸 날 밤, 충동적으로 ChatGPT 창에 <strong>"고마워"</strong>라고 썼어요.</p>
+              <p>돌아온 답변이 이상하게 따뜻하게 느껴졌어요.<br /><strong>"정말 멋지시네요. 개발자로서의 여정이 계속 성장하길 기대합니다."</strong></p>
+              <p>울 뻔했죠.</p>
+              <p>그때 든 생각이었어요.<br />이 대화, 내일도 기억하고 싶다.</p>
+              <p><strong>Mind Echo는 그 마음에서 시작했어요.</strong></p>
+            </div>
+            <div className="story-screenshot">
+              <img src="/screenshots/origin.png" alt="Mind Echo의 시작" />
+            </div>
+          </div>
+        </section>
+
+        {/* 특징 */}
         <section className="features" id="features">
           <div className="section-label">왜 Mind Echo인가</div>
-          <h2 className="section-title">ChatGPT와 다른 단 하나의 이유</h2>
-          <p className="section-sub">대화는 사라지지 않습니다. 감정 데이터로 쌓여서 패턴이 됩니다.</p>
+          <h2 className="section-title">말하는 것 이상이 일어나요</h2>
+          <p className="section-sub">털어놓은 감정이 사라지지 않고 데이터가 돼요. 쌓이다 보면 내가 보여요.</p>
           <div className="feature-grid">
             <div className="feature-card">
               <div className="feature-icon">💬</div>
-              <div className="feature-title">가볍게 털어놓기</div>
-              <div className="feature-desc">치료나 상담이 아닙니다. 답답한 마음을 편하게 꺼내놓는 것으로 시작해요. AI가 먼저 충분히 듣습니다.</div>
+              <div className="feature-title">그냥 말하면 돼요</div>
+              <div className="feature-desc">치료나 상담이 아니에요. 오늘 있었던 거, 답답한 거, 기뻤던 거 — 뭐든 편하게 털어놓으면 AI가 먼저 들어요.</div>
             </div>
             <div className="feature-card">
               <div className="feature-icon">📊</div>
-              <div className="feature-title">자동 감정 추출</div>
-              <div className="feature-desc">대화가 끝나면 AI가 감정, 강도, 트리거를 자동으로 추출합니다. 따로 기록할 필요 없어요.</div>
+              <div className="feature-title">자동으로 쌓여요</div>
+              <div className="feature-desc">대화가 끝나면 AI가 감정, 강도, 상황을 자동으로 추출해요. 따로 기록하지 않아도 돼요.</div>
             </div>
             <div className="feature-card">
               <div className="feature-icon">✦</div>
-              <div className="feature-title">패턴 시각화</div>
-              <div className="feature-desc">데이터가 쌓이면 대시보드에서 내 감정 흐름이 보입니다. 어떤 상황에서 힘든지 스스로 알게 돼요.</div>
+              <div className="feature-title">나를 알게 돼요</div>
+              <div className="feature-desc">데이터가 쌓이면 어떤 날 기쁜지, 어떤 상황에서 힘든지 패턴이 보여요. 물어보지 않아도요.</div>
             </div>
           </div>
         </section>
 
+        {/* 사용 흐름 */}
         <section className="how">
           <div className="section-label">사용 흐름</div>
           <h2 className="section-title">3단계로 끝납니다</h2>
@@ -394,84 +413,57 @@ export default function Landing() {
             <div className="step">
               <div className="step-num">01</div>
               <div className="step-title">구글 로그인</div>
-              <div className="step-desc">별도 회원가입 없이 구글 계정으로 바로 시작합니다.</div>
+              <div className="step-desc">별도 회원가입 없이 구글 계정으로 바로 시작해요.</div>
             </div>
             <div className="step">
               <div className="step-num">02</div>
-              <div className="step-title">감정 대화</div>
-              <div className="step-desc">오늘 있었던 일, 답답한 것, 뭐든 편하게 채팅으로 털어놔요.</div>
+              <div className="step-title">그냥 말해요</div>
+              <div className="step-desc">오늘 있었던 거, 답답한 거, 기뻤던 거 — 뭐든 채팅으로 털어놔요.</div>
             </div>
             <div className="step">
               <div className="step-num">03</div>
-              <div className="step-title">패턴 확인</div>
-              <div className="step-desc">대화 종료 버튼을 누르면 감정이 기록되고 대시보드에 쌓입니다.</div>
+              <div className="step-title">패턴이 보여요</div>
+              <div className="step-desc">대화가 쌓이면 대시보드에서 내 감정 흐름이 보이기 시작해요.</div>
             </div>
           </div>
         </section>
 
+        {/* 스크린샷 */}
         <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 100px', position: 'relative', zIndex: 1 }}>
           <div className="section-label">서비스 화면</div>
           <h2 className="section-title">이렇게 생겼어요</h2>
-          <p style={{ fontSize: 13, color: t.muted, marginTop: 8, marginBottom: 40 }}>
-            이미지를 클릭하시면 크게 보실 수 있어요
-          </p>
+          <p style={{ fontSize: 13, color: t.muted, marginTop: 8, marginBottom: 40 }}>이미지를 클릭하시면 크게 보실 수 있어요</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             {[
-              '/screenshots/chat.png',
-              '/screenshots/emotion-card.png',
-              '/screenshots/dashboard.png',
-              '/screenshots/dashboard-modal.png',
-            ].map((src) => (
-              <div
-                key={src}
-                className="screenshot-card"
-                onClick={() => setModalSrc(src)}
-              >
-                <img src={src} alt="서비스 화면" style={{ width: '100%', display: 'block' }} />
-                <div style={{ padding: '14px 16px', fontSize: 13, color: t.muted }}>
-                  {src.includes('chat') ? 'AI와 감정 대화'
-                    : src.includes('emotion') ? '대화 종료 후 자동 감정 추출'
-                    : src.includes('dashboard-modal') ? '날짜별 감정 상세 보기'
-                    : '감정 패턴 대시보드' }
-                </div>
+              { src: '/screenshots/chat.png', label: 'AI와 감정 대화' },
+              { src: '/screenshots/emotion-card.png', label: '대화 후 자동 감정 추출' },
+              { src: '/screenshots/dashboard.png', label: '감정 패턴 대시보드' },
+              { src: '/screenshots/dashboard-modal.png', label: '날짜별 감정 상세 보기' },
+            ].map(({ src, label }) => (
+              <div key={src} className="screenshot-card" onClick={() => setModalSrc(src)}>
+                <img src={src} alt={label} style={{ width: '100%', display: 'block' }} />
+                <div style={{ padding: '14px 16px', fontSize: 13, color: t.muted }}>{label}</div>
                 <div className="screenshot-hint">클릭하시면 크게 보실 수 있어요</div>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="tech">
-          <div className="section-label">기술 스택</div>
-          <h2 className="section-title">1인 풀스택 개발</h2>
-          <p className="section-sub" style={{ marginBottom: 0 }}>기획, 디자인, 개발, 배포까지 혼자 만들었습니다.</p>
-          <div className="tech-grid">
-            <span className="tech-tag highlight">Next.js 15</span>
-            <span className="tech-tag highlight">TypeScript</span>
-            <span className="tech-tag highlight">Supabase</span>
-            <span className="tech-tag highlight">GPT-4.1</span>
-            <span className="tech-tag">Tailwind CSS v4</span>
-            <span className="tech-tag">Supabase Auth</span>
-            <span className="tech-tag">Google OAuth</span>
-            <span className="tech-tag">PostgreSQL</span>
-            <span className="tech-tag">Row Level Security</span>
-            <span className="tech-tag">Vercel</span>
-            <span className="tech-tag">Recharts</span>
-            <span className="tech-tag">App Router</span>
-          </div>
-        </section>
-
+        {/* CTA */}
         <section className="cta-section">
           <div className="cta-card">
             <h2 className="cta-title">오늘 하루 어땠나요?</h2>
-            <p className="cta-sub">잘 모르겠다면, 그냥 털어놔 보세요.<br />AI가 먼저 들어드릴게요.</p>
-            <a href="/form" className="btn-primary" style={{ display: 'inline-block', position: 'relative' }}>
-              지금 시작하기
-            </a>
+            <p className="cta-sub">잘 모르겠다면, 그냥 털어놔 보세요.<br />Mind Echo가 먼저 들을게요.</p>
+            <a href="/form" className="btn-primary" style={{ display: 'inline-block', position: 'relative' }}>지금 시작하기</a>
           </div>
         </section>
 
         <footer>
           <div className="footer-text">© {new Date().getFullYear()} Mind Echo · Lynqrate</div>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <a href="/privacy" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>개인정보처리방침</a>
+            <a href="/terms" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>이용약관</a>
+          </div>
         </footer>
       </div>
     </>

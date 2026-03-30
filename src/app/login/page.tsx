@@ -109,12 +109,12 @@ export default function LoginPage() {
         <div style={{ width: '100%', height: 1, background: t.border, margin: '28px 0', opacity: 0.6 }} />
 
         <p style={{
-          fontSize: 12, color: t.subtle, textAlign: 'center', lineHeight: 1.7,
+          fontSize: 12, color: t.muted, textAlign: 'center', lineHeight: 1.7,
         }}>
           계속하면 Mind Echo의{' '}
-          <span style={{ color: t.muted, textDecoration: 'underline', cursor: 'pointer' }}>서비스 약관</span>
+          <a href="/terms" style={{ color: t.muted, textDecoration: 'underline' }}>서비스 약관</a>
           {' '}및{' '}
-          <span style={{ color: t.muted, textDecoration: 'underline', cursor: 'pointer' }}>개인정보 처리방침</span>
+          <a href="/privacy" style={{ color: t.muted, textDecoration: 'underline' }}>개인정보 처리방침</a>
           에 동의하는 것으로 간주됩니다
         </p>
       </div>
