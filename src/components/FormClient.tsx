@@ -717,20 +717,13 @@ export default function FormClient() {
                 </button>
                 <div style={{ height: 1, background: t.border }} />
                 {subscription.plan === 'free' ? (
-                  <button onClick={async () => {
-                    setSettingsOpen(false)
-                    const res = await fetch('/api/checkout', { method: 'POST' })
-                    const data = await res.json()
-                    if (data.checkout_url) window.location.href = data.checkout_url
-                  }} style={{
+                  <div style={{
                     width: '100%', padding: '11px 14px',
                     display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'transparent', border: 'none',
-                    color: '#a78bfa', fontSize: 13, cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'left', fontWeight: 600,
+                    color: t.muted, fontSize: 13,
                   }}>
-                    ✦ Pro로 업그레이드하기
-                  </button>
+                    ✦ Pro 플랜 준비 중
+                  </div>
                 ) : (
                   <button onClick={async () => {
                     setSettingsOpen(false)
