@@ -448,19 +448,40 @@ export default function Landing() {
             ))}
           </div>
         </section>
+        
+        <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 100px', position: 'relative', zIndex: 1 }}>
+          <div className="section-label">요금제</div>
+          <h2 className="section-title">심플한 가격</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 40 }}>
+            <div className="feature-card">
+              <div className="feature-title">무료</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: t.text, margin: '16px 0' }}>$0</div>
+              <div className="feature-desc">월 5회 채팅 + 기본 기록</div>
+            </div>
+            <div className="feature-card" style={{ border: `1px solid ${t.cardHoverBorder}` }}>
+              <div className="feature-title">Pro</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: t.accent, margin: '16px 0' }}>$6.99<span style={{ fontSize: 14, color: t.muted }}>/월</span></div>
+              <div className="feature-desc">무제한 채팅 + 감정 패턴 대시보드 + 무제한 기록</div>
+            </div>
+          </div>
+        </section>
 
         {/* CTA */}
         <section className="cta-section">
           <div className="cta-card">
             <h2 className="cta-title">오늘 하루 어땠나요?</h2>
-            <p className="cta-sub">잘 모르겠다면, 그냥 털어놔 보세요.<br />Mind Echo가 먼저 들을게요.</p>
+            <p className="cta-sub">
+              잘 모르겠다면, 그냥 털어놔 보세요.<br />
+              Mind Echo가 먼저 들을게요.<br />
+            </p>
             <a href="/form" className="btn-primary" style={{ display: 'inline-block', position: 'relative' }}>지금 시작하기</a>
           </div>
         </section>
 
         <footer>
           <div className="footer-text">© {new Date().getFullYear()} Mind Echo · Lynqrate</div>
-          <div style={{ display: 'flex', gap: 16 }}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <a href="mailto:hello@lynqrateflow.com" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>hello@lynqrateflow.com</a>
             <a href="/privacy" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>개인정보처리방침</a>
             <a href="/terms" style={{ fontSize: 12, color: t.muted, textDecoration: 'none' }}>이용약관</a>
           </div>
