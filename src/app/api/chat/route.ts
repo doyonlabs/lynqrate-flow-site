@@ -76,6 +76,12 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: lastUserMessage.content,
       })
+
+    // 세션 updated_at 갱신
+    await supabaseAdmin
+      .from('chat_sessions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', currentSessionId)
   }
 
   try {

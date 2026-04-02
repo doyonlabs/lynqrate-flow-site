@@ -212,41 +212,47 @@ export default function FormClient() {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
       const { data: userData } = await supabase
         .from('users').select('display_name, email').eq('id', user.id).single()
       if (userData) setUserInfo(userData)
-      
-      const { data: subData } = await supabase
-        .from('subscriptions')
-        .select('plan, status')
-        .eq('user_id', user.id)
-        .single()
 
+      const { data: subData } = await supabase
+        .from('subscriptions').select('plan, status').eq('user_id', user.id).single()
       if (subData) setSubscription(subData)
 
       await fetchSessions()
 
-      // 첫 세션 여부 체크
       const { data: sessionCheck } = await supabase
-        .from('chat_sessions')
-        .select('id')
-        .limit(1)
-
-      if (!sessionCheck || sessionCheck.length === 0) {
-        setIsFirstSession(true)
-      }
+        .from('chat_sessions').select('id').limit(1)
+      if (!sessionCheck || sessionCheck.length === 0) setIsFirstSession(true)
 
       await fetchTodayEntries()
 
-      // 미완료 세션 자동 extract
-      const { data: incompleteSessions } = await supabase
+      const { data: nullSessions } = await supabase
         .from('chat_sessions')
         .select('id')
         .is('last_extracted_at', null)
         .order('created_at', { ascending: false })
         .limit(5)
 
-      if (incompleteSessions?.length) {
+      const { data: allSessions } = await supabase
+        .from('chat_sessions')
+        .select('id, last_extracted_at, updated_at')
+        .not('last_extracted_at', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      const newMessageSessions = allSessions?.filter(s =>
+        new Date(s.last_extracted_at!) < new Date(s.updated_at)
+      ) ?? []
+
+      const incompleteSessions = [...(nullSessions ?? []), ...newMessageSessions]
+//console.log('nullSessions:', nullSessions)
+//console.log('newMessageSessions:', newMessageSessions)
+//console.log('incompleteSessions:', incompleteSessions)
+
+      if (incompleteSessions.length) {
         incompleteSessions.forEach(s => {
           fetch('/api/chat/extract', {
             method: 'POST',
@@ -256,12 +262,22 @@ export default function FormClient() {
             if (res.ok) {
               fetchSessions()
               fetchTodayEntries()
+              fetchDashboardData(true)
             }
           }).catch(() => {})
         })
       }
     }
-    load()
+
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'INITIAL_SESSION') {
+          if (session?.user) load()
+        }
+      }
+    )
+
+    return () => authSub.unsubscribe()
   }, [])
 
   useEffect(() => {
@@ -354,8 +370,8 @@ export default function FormClient() {
     }
   }
 
-  const fetchDashboardData = async () => {
-    setDashboardLoading(true)
+  const fetchDashboardData = async (silent = false) => {
+    if (!silent) setDashboardLoading(true)
     const [{ data: entries }, { data: emotions }] = await Promise.all([
       supabase.from('emotion_entries')
         .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
@@ -777,13 +793,20 @@ export default function FormClient() {
                 </button>
                 <div style={{ height: 1, background: t.border }} />
                 {subscription.plan === 'free' ? (
-                  <div style={{
+                  <button onClick={async () => {
+                    setSettingsOpen(false)
+                    const res = await fetch('/api/checkout', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.checkout_url) window.open(data.checkout_url, '_blank')
+                  }} style={{
                     width: '100%', padding: '11px 14px',
                     display: 'flex', alignItems: 'center', gap: 10,
-                    color: t.muted, fontSize: 13,
+                    background: 'transparent', border: 'none',
+                    color: '#a78bfa', fontSize: 13, cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'left',
                   }}>
-                    ✦ Pro 플랜 준비 중
-                  </div>
+                    ✦ Pro로 업그레이드
+                  </button>
                 ) : (
                   <button onClick={async () => {
                     setSettingsOpen(false)
@@ -1541,20 +1564,22 @@ export default function FormClient() {
                           <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>최근 기록</p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                             {recentEntries.map((e) => {
-                              const daysAgo = Math.floor(
-                                (Date.now() - new Date(e.created_at).getTime()) / (1000 * 60 * 60 * 24)
-                              )
                               const createdDate = new Date(e.created_at)
                               const timeLabel = createdDate.toLocaleTimeString('ko-KR', {
                                 hour: 'numeric',
                                 minute: '2-digit',
                                 hour12: true,
                               })
-                              const dateLabel = daysAgo === 0
+                              const today = new Date()
+                              today.setHours(0, 0, 0, 0)
+                              const yesterday = new Date(today)
+                              yesterday.setDate(today.getDate() - 1)
+
+                              const dateLabel = createdDate >= today
                                 ? `오늘 ${timeLabel}`
-                                : daysAgo === 1
+                                : createdDate >= yesterday
                                 ? '어제'
-                                : `${daysAgo}일 전`
+                                : `${Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24))}일 전`
                               const color = emotionColors[e.raw_emotion] ?? '#a78bfa'
 
                               return (
