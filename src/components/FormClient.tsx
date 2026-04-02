@@ -155,6 +155,8 @@ export default function FormClient() {
 
   const [subscription, setSubscription] = useState<SubscriptionInfo>({ plan: 'free', status: 'active' })
 
+  const [limitModalOpen, setLimitModalOpen] = useState(false)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -412,8 +414,8 @@ export default function FormClient() {
       const data = await res.json()
       setIsLoading(false)
       if (res.status === 429) {
-        setMessages(prev => [...prev, { role: 'ai', content: '이번 달 무료 대화 횟수(5회)를 모두 사용했어요. 다음 달에 다시 만나요.' }])
-        setSessionEnded(true)
+        setIsLoading(false)
+        setLimitModalOpen(true)
         return
       }
       setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
@@ -457,7 +459,6 @@ export default function FormClient() {
     //console.log('handleNewChat 진입, sessionId:', sessionId, 'hasUser:', messages.some(m => m.role === 'user'))
     if (hasNewMessage && sessionId) {
       //console.log('handleNewChat sessionId:', sessionId, 'messages:', messages.length)
-      const snapshot = messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))
       const sid = sessionId
       fetch('/api/chat/extract', {
         method: 'POST',
@@ -486,7 +487,6 @@ export default function FormClient() {
   const handleLoadSession = async (session: ChatSession) => {
     // 현재 세션에 새 메시지 있으면 백그라운드 extract
     if (hasNewMessage && sessionId && sessionId !== session.id) {
-      const snapshot = messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))
       const sid = sessionId
       fetch('/api/chat/extract', {
         method: 'POST',
@@ -618,6 +618,66 @@ export default function FormClient() {
           animation: 'fadeInUp 0.3s ease',
         }}>
           ✦ {toast}
+        </div>
+      )}
+
+      {/* 무료 사용자 월 10회 제한 알림 */}
+      {limitModalOpen && (
+        <div
+          onClick={() => setLimitModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: t.popup, border: `1px solid ${t.border}`,
+              borderRadius: 20, padding: '28px 28px 24px',
+              width: '100%', maxWidth: 360,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 12 }}>✦</div>
+              <p style={{ fontSize: 16, fontWeight: 700, color: t.text, marginBottom: 8 }}>
+                이번 달 감정 기록 10회를 채웠어요
+              </p>
+              <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.7 }}>
+                10번의 감정을 꺼내놓았네요.<br />
+                데이터가 쌓일수록 패턴이 선명해져요.<br />
+                계속 기록하고 싶다면 Pro로 이어갈 수 있어요.
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                setLimitModalOpen(false)
+                const res = await fetch('/api/checkout', { method: 'POST' })
+                const data = await res.json()
+                if (data.checkout_url) window.open(data.checkout_url, '_blank')
+              }}
+              style={{
+                width: '100%', padding: '14px', borderRadius: 14,
+                background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              계속 기록하기
+            </button>
+            <button
+              onClick={() => setLimitModalOpen(false)}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 14,
+                background: 'transparent', border: `1px solid ${t.border}`,
+                color: t.muted, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              괜찮아요
+            </button>
+          </div>
         </div>
       )}
 

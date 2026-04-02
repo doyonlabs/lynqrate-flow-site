@@ -24,36 +24,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 })
   }
 
-  // 월별 사용량 체크 (무료 플랜 — 신규 세션 월 5회 제한)
-  // 지인 테스트 중 기간 제한 해제(추후 서비스 실 배포시 주석 해제)
-    /* const yearMonth = new Date().toISOString().slice(0, 7)
+  // 월별 사용량 체크 (무료 플랜 — 추출 월 10회 제한)
+  const yearMonth = new Date().toISOString().slice(0, 7)
 
-    const { data: sub } = await supabaseAdmin
+  const { data: sub } = await supabaseAdmin
     .from('subscriptions')
     .select('plan')
     .eq('user_id', user.id)
     .eq('status', 'active')
     .single()
 
-    
-    if (!sub || sub.plan === 'free') {
-        if (!sessionId) {
-            // 신규 세션일 때만 체크
-            const { count } = await supabaseAdmin
-            .from('chat_sessions')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user.id)
-            .gte('created_at', `${yearMonth}-01`)
+  if (!sub || sub.plan === 'free') {
+    const { count } = await supabaseAdmin
+      .from('emotion_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', `${yearMonth}-01`)
 
-            if ((count ?? 0) >= 5) {
-            return NextResponse.json({ error: 'limit_exceeded' }, { status: 429 })
-            }
-        }
-    } */
+    if ((count ?? 0) >= 10) {
+      return NextResponse.json({ error: 'limit_exceeded' }, { status: 429 })
+    }
+  }
 
-    // 세션 없으면 새로 생성
-    let currentSessionId = sessionId
-    if (!currentSessionId) {
+  // 세션 없으면 새로 생성
+  let currentSessionId = sessionId
+  if (!currentSessionId) {
     const firstUserMessage = messages.find((m: { role: string }) => m.role === 'user')
     const title = firstUserMessage?.content?.slice(0, 30) ?? null
 

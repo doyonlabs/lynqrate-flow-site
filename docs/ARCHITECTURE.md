@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-03-30
+> 마지막 업데이트: 2026-04-02
 
 ---
 
@@ -173,7 +173,7 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 **처리 순서**:
 1. 로그인 유저 확인
-2. 무료 플랜 월별 사용량 체크 (신규 세션 시 chat_sessions 카운트, 5회 초과 시 429 반환) ← 베타 기간 비활성화
+2. 무료 플랜 월별 사용량 체크 (이번 달 emotion_entries 카운트, 10회 초과 시 429 반환)
 3. sessionId 없으면 chat_sessions 신규 생성 (title: 첫 메시지 30자)
 4. 유저 메시지 chat_messages 저장
 5. GPT-4.1 호출 (최근 20개 메시지만 전달 + 최근 emotion_entries 5개 컨텍스트 주입)
@@ -250,7 +250,7 @@ standard_emotions (표준 감정 분류 10개)
 |--------|------|
 | `public.users` | 서비스 사용자 정보 |
 | `subscriptions` | 구독 관리 (free/pro, active/cancelled/expired), user_id unique 제약 |
-| `monthly_usage` | 현재 미사용 — 무료 플랜 사용량은 chat_sessions 카운트로 체크 |
+| `monthly_usage` | 현재 미사용 — 무료 플랜 사용량은 emotion_entries 카운트로 체크 |
 | `chat_sessions` | 대화 세션 단위 (사이드바/기록 탭 목록), last_extracted_at 컬럼으로 추출 시점 관리 |
 | `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
 | `emotion_entries` | 자동 추출 감정 데이터 (대시보드 분석 원천, 세션:엔트리 = N:M) |
@@ -269,7 +269,7 @@ supabase/
 
 | 플랜 | 내용 |
 |------|------|
-| 무료 | 채팅 + 기본 피드백 월 5회 (베타 기간 무제한) |
+| 무료 | 감정 기록 월 10회 (emotion_entries 추출 수 기준) |
 | Pro | 대시보드 패턴 분석 + 무제한 기록 + 감정 리포트 |
 
 - 월 4,900원 내외 구독료 검토 중
@@ -380,9 +380,11 @@ supabase/
 - [x] Creem KYC 인증 + 계좌 연결 완료 (승인 대기 중)
 - [x] Pro 버튼 임시 "준비 중" 처리
 - [x] 레거시 코드 제거
-- [ ] Creem Live 모드 전환 (승인 대기 중)
+- [x] 무료 플랜 사용량 제한 기준 변경 (chat_sessions → emotion_entries 추출 수 월 10회)
+- [x] 사용량 초과 시 Pro 유도 모달 추가 (limit_exceeded)
+- [x] Creem Live 모드 승인 완료
+- [x] 베타 종료 — 무료 플랜 월 10회 제한 활성화
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
-- [ ] 베타 종료 후 사용량 제한 복구
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
 - [ ] standard_emotions 매칭 로직 활성화
