@@ -209,59 +209,55 @@ export default function FormClient() {
 
   // 초기 로드
   useEffect(() => {
-    const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data: userData } = await supabase
-        .from('users').select('display_name, email').eq('id', user.id).single()
-      if (userData) setUserInfo(userData)
-      
-      const { data: subData } = await supabase
-        .from('subscriptions')
-        .select('plan, status')
-        .eq('user_id', user.id)
-        .single()
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          if (!session?.user) return
+          const user = session.user
 
-      if (subData) setSubscription(subData)
+          const { data: userData } = await supabase
+            .from('users').select('display_name, email').eq('id', user.id).single()
+          if (userData) setUserInfo(userData)
 
-      await fetchSessions()
+          const { data: subData } = await supabase
+            .from('subscriptions').select('plan, status').eq('user_id', user.id).single()
+          if (subData) setSubscription(subData)
 
-      // 첫 세션 여부 체크
-      const { data: sessionCheck } = await supabase
-        .from('chat_sessions')
-        .select('id')
-        .limit(1)
+          await fetchSessions()
 
-      if (!sessionCheck || sessionCheck.length === 0) {
-        setIsFirstSession(true)
+          const { data: sessionCheck } = await supabase
+            .from('chat_sessions').select('id').limit(1)
+          if (!sessionCheck || sessionCheck.length === 0) setIsFirstSession(true)
+
+          await fetchTodayEntries()
+
+          const { data: incompleteSessions } = await supabase
+            .from('chat_sessions')
+            .select('id')
+            .is('last_extracted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(5)
+
+          if (incompleteSessions?.length) {
+            incompleteSessions.forEach(s => {
+              fetch('/api/chat/extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: s.id }),
+              }).then(res => {
+                if (res.ok) {
+                  fetchSessions()
+                  fetchTodayEntries()
+                  fetchDashboardData()
+                }
+              }).catch(() => {})
+            })
+          }
+        }
       }
+    )
 
-      await fetchTodayEntries()
-
-      // 미완료 세션 자동 extract
-      const { data: incompleteSessions } = await supabase
-        .from('chat_sessions')
-        .select('id')
-        .is('last_extracted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      if (incompleteSessions?.length) {
-        incompleteSessions.forEach(s => {
-          fetch('/api/chat/extract', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: s.id }),
-          }).then(res => {
-            if (res.ok) {
-              fetchSessions()
-              fetchTodayEntries()
-            }
-          }).catch(() => {})
-        })
-      }
-    }
-    load()
+    return () => authSub.unsubscribe()
   }, [])
 
   useEffect(() => {
