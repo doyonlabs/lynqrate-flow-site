@@ -250,7 +250,7 @@ standard_emotions (표준 감정 분류 10개)
 | 테이블 | 역할 |
 |--------|------|
 | `public.users` | 서비스 사용자 정보 |
-| `subscriptions` | 구독 관리 (free/pro, active/cancelled/expired), user_id unique 제약 |
+| `subscriptions` | 구독 관리 (free/pro, active/canceled), canceled_at 컬럼으로 취소 시점 관리, expires_at으로 만료일 관리, user_id unique 제약 |
 | `monthly_usage` | 현재 미사용 — 무료 플랜 사용량은 emotion_entries 카운트로 체크 |
 | `chat_sessions` | 대화 세션 단위 (사이드바/기록 탭 목록), last_extracted_at 컬럼으로 추출 시점 관리 |
 | `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
@@ -393,6 +393,15 @@ supabase/
 - [x] 설정 뷰 구독 섹션 추가 (모바일 구독 버튼 대응)
 - [x] 인사이트 문구 조사 자동 처리 (은/는/이/가/을/를/으로/로)
 - [x] 최근 기록 날짜 표기 버그 수정 (자정 기준으로 변경)
+- [x] 구독 취소 후 만료일까지 Pro 유지 구조 구현 (canceled 상태 + expires_at 기준)
+- [x] subscriptions 테이블 canceled_at 컬럼 추가
+- [x] chat API 구독 체크 로직 수정 (canceled 상태 + expires_at 기준)
+- [x] 웹훅 이벤트 분리 (subscription.active / canceled / expired)
+- [x] 웹훅 페이로드 키 검증 완료 (current_period_end_date, canceled_at)
+- [x] canceled 스펠링 통일 (DB/코드/웹훅)
+- [x] 구독 상태별 UI 분기 (free/pro+active/pro+canceled) 세 군데 통일
+- [x] 대시보드 구독 상태 카드 추가 (무료 사용량 진행바)
+- [x] 이번 달 사용량 monthlyCount fetch 로직 추가 
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가

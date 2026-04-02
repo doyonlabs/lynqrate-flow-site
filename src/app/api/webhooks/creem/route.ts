@@ -25,20 +25,20 @@ export async function POST(req: NextRequest) {
         status: 'active',
         started_at: new Date().toISOString(),
         expires_at: object?.current_period_end_date ?? null,
-        cancelled_at: null,
+        canceled_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', userId)
   }
 
-  // 구독 취소 — plan/expires_at 건드리지 않음, 기간까지 사용 가능
+  // 구독 취소 예약 — 만료일까지 Pro 유지, 만료 시 subscription.expired 이벤트로 free 전환
   if (eventType === 'subscription.canceled') {
     await supabaseAdmin
       .from('subscriptions')
       .update({
-        status: 'cancelled',
-        cancelled_at: new Date().toISOString(),
-        expires_at: object?.current_period_end_date ?? null, // 추가
+        status: 'canceled',
+        canceled_at: object?.canceled_at ?? new Date().toISOString(),
+        expires_at: object?.current_period_end_date ?? null,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', userId)
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         plan: 'free',
         status: 'active',
         expires_at: null,
-        cancelled_at: null,
+        canceled_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', userId)

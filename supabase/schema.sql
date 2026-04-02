@@ -6,6 +6,7 @@
 -- ── 변경 히스토리 ─────────────────────────────────────────────
 -- 2026-03-12: subscriptions.user_id unique 제약 추가
 -- 2026-03-23: chat_sessions.last_extracted_at 컬럼 추가
+-- 2026-04-02: subscriptions.status canceled 스펠링 통일, canceled_at 컬럼 추가
 -- ────────────────────────────────────────────────────────────
 
 -- ── 1. users ──────────────────────────────────────────────────
@@ -35,9 +36,10 @@ create table public.subscriptions (
   id         uuid        primary key default gen_random_uuid(),
   user_id    uuid        not null references public.users(id) on delete cascade,
   plan       text        not null default 'free' check (plan in ('free', 'pro')),
-  status     text        not null default 'active' check (status in ('active', 'cancelled', 'expired')),
+  status     text        not null default 'active' check (status in ('active', 'canceled')),
   started_at timestamptz not null default now(),
   expires_at timestamptz,
+  canceled_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint subscriptions_user_id_key unique (user_id)

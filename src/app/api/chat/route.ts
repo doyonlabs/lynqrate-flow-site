@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   const isPro = sub?.plan === 'pro' && (
     sub.status === 'active' ||
-    (sub.status === 'cancelled' && new Date(sub.expires_at) > new Date())
+    (sub.status === 'canceled' && new Date(sub.expires_at) > new Date())
   )
 
   if (!isPro) {

@@ -819,6 +819,10 @@ export default function FormClient() {
                   }}>
                     ✦ Pro로 업그레이드
                   </button>
+                ) : subscription.status === 'canceled' ? (
+                  <div style={{ padding: '11px 14px', fontSize: 13, color: '#a78bfa' }}>
+                    ✦ Pro · {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료 예정
+                  </div>
                 ) : (
                   <button onClick={async () => {
                     setSettingsOpen(false)
@@ -865,7 +869,7 @@ export default function FormClient() {
                 </div>
                 <div style={{ fontSize: 11, color: subscription.plan === 'pro' ? '#a78bfa' : t.muted }}>
                   {subscription.plan === 'pro'
-                    ? subscription.status === 'cancelled'
+                    ? subscription.status === 'canceled'
                       ? `✦ Pro · ${new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료`
                       : '✦ Pro'
                     : '무료 사용자'}
@@ -1182,23 +1186,13 @@ export default function FormClient() {
                     <span>Pro로 업그레이드</span>
                     <span style={{ fontSize: 12 }}>→</span>
                   </button>
-                ) : subscription.status === 'cancelled' ? (
-                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <p style={{ fontSize: 13, color: t.muted }}>
+                ) : subscription.status === 'canceled' ? (
+                  <div style={{ padding: '14px 16px' }}>
+                    <div style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600, marginBottom: 4 }}>✦ Pro</div>
+                    <div style={{ fontSize: 12, color: t.muted }}>
                       {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
-                    </p>
-                    <button onClick={async () => {
-                      const res = await fetch('/api/portal', { method: 'POST' })
-                      const data = await res.json()
-                      if (data.portal_url) window.open(data.portal_url, '_blank')
-                    }} style={{
-                      padding: '11px 16px', borderRadius: 12,
-                      background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-                      border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
-                      cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
-                    }}>
-                      구독 관리하기
-                    </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>만료 후 다시 구독할 수 있어요</div>
                   </div>
                 ) : (
                   <button onClick={async () => {
@@ -1451,14 +1445,14 @@ export default function FormClient() {
                       </button>
                     </div>
 
-                    {/* 구독 상태 카드 — free 또는 cancelled일 때만 */}
-                    {(subscription.plan === 'free' || subscription.status === 'cancelled') && (
+                    {/* 구독 상태 카드 — free 또는 canceled일 때만 */}
+                    {(subscription.plan === 'free' || subscription.status === 'canceled') && (
                       <div style={{
                         gridColumn: fullSpan,
-                        background: subscription.status === 'cancelled'
+                        background: subscription.status === 'canceled'
                           ? 'linear-gradient(135deg, #a78bfa22, #60a5fa22)'
                           : t.sidebar,
-                        border: `1px solid ${subscription.status === 'cancelled' ? '#a78bfa44' : t.border}`,
+                        border: `1px solid ${subscription.status === 'canceled' ? '#a78bfa44' : t.border}`,
                         borderRadius: 16,
                         padding: '16px 20px',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
@@ -1469,14 +1463,11 @@ export default function FormClient() {
                               <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 8 }}>
                                 이번 달 {monthlyCount}/10회 사용
                               </p>
-                              {/* 진행바 */}
                               <div style={{ height: 4, borderRadius: 2, background: t.border }}>
                                 <div style={{
                                   width: `${Math.min((monthlyCount / 10) * 100, 100)}%`,
                                   height: '100%', borderRadius: 2,
-                                  background: monthlyCount >= 8
-                                    ? '#f87171'
-                                    : 'linear-gradient(90deg, #a78bfa, #60a5fa)',
+                                  background: monthlyCount >= 8 ? '#f87171' : 'linear-gradient(90deg, #a78bfa, #60a5fa)',
                                   transition: 'width 0.3s',
                                 }} />
                               </div>
@@ -1495,26 +1486,13 @@ export default function FormClient() {
                             </button>
                           </>
                         ) : (
-                          <>
-                            <div>
-                              <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600, marginBottom: 4 }}>✦ Pro</p>
-                              <p style={{ fontSize: 12, color: t.muted }}>
-                                {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
-                              </p>
-                            </div>
-                            <button onClick={async () => {
-                              const res = await fetch('/api/checkout', { method: 'POST' })
-                              const data = await res.json()
-                              if (data.checkout_url) window.open(data.checkout_url, '_blank')
-                            }} style={{
-                              flexShrink: 0, padding: '8px 16px', borderRadius: 20,
-                              background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-                              border: 'none', color: '#fff', fontSize: 12, fontWeight: 600,
-                              cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-                            }}>
-                              갱신하기
-                            </button>
-                          </>
+                          <div>
+                            <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>✦ Pro</p>
+                            <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>
+                              {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
+                            </p>
+                            <p style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>만료 후 다시 구독할 수 있어요</p>
+                          </div>
                         )}
                       </div>
                     )}
