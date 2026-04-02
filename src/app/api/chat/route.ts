@@ -29,12 +29,16 @@ export async function POST(req: NextRequest) {
 
   const { data: sub } = await supabaseAdmin
     .from('subscriptions')
-    .select('plan')
+    .select('plan, status, expires_at')
     .eq('user_id', user.id)
-    .eq('status', 'active')
     .single()
 
-  if (!sub || sub.plan === 'free') {
+  const isPro = sub?.plan === 'pro' && (
+    sub.status === 'active' ||
+    (sub.status === 'cancelled' && new Date(sub.expires_at) > new Date())
+  )
+
+  if (!isPro) {
     const { count } = await supabaseAdmin
       .from('emotion_entries')
       .select('*', { count: 'exact', head: true })

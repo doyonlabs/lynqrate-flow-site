@@ -29,6 +29,7 @@ interface UserInfo {
 interface SubscriptionInfo {
   plan: 'free' | 'pro'
   status: string
+  expires_at: string | null
 }
 
 interface EmotionEntry {
@@ -153,9 +154,11 @@ export default function FormClient() {
   const [firstSessionExtracted, setFirstSessionExtracted] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const [subscription, setSubscription] = useState<SubscriptionInfo>({ plan: 'free', status: 'active' })
+  const [subscription, setSubscription] = useState<SubscriptionInfo>({ plan: 'free', status: 'active', expires_at: null })
 
   const [limitModalOpen, setLimitModalOpen] = useState(false)
+
+  const [monthlyCount, setMonthlyCount] = useState(0)
 
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -218,8 +221,17 @@ export default function FormClient() {
       if (userData) setUserInfo(userData)
 
       const { data: subData } = await supabase
-        .from('subscriptions').select('plan, status').eq('user_id', user.id).single()
+        .from('subscriptions').select('plan, status, expires_at').eq('user_id', user.id).single()
       if (subData) setSubscription(subData)
+
+      const now = new Date()
+      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const { count } = await supabase
+        .from('emotion_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', `${yearMonth}-01`)
+      if (count !== null) setMonthlyCount(count)
 
       await fetchSessions()
 
@@ -852,7 +864,11 @@ export default function FormClient() {
                   {userInfo.display_name ?? '사용자'}
                 </div>
                 <div style={{ fontSize: 11, color: subscription.plan === 'pro' ? '#a78bfa' : t.muted }}>
-                  {subscription.plan === 'pro' ? '✦ Pro' : '무료 사용자'}
+                  {subscription.plan === 'pro'
+                    ? subscription.status === 'cancelled'
+                      ? `✦ Pro · ${new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료`
+                      : '✦ Pro'
+                    : '무료 사용자'}
                 </div>
               </div>
               <span style={{ color: t.muted, fontSize: 12 }}>···</span>
@@ -1166,6 +1182,24 @@ export default function FormClient() {
                     <span>Pro로 업그레이드</span>
                     <span style={{ fontSize: 12 }}>→</span>
                   </button>
+                ) : subscription.status === 'cancelled' ? (
+                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <p style={{ fontSize: 13, color: t.muted }}>
+                      {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
+                    </p>
+                    <button onClick={async () => {
+                      const res = await fetch('/api/portal', { method: 'POST' })
+                      const data = await res.json()
+                      if (data.portal_url) window.open(data.portal_url, '_blank')
+                    }} style={{
+                      padding: '11px 16px', borderRadius: 12,
+                      background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                      border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
+                    }}>
+                      구독 관리하기
+                    </button>
+                  </div>
                 ) : (
                   <button onClick={async () => {
                     const res = await fetch('/api/portal', { method: 'POST' })
@@ -1416,6 +1450,74 @@ export default function FormClient() {
                         오늘 털어놓기
                       </button>
                     </div>
+
+                    {/* 구독 상태 카드 — free 또는 cancelled일 때만 */}
+                    {(subscription.plan === 'free' || subscription.status === 'cancelled') && (
+                      <div style={{
+                        gridColumn: fullSpan,
+                        background: subscription.status === 'cancelled'
+                          ? 'linear-gradient(135deg, #a78bfa22, #60a5fa22)'
+                          : t.sidebar,
+                        border: `1px solid ${subscription.status === 'cancelled' ? '#a78bfa44' : t.border}`,
+                        borderRadius: 16,
+                        padding: '16px 20px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                      }}>
+                        {subscription.plan === 'free' ? (
+                          <>
+                            <div style={{ flex: 1 }}>
+                              <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 8 }}>
+                                이번 달 {monthlyCount}/10회 사용
+                              </p>
+                              {/* 진행바 */}
+                              <div style={{ height: 4, borderRadius: 2, background: t.border }}>
+                                <div style={{
+                                  width: `${Math.min((monthlyCount / 10) * 100, 100)}%`,
+                                  height: '100%', borderRadius: 2,
+                                  background: monthlyCount >= 8
+                                    ? '#f87171'
+                                    : 'linear-gradient(90deg, #a78bfa, #60a5fa)',
+                                  transition: 'width 0.3s',
+                                }} />
+                              </div>
+                            </div>
+                            <button onClick={async () => {
+                              const res = await fetch('/api/checkout', { method: 'POST' })
+                              const data = await res.json()
+                              if (data.checkout_url) window.open(data.checkout_url, '_blank')
+                            }} style={{
+                              flexShrink: 0, padding: '8px 16px', borderRadius: 20,
+                              background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                              border: 'none', color: '#fff', fontSize: 12, fontWeight: 600,
+                              cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                            }}>
+                              Pro로 업그레이드
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600, marginBottom: 4 }}>✦ Pro</p>
+                              <p style={{ fontSize: 12, color: t.muted }}>
+                                {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
+                              </p>
+                            </div>
+                            <button onClick={async () => {
+                              const res = await fetch('/api/checkout', { method: 'POST' })
+                              const data = await res.json()
+                              if (data.checkout_url) window.open(data.checkout_url, '_blank')
+                            }} style={{
+                              flexShrink: 0, padding: '8px 16px', borderRadius: 20,
+                              background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                              border: 'none', color: '#fff', fontSize: 12, fontWeight: 600,
+                              cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                            }}>
+                              갱신하기
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     {/* ⑥ 감정 히트맵 */}
                     {(() => {
