@@ -1137,6 +1137,52 @@ export default function FormClient() {
                   </button>
                 </div>
               </div>
+              {/* 구독 섹션 */}
+              <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>구독</p>
+              <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
+                <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>
+                      {subscription.plan === 'pro' ? '✦ Pro 플랜' : '무료 플랜'}
+                    </div>
+                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>
+                      {subscription.plan === 'pro' ? '무제한 감정 기록' : '월 10회 감정 기록'}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ height: 1, background: t.border }} />
+                {subscription.plan === 'free' ? (
+                  <button onClick={async () => {
+                    const res = await fetch('/api/checkout', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.checkout_url) window.open(data.checkout_url, '_blank')
+                  }} style={{
+                    width: '100%', padding: '14px 16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'transparent', border: 'none',
+                    color: '#a78bfa', fontSize: 14, cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'left',
+                  }}>
+                    <span>Pro로 업그레이드</span>
+                    <span style={{ fontSize: 12 }}>→</span>
+                  </button>
+                ) : (
+                  <button onClick={async () => {
+                    const res = await fetch('/api/portal', { method: 'POST' })
+                    const data = await res.json()
+                    if (data.portal_url) window.open(data.portal_url, '_blank')
+                  }} style={{
+                    width: '100%', padding: '14px 16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'transparent', border: 'none',
+                    color: t.text, fontSize: 14, cursor: 'pointer',
+                    fontFamily: 'inherit', textAlign: 'left',
+                  }}>
+                    <span>구독 관리</span>
+                    <span style={{ fontSize: 12, color: t.muted }}>→</span>
+                  </button>
+                )}
+              </div>
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>계정</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1288,45 +1334,54 @@ export default function FormClient() {
 
                 const NEGATIVE_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움']
                 const POSITIVE_EMOTIONS = ['설렘', '기쁨', '감사', '평온']
+                
+                const hasFinalConsonant = (str: string) => {
+                  const code = str.charCodeAt(str.length - 1) - 0xAC00
+                  return code >= 0 && code % 28 !== 0
+                }
+                const eul = (s: string) => hasFinalConsonant(s) ? '을' : '를'
+                const eun = (s: string) => hasFinalConsonant(s) ? '은' : '는'
+                const i = (s: string) => hasFinalConsonant(s) ? '이' : '가'
+                const euro = (s: string) => hasFinalConsonant(s) ? '으로' : '로'
 
                 const insightText = (() => {
-                  const topEmotionName = topEmotion[0]
-                  const topEmotionCount = topEmotion[1]
-                  const isNegative = NEGATIVE_EMOTIONS.includes(topEmotionName)
-                  const isPositive = POSITIVE_EMOTIONS.includes(topEmotionName)
+                const topEmotionName = topEmotion[0]
+                const topEmotionCount = topEmotion[1]
+                const isNegative = NEGATIVE_EMOTIONS.includes(topEmotionName)
+                const isPositive = POSITIVE_EMOTIONS.includes(topEmotionName)
 
-                  if (thisWeekTop && lastWeekTop && thisWeekTop[0] !== lastWeekTop[0]) {
-                    const prevIsNeg = NEGATIVE_EMOTIONS.includes(lastWeekTop[0])
-                    const currIsPos = POSITIVE_EMOTIONS.includes(thisWeekTop[0])
-                    const currIsNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
-                    if (prevIsNeg && currIsPos)
-                      return `지난 주 ${lastWeekTop[0]}을 비워냈더니 이번 주엔 ${thisWeekTop[0]}이 찾아왔네요.`
-                    if (prevIsNeg && currIsNeg)
-                      return `지난 주 ${lastWeekTop[0]}에 이어 이번 주는 ${thisWeekTop[0]}이 많네요. 꺼낼수록 가벼워져요.`
-                    return `지난 주 ${lastWeekTop[0]}에서 이번 주 ${thisWeekTop[0]}으로 흘러가고 있어요.`
-                  }
+                if (thisWeekTop && lastWeekTop && thisWeekTop[0] !== lastWeekTop[0]) {
+                  const prevIsNeg = NEGATIVE_EMOTIONS.includes(lastWeekTop[0])
+                  const currIsPos = POSITIVE_EMOTIONS.includes(thisWeekTop[0])
+                  const currIsNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
+                  if (prevIsNeg && currIsPos)
+                    return `지난 주 ${lastWeekTop[0]}${eul(lastWeekTop[0])} 비워냈더니 이번 주엔 ${thisWeekTop[0]}${i(thisWeekTop[0])} 찾아왔네요.`
+                  if (prevIsNeg && currIsNeg)
+                    return `지난 주 ${lastWeekTop[0]}에 이어 이번 주는 ${thisWeekTop[0]}${i(thisWeekTop[0])} 많네요. 꺼낼수록 가벼워져요.`
+                  return `지난 주 ${lastWeekTop[0]}에서 이번 주 ${thisWeekTop[0]}${euro(thisWeekTop[0])} 흘러가고 있어요.`
+                }
 
-                  if (thisWeekTop && thisWeekData.length > lastWeekData.length) {
-                    const isNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
-                    if (isNeg)
-                      return `이번 주 ${thisWeekTop[0]}이 자주 찾아왔어요. 꺼낼수록 조금씩 비워져요.`
-                    return `이번 주 ${thisWeekTop[0]}이 가득한 한 주네요.`
-                  }
+                if (thisWeekTop && thisWeekData.length > lastWeekData.length) {
+                  const isNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
+                  if (isNeg)
+                    return `이번 주 ${thisWeekTop[0]}${i(thisWeekTop[0])} 자주 찾아왔어요. 꺼낼수록 조금씩 비워져요.`
+                  return `이번 주 ${thisWeekTop[0]}${i(thisWeekTop[0])} 가득한 한 주네요.`
+                }
 
-                  if (isNegative) {
-                    if (topEmotionCount >= 5)
-                      return `${topEmotionName}을 ${topEmotionCount}번 꺼내놓았어요. 비울수록 가벼워져요.`
-                    return `${topEmotionName}이 자주 찾아온 시간이었어요. 꺼낼수록 조금씩 비워져요.`
-                  }
+                if (isNegative) {
+                  if (topEmotionCount >= 5)
+                    return `${topEmotionName}${eul(topEmotionName)} ${topEmotionCount}번 꺼내놓았어요. 비울수록 가벼워져요.`
+                  return `${topEmotionName}${i(topEmotionName)} 자주 찾아온 시간이었어요. 꺼낼수록 조금씩 비워져요.`
+                }
 
-                  if (isPositive) {
-                    if (topEmotionName === '평온')
-                      return `${topEmotionCount}번의 기록 중 평온이 가장 많았어요. 잔잔한 시간이 이어지고 있어요.`
-                    return `${topEmotionCount}번의 기록 중 ${topEmotionName}이 가장 많았어요. 좋은 감정이 차곡차곡 쌓이고 있어요.`
-                  }
+                if (isPositive) {
+                  if (topEmotionName === '평온')
+                    return `${topEmotionCount}번의 기록 중 평온이 가장 많았어요. 잔잔한 시간이 이어지고 있어요.`
+                  return `${topEmotionCount}번의 기록 중 ${topEmotionName}${i(topEmotionName)} 가장 많았어요. 좋은 감정이 차곡차곡 쌓이고 있어요.`
+                }
 
-                  return `${total}번의 감정을 기록했어요. 감정을 꺼내는 것만으로도 충분해요.`
-                })()
+                return `${total}번의 감정을 기록했어요. 감정을 꺼내는 것만으로도 충분해요.`
+              })()
 
                 // [FIX] 모바일: 1열 / 데스크탑: 3열 — 인라인 스타일로 확실하게
                 const cols = isMobile ? '1fr' : '1fr 1fr 1fr'
