@@ -140,7 +140,7 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 | 다른 세션 클릭 | 현재 세션에 새 메시지가 있고 유저 메시지 5개 이상일 때 이동 전 실행 |
 | visibilitychange | 브라우저 탭 전환 / 앱 전환 / 화면 잠금 시 (sendBeacon 적용 예정) |
 | 첫 세션 즉시 추출 | 가입 후 첫 세션에서 유저 메시지 5개 도달 시 즉시 추출 + 토스트 |
-| 로그인 시 | last_extracted_at=null인 미완료 세션 최대 5개 일괄 처리 |
+| 로그인 시 | last_extracted_at=null 또는 last_extracted_at < updated_at인 미완료 세션 최대 5개 일괄 처리 |
 
 ### N:M 구조
 - 하나의 세션에서 여러 번 extract 가능 (대화가 여러 날에 걸칠 때)
@@ -176,9 +176,10 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 2. 무료 플랜 월별 사용량 체크 (이번 달 emotion_entries 카운트, 10회 초과 시 429 반환)
 3. sessionId 없으면 chat_sessions 신규 생성 (title: 첫 메시지 30자)
 4. 유저 메시지 chat_messages 저장
-5. GPT-4.1 호출 (최근 20개 메시지만 전달 + 최근 emotion_entries 5개 컨텍스트 주입)
-6. AI 답변 chat_messages 저장
-7. reply + sessionId 반환
+5. chat_sessions.updated_at 갱신
+6. GPT-4.1 호출 (최근 20개 메시지만 전달 + 최근 emotion_entries 5개 컨텍스트 주입)
+7. AI 답변 chat_messages 저장
+8. reply + sessionId 반환
 
 ---
 
@@ -384,6 +385,14 @@ supabase/
 - [x] 사용량 초과 시 Pro 유도 모달 추가 (limit_exceeded)
 - [x] Creem Live 모드 승인 완료
 - [x] 베타 종료 — 무료 플랜 월 10회 제한 활성화
+- [x] 로그인 시 미완료 세션 감지 로직 개선 (last_extracted_at < updated_at 조건 추가)
+- [x] chat API 메시지 저장 시 chat_sessions.updated_at 갱신
+- [x] onAuthStateChange INITIAL_SESSION 기반으로 초기 로드 구조 변경 (401 방지)
+- [x] extract 성공 시 대시보드 silent 갱신 (깜빡임 방지)
+- [x] Pro 버튼 결제 버튼으로 교체 (Live 모드)
+- [x] 설정 뷰 구독 섹션 추가 (모바일 구독 버튼 대응)
+- [x] 인사이트 문구 조사 자동 처리 (은/는/이/가/을/를/으로/로)
+- [x] 최근 기록 날짜 표기 버그 수정 (자정 기준으로 변경)
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
