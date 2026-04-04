@@ -1445,8 +1445,8 @@ export default function FormClient() {
                       </button>
                     </div>
 
-                    {/* 구독 상태 카드 — free 또는 canceled일 때만 */}
-                    {(subscription.plan === 'free' || subscription.status === 'canceled') && (
+                    {/* 구독 상태 카드 */}
+                    {subscription.plan === 'free' || subscription.status === 'canceled' ? (
                       <div style={{
                         gridColumn: fullSpan,
                         background: subscription.status === 'canceled'
@@ -1494,6 +1494,31 @@ export default function FormClient() {
                             <p style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>만료 후 다시 구독할 수 있어요</p>
                           </div>
                         )}
+                      </div>
+                    ) : (
+                      <div style={{
+                        gridColumn: fullSpan,
+                        background: 'linear-gradient(135deg, #a78bfa22, #60a5fa22)',
+                        border: '1px solid #a78bfa44',
+                        borderRadius: 16,
+                        padding: '16px 20px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                      }}>
+                        <div>
+                          <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>✦ Pro 구독 중</p>
+                          <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>무제한 감정 기록</p>
+                        </div>
+                        <button onClick={async () => {
+                          const res = await fetch('/api/portal', { method: 'POST' })
+                          const data = await res.json()
+                          if (data.portal_url) window.open(data.portal_url, '_blank')
+                        }} style={{
+                          padding: '8px 16px', borderRadius: 20,
+                          background: 'transparent', border: '1px solid #a78bfa44',
+                          color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                        }}>
+                          구독 관리
+                        </button>
                       </div>
                     )}
 
