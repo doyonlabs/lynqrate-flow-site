@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
         plan: 'pro',
         status: 'active',
         creem_customer_id: object?.customer?.id ?? null,
+        creem_subscription_id: object?.id ?? null,
         started_at: new Date().toISOString(),
         expires_at: object?.current_period_end_date ?? null,
         canceled_at: null,
