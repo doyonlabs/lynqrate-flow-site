@@ -17,7 +17,7 @@ export async function DELETE() {
 
   if (sub?.plan === 'pro' && sub?.status === 'active') {
     // Creem에서 구독 ID 조회 후 취소
-    const baseUrl = process.env.CREEM_API_KEY?.startsWith('test_') 
+    const baseUrl = process.env.CREEM_API_KEY?.includes('test')
       ? 'https://test-api.creem.io' 
       : 'https://api.creem.io'
 

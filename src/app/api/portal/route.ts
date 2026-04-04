@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const baseUrl = process.env.CREEM_API_KEY?.startsWith('test_')
+  const baseUrl = process.env.CREEM_API_KEY?.includes('test')
     ? 'https://test-api.creem.io'
     : 'https://api.creem.io'
 
