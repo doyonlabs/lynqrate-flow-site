@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       .update({
         plan: 'pro',
         status: 'active',
+        creem_customer_id: object?.customer?.id ?? null,
         started_at: new Date().toISOString(),
         expires_at: object?.current_period_end_date ?? null,
         canceled_at: null,

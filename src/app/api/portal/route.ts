@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabaseServer'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
@@ -13,26 +14,23 @@ export async function POST(req: NextRequest) {
     ? 'https://test-api.creem.io'
     : 'https://api.creem.io'
 
-  // 고객 목록 조회 후 이메일로 필터
-  const customerRes = await fetch(`${baseUrl}/v1/customers/list`, {
-    headers: { 'x-api-key': process.env.CREEM_API_KEY! },
-  })
+  const { data: sub } = await supabaseAdmin
+    .from('subscriptions')
+    .select('creem_customer_id')
+    .eq('user_id', user.id)
+    .single()
 
-  const customerData = await customerRes.json()
-  const customer = customerData?.items?.find((c: any) => c.email === user.email)
-
-  if (!customer) {
-    return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
+  if (!sub?.creem_customer_id) {
+    return NextResponse.json({ error: 'No customer found' }, { status: 404 })
   }
 
-  // 포털 링크 생성
   const portalRes = await fetch(`${baseUrl}/v1/customers/billing`, {
     method: 'POST',
     headers: {
       'x-api-key': process.env.CREEM_API_KEY!,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ customer_id: customer.id }),
+    body: JSON.stringify({ customer_id: sub.creem_customer_id }),
   })
 
   const portalData = await portalRes.json()
