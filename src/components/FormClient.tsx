@@ -294,7 +294,10 @@ export default function FormClient() {
   }, [])
 
   useEffect(() => {
-    if (view === 'dashboard') fetchDashboardData()
+    if (view === 'dashboard') {
+      fetchDashboardData()
+      fetchMonthlyCount() 
+    }
   }, [view])
 
   //풀 스크롤 방지
