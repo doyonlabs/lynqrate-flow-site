@@ -357,14 +357,11 @@ export default function FormClient() {
   }
 
   const fetchMonthlyCount = async () => {
-  const now = new Date()
-  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+    const now = new Date()
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const { count } = await supabase
       .from('emotion_entries')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
       .gte('created_at', `${yearMonth}-01`)
     if (count !== null) setMonthlyCount(count)
   }
@@ -461,7 +458,7 @@ export default function FormClient() {
         setLimitModalOpen(true)
         return
       }
-      setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요.' }])
+      setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요. 페이지를 새로고침 후 다시 시도해주세요.' }])
       setHasNewMessage(true)
 
       // 첫 세션: 유저 메시지 5개 도달 시 즉시 자동 추출
@@ -492,7 +489,7 @@ export default function FormClient() {
       }
     } catch {
       setIsLoading(false)
-      setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 다시 시도해주세요.' }])
+      setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 페이지를 새로고침 후 다시 시도해주세요.' }])
     }
   }
   // ─── 새 대화 ────────────────────────────────────────────────────────────
