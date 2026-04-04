@@ -275,6 +275,7 @@ export default function FormClient() {
               fetchSessions()
               fetchTodayEntries()
               fetchDashboardData(true)
+              fetchMonthlyCount()
             }
           }).catch(() => {})
         })
@@ -316,6 +317,7 @@ export default function FormClient() {
           if (res.ok) {
             fetchSessions()
             fetchTodayEntries()
+            fetchMonthlyCount()
           }
         }).catch(() => {})
       }
@@ -352,6 +354,19 @@ export default function FormClient() {
       .from('chat_sessions').select('id, title, started_at, ended_at')
       .order('created_at', { ascending: false }).limit(30)
     if (data) setSessions(data)
+  }
+
+  const fetchMonthlyCount = async () => {
+  const now = new Date()
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+    const { count } = await supabase
+      .from('emotion_entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', `${yearMonth}-01`)
+    if (count !== null) setMonthlyCount(count)
   }
 
   const fetchTodayEntries = async () => {
@@ -496,6 +511,7 @@ export default function FormClient() {
         if (res.ok) {
           fetchSessions()
           fetchTodayEntries()
+          fetchMonthlyCount()
         }
       }).catch(() => {})
     }
@@ -524,6 +540,7 @@ export default function FormClient() {
         if (res.ok) {
           fetchSessions()
           fetchTodayEntries()
+          fetchMonthlyCount()
         }
       }).catch(() => {})
     }
