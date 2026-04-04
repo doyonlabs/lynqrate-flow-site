@@ -592,7 +592,7 @@ export default function FormClient() {
 
   // ─── 탈퇴하기 ────────────────────────────────────────────────────────────
   const handleDeleteAccount = async () => {
-    if (!confirm('정말 탈퇴하시겠어요? 모든 기록이 삭제되며 복구할 수 없어요.')) return
+    if (!confirm('정말 탈퇴하시겠어요? 모든 기록이 삭제되며 복구할 수 없어요. Pro 구독 중이라면 즉시 해지됩니다.')) return
     const res = await fetch('/api/user/delete', { method: 'DELETE' })
     if (res.ok) {
       await supabase.auth.signOut()

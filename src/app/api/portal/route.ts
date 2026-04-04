@@ -9,7 +9,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const baseUrl = 'https://test-api.creem.io'
+  const baseUrl = process.env.CREEM_API_KEY?.startsWith('test_')
+    ? 'https://test-api.creem.io'
+    : 'https://api.creem.io'
 
   // 고객 목록 조회 후 이메일로 필터
   const customerRes = await fetch(`${baseUrl}/v1/customers/list`, {

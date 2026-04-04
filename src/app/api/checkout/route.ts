@@ -9,7 +9,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const response = await fetch('https://test-api.creem.io/v1/checkouts', {
+  const baseUrl = process.env.CREEM_API_KEY?.startsWith('test_')
+    ? 'https://test-api.creem.io'
+    : 'https://api.creem.io'
+
+  const response = await fetch(`${baseUrl}/v1/checkouts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
