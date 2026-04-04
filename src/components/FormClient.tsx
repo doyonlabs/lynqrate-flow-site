@@ -296,7 +296,8 @@ export default function FormClient() {
   useEffect(() => {
     if (view === 'dashboard') {
       fetchDashboardData()
-      fetchMonthlyCount() 
+      fetchMonthlyCount()
+      fetchSubscription()
     }
   }, [view])
 
@@ -321,12 +322,16 @@ export default function FormClient() {
             fetchSessions()
             fetchTodayEntries()
             fetchMonthlyCount()
+            fetchSubscription()
           }
         }).catch(() => {})
       }
       // 앱으로 돌아올 때 요약바 갱신
       if (document.visibilityState === 'visible') {
         fetchTodayEntries()
+        fetchDashboardData(true)
+        fetchMonthlyCount()
+        fetchSubscription()
       }
     }
 
@@ -367,6 +372,13 @@ export default function FormClient() {
       .select('*', { count: 'exact', head: true })
       .gte('created_at', `${yearMonth}-01`)
     if (count !== null) setMonthlyCount(count)
+  }
+
+  const fetchSubscription = async () => {
+    const { data } = await supabase
+      .from('subscriptions').select('plan, status, expires_at')
+      .single()
+    if (data) setSubscription(data)
   }
 
   const fetchTodayEntries = async () => {
@@ -512,6 +524,7 @@ export default function FormClient() {
           fetchSessions()
           fetchTodayEntries()
           fetchMonthlyCount()
+          fetchSubscription()
         }
       }).catch(() => {})
     }
@@ -541,6 +554,7 @@ export default function FormClient() {
           fetchSessions()
           fetchTodayEntries()
           fetchMonthlyCount()
+          fetchSubscription()
         }
       }).catch(() => {})
     }
