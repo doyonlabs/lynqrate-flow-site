@@ -7,6 +7,7 @@
 -- 2026-03-12: subscriptions.user_id unique 제약 추가
 -- 2026-03-23: chat_sessions.last_extracted_at 컬럼 추가
 -- 2026-04-02: subscriptions.status canceled 스펠링 통일, canceled_at 컬럼 추가
+-- 2026-04-04: subscriptions.creem_customer_id, creem_subscription_id 컬럼 추가
 -- ────────────────────────────────────────────────────────────
 
 -- ── 1. users ──────────────────────────────────────────────────
@@ -42,6 +43,8 @@ create table public.subscriptions (
   canceled_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  creem_customer_id    text,
+  creem_subscription_id text,
   constraint subscriptions_user_id_key unique (user_id)
 );
 

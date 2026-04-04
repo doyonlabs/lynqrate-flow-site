@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-04-02
+> 마지막 업데이트: 2026-04-04
 
 ---
 
@@ -250,7 +250,7 @@ standard_emotions (표준 감정 분류 10개)
 | 테이블 | 역할 |
 |--------|------|
 | `public.users` | 서비스 사용자 정보 |
-| `subscriptions` | 구독 관리 (free/pro, active/canceled), canceled_at 컬럼으로 취소 시점 관리, expires_at으로 만료일 관리, user_id unique 제약 |
+| `subscriptions` | 구독 관리 (free/pro, active/canceled), canceled_at 컬럼으로 취소 시점 관리, expires_at으로 만료일 관리, user_id unique 제약, creem_customer_id로 포털 URL 생성, creem_subscription_id로 탈퇴 시 구독 취소 |
 | `monthly_usage` | 현재 미사용 — 무료 플랜 사용량은 emotion_entries 카운트로 체크 |
 | `chat_sessions` | 대화 세션 단위 (사이드바/기록 탭 목록), last_extracted_at 컬럼으로 추출 시점 관리 |
 | `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
@@ -273,8 +273,8 @@ supabase/
 | 무료 | 감정 기록 월 10회 (emotion_entries 추출 수 기준) |
 | Pro | 대시보드 패턴 분석 + 무제한 기록 + 감정 리포트 |
 
-- 월 4,900원 내외 구독료 검토 중
-- 목표 수익: 월 100만원 (구독자 약 205명)
+- 월 $6.99 내외 구독료 검토 중
+- 목표 수익: 월 100만원 (구독자 약 100명)
 - 구독 전환 트리거: 대시보드에서 패턴이 보이기 시작하는 순간
 - Creem (MerchantOfRecord, USD, 테스트 모드) — Live 전환 시 운영 키로 교체 필요
 
@@ -402,6 +402,15 @@ supabase/
 - [x] 구독 상태별 UI 분기 (free/pro+active/pro+canceled) 세 군데 통일
 - [x] 대시보드 구독 상태 카드 추가 (무료 사용량 진행바)
 - [x] 이번 달 사용량 monthlyCount fetch 로직 추가 
+- [x] Creem baseUrl 동적 처리 (test/live 자동 전환, includes('test') 조건)
+- [x] 탈퇴 시 Creem 구독 즉시 취소 로직 추가 (creem_subscription_id 기반)
+- [x] portal API creem_customer_id 기반으로 변경 (이메일 조회 제거)
+- [x] subscriptions 테이블 creem_customer_id, creem_subscription_id 컬럼 추가
+- [x] 웹훅 subscription.active에서 creem_customer_id, creem_subscription_id 저장
+- [x] 탭 전환 및 대시보드 진입 시 전체 상태 동기화 (fetchSubscription, fetchMonthlyCount, fetchDashboardData)
+- [x] 채팅 오류 메시지 개선 (새로고침 안내 추가)
+- [x] fetchMonthlyCount getUser 제거 (RLS 기반으로 단순화)
+- [ ] Creem Live 키 교체 (운영 배포 전 필요)
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
 - [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
