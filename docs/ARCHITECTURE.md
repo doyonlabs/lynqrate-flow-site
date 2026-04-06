@@ -86,6 +86,8 @@ Google 로그인 클릭
 | `src/app/api/checkout/route.ts` | Creem checkout URL 생성 |
 | `src/app/api/webhooks/creem/route.ts` | 결제/구독 webhook 처리 |
 | `src/app/api/portal/route.ts` | 고객 포털 링크 생성 |
+| `src/app/api/subscription/cancel/route.ts` | 구독 취소 예약 (scheduled_cancel) |
+| `src/app/api/subscription/resume/route.ts` | 구독 취소 철회 |
 | `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login, / 접근 시 /form 리다이렉트 |
 
 ---
@@ -250,7 +252,7 @@ standard_emotions (표준 감정 분류 10개)
 | 테이블 | 역할 |
 |--------|------|
 | `public.users` | 서비스 사용자 정보 |
-| `subscriptions` | 구독 관리 (free/pro, active/canceled), canceled_at 컬럼으로 취소 시점 관리, expires_at으로 만료일 관리, user_id unique 제약, creem_customer_id로 포털 URL 생성, creem_subscription_id로 탈퇴 시 구독 취소 |
+| `subscriptions` | 구독 관리 (free/pro, active/canceled/scheduled_cancel), canceled_at 컬럼으로 취소 시점 관리, expires_at으로 만료일 관리, user_id unique 제약, creem_customer_id로 포털 URL 생성, creem_subscription_id로 취소/철회 API 호출 |
 | `monthly_usage` | 현재 미사용 — 무료 플랜 사용량은 emotion_entries 카운트로 체크 |
 | `chat_sessions` | 대화 세션 단위 (사이드바/기록 탭 목록), last_extracted_at 컬럼으로 추출 시점 관리 |
 | `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
@@ -413,6 +415,13 @@ supabase/
 - [x] 구독 취소 예약(scheduled_cancel) 및 취소 철회(resume) 기능 구현
 - [x] 웹훅 서명 검증 추가
 - [x] 결제 체크아웃 이메일 prefill 추가
+- [x] subscriptions.status scheduled_cancel 추가 (DB constraint)
+- [x] 웹훅 started_at 덮어쓰기 제거
+- [x] scheduled_cancel 상태 Pro 채팅 접근 허용
+- [x] fetchSubscription 만료일 비교 방어 로직 scheduled_cancel 포함
+- [x] 웹훅 중복 처리 방어 코드 추가 (canceled + 만료일 체크)
+- [x] 사이드바 팝업 active 상태 포털 버튼 → 설정 탭으로 변경
+- [x] 구독 취소 버튼 화살표 제거
 - [ ] Creem Live 키 교체 (운영 배포 전 필요)
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
 - [ ] 구독 모델 연동 (Toss Payments)
