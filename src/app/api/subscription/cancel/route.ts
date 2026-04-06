@@ -24,12 +24,13 @@ export async function POST(req: NextRequest) {
     ? 'https://test-api.creem.io'
     : 'https://api.creem.io'
 
-  const res = await fetch(`${baseUrl}/v1/subscriptions/${sub.creem_subscription_id}/cancel?mode=scheduled`, {
+  const res = await fetch(`${baseUrl}/v1/subscriptions/${sub.creem_subscription_id}/cancel`, {
     method: 'POST',
     headers: {
-      'x-api-key': process.env.CREEM_API_KEY!,
-      'Content-Type': 'application/json',
+        'x-api-key': process.env.CREEM_API_KEY!,
+        'Content-Type': 'application/json',
     },
+    body: JSON.stringify({ mode: 'scheduled' }),
   })
 
   if (!res.ok) {
