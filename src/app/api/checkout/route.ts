@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify({
       product_id: process.env.CREEM_PRODUCT_ID!,
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/form?upgraded=true`,
+      customer: {
+        email: user.email,  // 추가
+      },
       metadata: {
         user_id: user.id,
       },

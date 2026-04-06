@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import * as crypto from 'crypto'
+
+function verifySignature(payload: string, signature: string): boolean {
+  const expected = crypto
+    .createHmac('sha256', process.env.CREEM_WEBHOOK_SECRET!)
+    .update(payload)
+    .digest('hex')
+  return expected === signature
+}
 
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL!,
@@ -7,7 +16,14 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(req: NextRequest) {
-  const payload = await req.json()
+  const rawBody = await req.text()  // json() 대신 text()로 읽어야 함
+  const signature = req.headers.get('creem-signature') ?? ''
+
+  if (!verifySignature(rawBody, signature)) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
+
+  const payload = JSON.parse(rawBody)
   console.log('webhook payload:', JSON.stringify(payload, null, 2))
   const { eventType, object } = payload
 
