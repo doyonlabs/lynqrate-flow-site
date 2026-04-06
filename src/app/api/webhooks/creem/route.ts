@@ -24,12 +24,13 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = JSON.parse(rawBody)
-  console.log('webhook payload:', JSON.stringify(payload, null, 2))
+  //console.log('webhook payload:', JSON.stringify(payload, null, 2))
   const { eventType, object } = payload
 
   const userId = object?.metadata?.user_id
   if (!userId) {
-    return NextResponse.json({ error: 'No user_id in metadata' }, { status: 400 })
+    console.error('No user_id in metadata', payload)
+    return NextResponse.json({ received: true }, { status: 200 })
   }
 
   // 구독 활성화
@@ -41,7 +42,6 @@ export async function POST(req: NextRequest) {
         status: 'active',
         creem_customer_id: object?.customer?.id ?? null,
         creem_subscription_id: object?.id ?? null,
-        started_at: new Date().toISOString(),
         expires_at: object?.current_period_end_date ?? null,
         canceled_at: null,
         updated_at: new Date().toISOString(),

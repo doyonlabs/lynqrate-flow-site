@@ -1276,7 +1276,6 @@ export default function FormClient() {
                     fontFamily: 'inherit', textAlign: 'left',
                   }}>
                     <span>구독 취소</span>
-                    <span style={{ fontSize: 12, color: t.muted }}>→</span>
                   </button>
                 )}
               </div>
