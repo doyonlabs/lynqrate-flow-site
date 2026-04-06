@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-04-04
+> 마지막 업데이트: 2026-04-06
 
 ---
 
@@ -410,6 +410,9 @@ supabase/
 - [x] 탭 전환 및 대시보드 진입 시 전체 상태 동기화 (fetchSubscription, fetchMonthlyCount, fetchDashboardData)
 - [x] 채팅 오류 메시지 개선 (새로고침 안내 추가)
 - [x] fetchMonthlyCount getUser 제거 (RLS 기반으로 단순화)
+- [x] 구독 취소 예약(scheduled_cancel) 및 취소 철회(resume) 기능 구현
+- [x] 웹훅 서명 검증 추가
+- [x] 결제 체크아웃 이메일 prefill 추가
 - [ ] Creem Live 키 교체 (운영 배포 전 필요)
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
 - [ ] 구독 모델 연동 (Toss Payments)

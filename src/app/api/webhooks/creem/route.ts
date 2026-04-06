@@ -49,12 +49,30 @@ export async function POST(req: NextRequest) {
       .eq('user_id', userId)
   }
 
-  // 구독 취소 예약 — 만료일까지 Pro 유지, 만료 시 subscription.expired 이벤트로 free 전환
+  // 구독 취소 — 만료일이 미래면 만료일까지 Pro 유지, 이미 만료됐으면 무시
   if (eventType === 'subscription.canceled') {
+    const expiresAt = object?.current_period_end_date
+    const isAlreadyExpired = expiresAt && new Date(expiresAt) < new Date()
+
+    if (!isAlreadyExpired) {
+      await supabaseAdmin
+        .from('subscriptions')
+        .update({
+          status: 'canceled',
+          canceled_at: object?.canceled_at ?? new Date().toISOString(),
+          expires_at: object?.current_period_end_date ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+    }
+  }
+
+  // 구독 취소 예약 — 만료일까지 Pro 유지, Resume으로 철회 가능
+  if (eventType === 'subscription.scheduled_cancel') {
     await supabaseAdmin
       .from('subscriptions')
       .update({
-        status: 'canceled',
+        status: 'scheduled_cancel',
         canceled_at: object?.canceled_at ?? new Date().toISOString(),
         expires_at: object?.current_period_end_date ?? null,
         updated_at: new Date().toISOString(),

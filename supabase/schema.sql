@@ -8,6 +8,7 @@
 -- 2026-03-23: chat_sessions.last_extracted_at 컬럼 추가
 -- 2026-04-02: subscriptions.status canceled 스펠링 통일, canceled_at 컬럼 추가
 -- 2026-04-04: subscriptions.creem_customer_id, creem_subscription_id 컬럼 추가
+-- 2026-04-06: subscriptions.status scheduled_cancel 추가
 -- ────────────────────────────────────────────────────────────
 
 -- ── 1. users ──────────────────────────────────────────────────
@@ -37,7 +38,7 @@ create table public.subscriptions (
   id         uuid        primary key default gen_random_uuid(),
   user_id    uuid        not null references public.users(id) on delete cascade,
   plan       text        not null default 'free' check (plan in ('free', 'pro')),
-  status     text        not null default 'active' check (status in ('active', 'canceled')),
+  status     text        not null default 'active' check (status in ('active', 'canceled', 'scheduled_cancel')),
   started_at timestamptz not null default now(),
   expires_at timestamptz,
   canceled_at timestamptz,

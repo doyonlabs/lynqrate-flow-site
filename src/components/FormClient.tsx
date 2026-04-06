@@ -378,7 +378,17 @@ export default function FormClient() {
     const { data } = await supabase
       .from('subscriptions').select('plan, status, expires_at')
       .single()
-    if (data) setSubscription(data)
+    if (data) {
+      const isExpired = (data.status === 'canceled' || data.status === 'scheduled_cancel')
+        && data.expires_at
+        && new Date(data.expires_at) < new Date()
+
+      if (isExpired) {
+        setSubscription({ plan: 'free', status: 'active', expires_at: null })
+      } else {
+        setSubscription(data)
+      }
+    }
   }
 
   const fetchTodayEntries = async () => {
@@ -850,16 +860,19 @@ export default function FormClient() {
                   }}>
                     ✦ Pro로 업그레이드
                   </button>
+                ) : subscription.status === 'scheduled_cancel' ? (
+                  <div style={{ padding: '11px 14px', fontSize: 13, color: '#a78bfa' }}>
+                    ✦ Pro · {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료 예정
+                  </div>
                 ) : subscription.status === 'canceled' ? (
                   <div style={{ padding: '11px 14px', fontSize: 13, color: '#a78bfa' }}>
                     ✦ Pro · {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료 예정
                   </div>
                 ) : (
-                  <button onClick={async () => {
+                  <button onClick={() => {
                     setSettingsOpen(false)
-                    const res = await fetch('/api/portal', { method: 'POST' })
-                    const data = await res.json()
-                    if (data.portal_url) window.open(data.portal_url, '_blank')
+                    setView('settings')
+                    closeSidebarOnMobile()
                   }} style={{
                     width: '100%', padding: '11px 14px',
                     display: 'flex', alignItems: 'center', gap: 10,
@@ -867,7 +880,7 @@ export default function FormClient() {
                     color: t.text, fontSize: 13, cursor: 'pointer',
                     fontFamily: 'inherit', textAlign: 'left',
                   }}>
-                    구독 관리
+                    ✦ Pro · 구독 관리
                   </button>
                 )}
                 <div style={{ height: 1, background: t.border }} />
@@ -900,7 +913,7 @@ export default function FormClient() {
                 </div>
                 <div style={{ fontSize: 11, color: subscription.plan === 'pro' ? '#a78bfa' : t.muted }}>
                   {subscription.plan === 'pro'
-                    ? subscription.status === 'canceled'
+                    ? (subscription.status === 'canceled' || subscription.status === 'scheduled_cancel')
                       ? `✦ Pro · ${new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료`
                       : '✦ Pro'
                     : '무료 사용자'}
@@ -1217,6 +1230,28 @@ export default function FormClient() {
                     <span>Pro로 업그레이드</span>
                     <span style={{ fontSize: 12 }}>→</span>
                   </button>
+                ) : subscription.status === 'scheduled_cancel' ? (
+                  <div style={{ padding: '14px 16px' }}>
+                    <div style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600, marginBottom: 4 }}>✦ Pro</div>
+                    <div style={{ fontSize: 12, color: t.muted }}>
+                      {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
+                    </div>
+                    <button onClick={async () => {
+                      const res = await fetch('/api/subscription/resume', { method: 'POST' })
+                      if (res.ok) {
+                        await fetchSubscription()
+                        setToast('구독이 재개됐어요.')
+                        setTimeout(() => setToast(null), 3000)
+                      }
+                    }} style={{
+                      marginTop: 10, padding: '8px 16px', borderRadius: 20,
+                      background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                      border: 'none', color: '#fff', fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}>
+                      구독 취소 철회
+                    </button>
+                  </div>
                 ) : subscription.status === 'canceled' ? (
                   <div style={{ padding: '14px 16px' }}>
                     <div style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600, marginBottom: 4 }}>✦ Pro</div>
@@ -1227,9 +1262,12 @@ export default function FormClient() {
                   </div>
                 ) : (
                   <button onClick={async () => {
-                    const res = await fetch('/api/portal', { method: 'POST' })
-                    const data = await res.json()
-                    if (data.portal_url) window.open(data.portal_url, '_blank')
+                    const res = await fetch('/api/subscription/cancel', { method: 'POST' })
+                    if (res.ok) {
+                      await fetchSubscription()
+                      setToast('구독 취소가 예약됐어요. 만료일까지 이용 가능해요.')
+                      setTimeout(() => setToast(null), 4000)
+                    }
                   }} style={{
                     width: '100%', padding: '14px 16px',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1237,7 +1275,7 @@ export default function FormClient() {
                     color: t.text, fontSize: 14, cursor: 'pointer',
                     fontFamily: 'inherit', textAlign: 'left',
                   }}>
-                    <span>구독 관리</span>
+                    <span>구독 취소</span>
                     <span style={{ fontSize: 12, color: t.muted }}>→</span>
                   </button>
                 )}
@@ -1477,15 +1515,12 @@ export default function FormClient() {
                     </div>
 
                     {/* 구독 상태 카드 */}
-                    {subscription.plan === 'free' || subscription.status === 'canceled' ? (
+                    {subscription.plan === 'free' || subscription.status === 'scheduled_cancel' || subscription.status === 'canceled' ? (
                       <div style={{
                         gridColumn: fullSpan,
-                        background: subscription.status === 'canceled'
-                          ? 'linear-gradient(135deg, #a78bfa22, #60a5fa22)'
-                          : t.sidebar,
-                        border: `1px solid ${subscription.status === 'canceled' ? '#a78bfa44' : t.border}`,
-                        borderRadius: 16,
-                        padding: '16px 20px',
+                        background: subscription.plan === 'free' ? t.sidebar : 'linear-gradient(135deg, #a78bfa22, #60a5fa22)',
+                        border: `1px solid ${subscription.plan === 'free' ? t.border : '#a78bfa44'}`,
+                        borderRadius: 16, padding: '16px 20px',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
                       }}>
                         {subscription.plan === 'free' ? (
@@ -1516,6 +1551,30 @@ export default function FormClient() {
                               Pro로 업그레이드
                             </button>
                           </>
+                        ) : subscription.status === 'scheduled_cancel' ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <div>
+                              <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>✦ Pro</p>
+                              <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>
+                                {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
+                              </p>
+                            </div>
+                            <button onClick={async () => {
+                              const res = await fetch('/api/subscription/resume', { method: 'POST' })
+                              if (res.ok) {
+                                await fetchSubscription()
+                                setToast('구독이 재개됐어요.')
+                                setTimeout(() => setToast(null), 3000)
+                              }
+                            }} style={{
+                              flexShrink: 0, padding: '8px 16px', borderRadius: 20,
+                              background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                              border: 'none', color: '#fff', fontSize: 12, fontWeight: 600,
+                              cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                            }}>
+                              구독 취소 철회
+                            </button>
+                          </div>
                         ) : (
                           <div>
                             <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>✦ Pro</p>
@@ -1531,8 +1590,7 @@ export default function FormClient() {
                         gridColumn: fullSpan,
                         background: 'linear-gradient(135deg, #a78bfa22, #60a5fa22)',
                         border: '1px solid #a78bfa44',
-                        borderRadius: 16,
-                        padding: '16px 20px',
+                        borderRadius: 16, padding: '16px 20px',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
                       }}>
                         <div>
@@ -1540,15 +1598,18 @@ export default function FormClient() {
                           <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>무제한 감정 기록</p>
                         </div>
                         <button onClick={async () => {
-                          const res = await fetch('/api/portal', { method: 'POST' })
-                          const data = await res.json()
-                          if (data.portal_url) window.open(data.portal_url, '_blank')
+                          const res = await fetch('/api/subscription/cancel', { method: 'POST' })
+                          if (res.ok) {
+                            await fetchSubscription()
+                            setToast('구독 취소가 예약됐어요. 만료일까지 이용 가능해요.')
+                            setTimeout(() => setToast(null), 4000)
+                          }
                         }} style={{
                           padding: '8px 16px', borderRadius: 20,
                           background: 'transparent', border: '1px solid #a78bfa44',
                           color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
                         }}>
-                          구독 관리
+                          구독 취소
                         </button>
                       </div>
                     )}
