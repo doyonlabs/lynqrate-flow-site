@@ -321,23 +321,9 @@ export default function FormClient() {
       }
     }
 
-    // iOS Safari에서 visibilitychange가 불안정할 때를 대비한 pagehide 보완
-    const handlePageHide = () => {
-      if (hasNewMessage && sessionId) {
-        const sid = sessionId
-        fetch('/api/chat/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: sid }),
-        })
-      }
-    }
-
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('pagehide', handlePageHide)
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('pagehide', handlePageHide)
     }
   }, [hasNewMessage, sessionId, messages])
 
