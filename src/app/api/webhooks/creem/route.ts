@@ -49,6 +49,20 @@ export async function POST(req: NextRequest) {
       .eq('user_id', userId)
   }
 
+  // 갱신 결제 성공 — expires_at 업데이트
+  if (eventType === 'subscription.paid') {
+    await supabaseAdmin
+      .from('subscriptions')
+      .update({
+        plan: 'pro',
+        status: 'active',
+        expires_at: object?.current_period_end_date ?? null,
+        canceled_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+  }
+
   // 구독 취소 — 만료일이 미래면 만료일까지 Pro 유지, 이미 만료됐으면 무시
   if (eventType === 'subscription.canceled') {
     const expiresAt = object?.current_period_end_date

@@ -14,7 +14,7 @@ export async function DELETE() {
     .eq('user_id', user.id)
     .single()
 
-  if (sub?.plan === 'pro' && sub?.status === 'active' && sub?.creem_subscription_id) {
+  if (sub?.plan === 'pro' && (sub?.status === 'active' || sub?.status === 'scheduled_cancel') && sub?.creem_subscription_id) {
     const baseUrl = process.env.CREEM_API_KEY?.includes('test')
       ? 'https://test-api.creem.io' 
       : 'https://api.creem.io'
