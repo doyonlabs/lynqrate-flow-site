@@ -271,12 +271,7 @@ export default function FormClient() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sessionId: s.id }),
           }).then(res => {
-            if (res.ok) {
-              fetchSessions()
-              fetchTodayEntries()
-              fetchDashboardData(true)
-              fetchMonthlyCount()
-            }
+            if (res.ok) refreshAll(true)
           }).catch(() => {})
         })
       }
@@ -296,9 +291,10 @@ export default function FormClient() {
   useEffect(() => {
     if (view === 'dashboard') {
       fetchDashboardData()
-      fetchMonthlyCount()
-      fetchSubscription()
+      refreshAll()
     }
+    if (view === 'records') fetchSessions()
+    if (view === 'settings') fetchSubscription()
   }, [view])
 
   //풀 스크롤 방지
@@ -310,7 +306,6 @@ export default function FormClient() {
   // 탭/앱 전환 시 자동 감정 추출 + 복귀 시 요약바 갱신
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // 탭 전환/앱 전환으로 화면이 숨겨질 때 자동 추출
       if (document.visibilityState === 'hidden' && hasNewMessage && sessionId) {
         const sid = sessionId
         fetch('/api/chat/extract', {
@@ -318,20 +313,11 @@ export default function FormClient() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: sid }),
         }).then(res => {
-          if (res.ok) {
-            fetchSessions()
-            fetchTodayEntries()
-            fetchMonthlyCount()
-            fetchSubscription()
-          }
+          if (res.ok) refreshAll(true)
         }).catch(() => {})
       }
-      // 앱으로 돌아올 때 요약바 갱신
       if (document.visibilityState === 'visible') {
-        fetchTodayEntries()
-        fetchDashboardData(true)
-        fetchMonthlyCount()
-        fetchSubscription()
+        refreshAll(true)
       }
     }
 
@@ -451,6 +437,16 @@ export default function FormClient() {
     setDashboardLoading(false)
   }
 
+  const refreshAll = useCallback(async (withDashboard = false) => {
+    await Promise.all([
+      fetchSessions(),
+      fetchTodayEntries(),
+      fetchMonthlyCount(),
+      fetchSubscription(),
+    ])
+    if (withDashboard) fetchDashboardData(true)
+  }, [])
+
   // ─── 헬퍼 ────────────────────────────────────────────────────────────────
 
   const closeSidebarOnMobile = useCallback(() => {
@@ -485,6 +481,7 @@ export default function FormClient() {
       }
       setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요. 페이지를 새로고침 후 다시 시도해주세요.' }])
       setHasNewMessage(true)
+      fetchTodayEntries()
 
       // 첫 세션: 유저 메시지 5개 도달 시 즉시 자동 추출
       if (isFirstSession && !firstSessionExtracted) {
@@ -499,7 +496,7 @@ export default function FormClient() {
           }).then(async (res) => {
             const result = await res.json()
             if (res.ok && !result.skipped) {
-              await fetchTodayEntries()
+              await refreshAll()
               setToast('첫 감정이 기록됐어요. 대화가 쌓이면 패턴이 보여요.')
               setTimeout(() => setToast(null), 4000)
             }
@@ -530,12 +527,7 @@ export default function FormClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: sid }),
       }).then(res => {
-        if (res.ok) {
-          fetchSessions()
-          fetchTodayEntries()
-          fetchMonthlyCount()
-          fetchSubscription()
-        }
+        if (res.ok) refreshAll(true)
       }).catch(() => {})
     }
 
@@ -560,12 +552,7 @@ export default function FormClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: sid }),
       }).then(res => {
-        if (res.ok) {
-          fetchSessions()
-          fetchTodayEntries()
-          fetchMonthlyCount()
-          fetchSubscription()
-        }
+        if (res.ok) refreshAll(true)
       }).catch(() => {})
     }
     setHasNewMessage(false)
