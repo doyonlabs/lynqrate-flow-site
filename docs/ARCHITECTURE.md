@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-04-06
+> 마지막 업데이트: 2026-04-11
 
 ---
 
@@ -294,6 +294,7 @@ supabase/
 | `CREEM_API_KEY` | Creem API 키 | 서버만 |
 | `CREEM_PRODUCT_ID` | Creem 상품 ID | 서버만 |
 | `NEXT_PUBLIC_APP_URL` | 앱 베이스 URL (결제 완료 후 리다이렉트용) | 브라우저 + 서버 |
+| `CREEM_WEBHOOK_SECRET` | Creem 웹훅 서명 검증 키 | 서버만 |
 
 ---
 
@@ -422,6 +423,12 @@ supabase/
 - [x] 웹훅 중복 처리 방어 코드 추가 (canceled + 만료일 체크)
 - [x] 사이드바 팝업 active 상태 포털 버튼 → 설정 탭으로 변경
 - [x] 구독 취소 버튼 화살표 제거
+- [x] 웹훅 subscription.paid 핸들러 추가 (갱신 결제 성공 시 expires_at 업데이트)
+- [x] 탈퇴 시 scheduled_cancel 상태 구독도 즉시 취소 처리
+- [x] refreshAll로 데이터 갱신 로직 통일 (dashboard/records/settings/visibilitychange/extract)
+- [x] pagehide 핸들러 제거 (visibilitychange와 중복 추출 버그 수정)
+- [x] 기록/설정 탭 진입 시 데이터 갱신 추가
+- [x] 운영 배포 (테스트 모드 결제 키로)
 - [ ] Creem Live 키 교체 (운영 배포 전 필요)
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
 - [ ] 구독 모델 연동 (Toss Payments)

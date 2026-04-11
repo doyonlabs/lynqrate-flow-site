@@ -235,9 +235,10 @@ export default function FormClient() {
 
       await fetchSessions()
 
-      const { data: sessionCheck } = await supabase
-        .from('chat_sessions').select('id').limit(1)
-      if (!sessionCheck || sessionCheck.length === 0) setIsFirstSession(true)
+      const { count: entryCount } = await supabase
+        .from('emotion_entries')
+        .select('*', { count: 'exact', head: true })
+      if (!entryCount || entryCount === 0) setIsFirstSession(true)
 
       await fetchTodayEntries()
 
