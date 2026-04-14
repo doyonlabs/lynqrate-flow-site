@@ -29,11 +29,28 @@ export async function POST(req: NextRequest) {
   // refund.created는 object.customer.id 기반으로 처리 (metadata.user_id 없음)
   if (eventType === 'refund.created') {
     const subscriptionId = object?.subscription?.id
+    const userId = object?.subscription?.metadata?.user_id
+
     if (!subscriptionId) {
       return NextResponse.json({ received: true })
     }
 
-    await supabaseAdmin
+    // Creem 구독 즉시 취소 (안 하면 다음 달 재결제 시도됨)
+    const baseUrl = process.env.CREEM_API_KEY?.includes('test')
+      ? 'https://test-api.creem.io/v1'
+      : 'https://api.creem.io/v1'
+
+    await fetch(`${baseUrl}/subscriptions/${subscriptionId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.CREEM_API_KEY!,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ mode: 'immediate' }),
+    })
+
+    // DB free로 초기화
+    const query = supabaseAdmin
       .from('subscriptions')
       .update({
         plan: 'free',
@@ -42,7 +59,12 @@ export async function POST(req: NextRequest) {
         canceled_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
-      .eq('creem_subscription_id', subscriptionId)
+
+    if (userId) {
+      await query.eq('user_id', userId)
+    } else {
+      await query.eq('creem_subscription_id', subscriptionId)
+    }
 
     return NextResponse.json({ received: true })
   }
