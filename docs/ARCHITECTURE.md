@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-04-11
+> 마지막 업데이트: 2026-04-14
 
 ---
 
@@ -278,7 +278,7 @@ supabase/
 - 월 $6.99 내외 구독료 검토 중
 - 목표 수익: 월 100만원 (구독자 약 100명)
 - 구독 전환 트리거: 대시보드에서 패턴이 보이기 시작하는 순간
-- Creem (MerchantOfRecord, USD, 테스트 모드) — Live 전환 시 운영 키로 교체 필요
+- Creem (MerchantOfRecord, USD) — Live 모드 운영 중
 
 ---
 
@@ -429,10 +429,11 @@ supabase/
 - [x] pagehide 핸들러 제거 (visibilitychange와 중복 추출 버그 수정)
 - [x] 기록/설정 탭 진입 시 데이터 갱신 추가
 - [x] 운영 배포 (테스트 모드 결제 키로)
-- [ ] Creem Live 키 교체 (운영 배포 전 필요)
+- [x] refund.created 웹훅 처리 추가 (환불 시 Creem 구독 즉시 취소 + DB free 초기화)
+- [x] 환불 시 subscription.canceled 덮어쓰기 방지 (plan: free 체크 가드 추가)
+- [x] 환불 정책 약관 수정 (3일 이내 미이용 시로 변경)
+- [x] Creem Live 키 교체 (운영 배포 전 필요)
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
-- [ ] 구독 모델 연동 (Toss Payments)
 - [ ] 카카오 로그인 추가
-- [ ] standard_emotions 매칭 로직 활성화
 - [ ] PWA manifest.json 추가
 - [ ] OG 이미지 추가 (카카오톡 링크 썸네일)
