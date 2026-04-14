@@ -16,7 +16,7 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(req: NextRequest) {
-  const rawBody = await req.text()  // json() 대신 text()로 읽어야 함
+  const rawBody = await req.text()
   const signature = req.headers.get('creem-signature') ?? ''
 
   if (!verifySignature(rawBody, signature)) {
@@ -24,8 +24,28 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = JSON.parse(rawBody)
-  //console.log('webhook payload:', JSON.stringify(payload, null, 2))
   const { eventType, object } = payload
+
+  // refund.created는 object.customer.id 기반으로 처리 (metadata.user_id 없음)
+  if (eventType === 'refund.created') {
+    const subscriptionId = object?.subscription?.id
+    if (!subscriptionId) {
+      return NextResponse.json({ received: true })
+    }
+
+    await supabaseAdmin
+      .from('subscriptions')
+      .update({
+        plan: 'free',
+        status: 'active',
+        expires_at: null,
+        canceled_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('creem_subscription_id', subscriptionId)
+
+    return NextResponse.json({ received: true })
+  }
 
   const userId = object?.metadata?.user_id
   if (!userId) {
@@ -63,21 +83,30 @@ export async function POST(req: NextRequest) {
       .eq('user_id', userId)
   }
 
-  // 구독 취소 — 만료일이 미래면 만료일까지 Pro 유지, 이미 만료됐으면 무시
+  // 구독 취소 — 환불로 인한 canceled는 refund.created에서 처리하므로 여기선 만료일 미래인 경우만
   if (eventType === 'subscription.canceled') {
     const expiresAt = object?.current_period_end_date
     const isAlreadyExpired = expiresAt && new Date(expiresAt) < new Date()
 
     if (!isAlreadyExpired) {
-      await supabaseAdmin
+      // 이미 환불로 free 처리된 경우 덮어쓰지 않도록 현재 plan 확인
+      const { data: current } = await supabaseAdmin
         .from('subscriptions')
-        .update({
-          status: 'canceled',
-          canceled_at: object?.canceled_at ?? new Date().toISOString(),
-          expires_at: object?.current_period_end_date ?? null,
-          updated_at: new Date().toISOString(),
-        })
+        .select('plan')
         .eq('user_id', userId)
+        .single()
+
+      if (current?.plan === 'pro') {
+        await supabaseAdmin
+          .from('subscriptions')
+          .update({
+            status: 'canceled',
+            canceled_at: object?.canceled_at ?? new Date().toISOString(),
+            expires_at: object?.current_period_end_date ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId)
+      }
     }
   }
 
