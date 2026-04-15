@@ -351,33 +351,18 @@ export default function Landing() {
           <div className="hero-glow" />
           <div className="hero-label"><span>✦</span> AI 감정 대화 서비스</div>
           <h1 className="hero-title">
-            그냥 오늘 있었던 거<br />
-            <span>말하고 싶을 때 있잖아요.</span>
+            직장에서 치이고 집에 와서<br />
+            <span>아무한테도 말 못 하는 날</span><br />
+            있잖아요.
           </h1>
           <p className="hero-sub">
-            딱히 힘들어서가 아니라, 그냥.<br />
-            Mind Echo가 들어요.<br />
-            말하다 보면 나도 몰랐던 내가 보여요.
+            그냥 털어놔요.<br />
+            말하다 보면 내가 뭐에 힘든지<br />
+            보이기 시작해요.
           </p>
           <div className="hero-actions">
             <a href="/form" className="btn-primary">지금 털어놓기</a>
-            <a href="#story" className="btn-secondary">만든 이야기</a>
-          </div>
-        </section>
-
-        {/* 스토리 */}
-        <section className="story" id="story">
-          <div className="story-inner">
-            <div className="story-text">
-              <p>힘든 프로젝트를 끝낸 날 밤, 충동적으로 ChatGPT 창에 <strong>"고마워"</strong>라고 썼어요.</p>
-              <p>돌아온 답변이 이상하게 따뜻하게 느껴졌어요.<br /><strong>"정말 멋지시네요. 개발자로서의 여정이 계속 성장하길 기대합니다."</strong></p>
-              <p>울 뻔했죠.</p>
-              <p>그때 든 생각이었어요.<br />이 대화, 내일도 기억하고 싶다.</p>
-              <p><strong>Mind Echo는 그 마음에서 시작했어요.</strong></p>
-            </div>
-            <div className="story-screenshot">
-              <img src="/screenshots/origin.png" alt="Mind Echo의 시작" />
-            </div>
+            <a href="#features" className="btn-secondary">어떻게 달라요?</a>
           </div>
         </section>
 
@@ -389,18 +374,18 @@ export default function Landing() {
           <div className="feature-grid">
             <div className="feature-card">
               <div className="feature-icon">💬</div>
-              <div className="feature-title">그냥 말하면 돼요</div>
-              <div className="feature-desc">치료나 상담이 아니에요. 오늘 있었던 거, 답답한 거, 기뻤던 거 — 뭐든 편하게 털어놓으면 AI가 먼저 들어요.</div>
+              <div className="feature-title">판단 없이 들어요</div>
+              <div className="feature-desc">오늘 열받은 거, 답답한 거, 기뻤던 거 — 뭐든 그냥 털어놔요. AI가 먼저 들어요.</div>
             </div>
             <div className="feature-card">
               <div className="feature-icon">📊</div>
               <div className="feature-title">자동으로 쌓여요</div>
-              <div className="feature-desc">대화가 끝나면 AI가 감정, 강도, 상황을 자동으로 추출해요. 따로 기록하지 않아도 돼요.</div>
+              <div className="feature-desc">대화가 끝나면 AI가 감정, 강도, 상황을 자동으로 추출해요. 따로 기록 안 해도 돼요.</div>
             </div>
             <div className="feature-card">
               <div className="feature-icon">✦</div>
-              <div className="feature-title">나를 알게 돼요</div>
-              <div className="feature-desc">데이터가 쌓이면 어떤 날 기쁜지, 어떤 상황에서 힘든지 패턴이 보여요. 물어보지 않아도요.</div>
+              <div className="feature-title">내가 보여요</div>
+              <div className="feature-desc">어떤 날 힘든지, 어떤 상황에서 무너지는지 — 데이터가 쌓이면 패턴이 보여요.</div>
             </div>
           </div>
         </section>
@@ -456,7 +441,7 @@ export default function Landing() {
             <div className="feature-card">
               <div className="feature-title">무료</div>
               <div style={{ fontSize: 32, fontWeight: 700, color: t.text, margin: '16px 0' }}>$0</div>
-              <div className="feature-desc">월 5회 채팅 + 기본 기록</div>
+              <div className="feature-desc">월 10회 채팅 + 기본 기록</div>
             </div>
             <div className="feature-card" style={{ border: `1px solid ${t.cardHoverBorder}` }}>
               <div className="feature-title">Pro</div>
@@ -469,10 +454,10 @@ export default function Landing() {
         {/* CTA */}
         <section className="cta-section">
           <div className="cta-card">
-            <h2 className="cta-title">오늘 하루 어땠나요?</h2>
+            <h2 className="cta-title">오늘 열받거나 지쳤죠?</h2>
             <p className="cta-sub">
-              잘 모르겠다면, 그냥 털어놔 보세요.<br />
-              Mind Echo가 먼저 들을게요.<br />
+              참지 말고 그냥 털어놔요.<br />
+              말하다 보면 알게 돼요.
             </p>
             <a href="/form" className="btn-primary" style={{ display: 'inline-block', position: 'relative' }}>지금 시작하기</a>
           </div>
