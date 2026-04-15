@@ -119,7 +119,7 @@ export default function Landing() {
         }
 
         .hero-sub {
-          font-size: clamp(15px, 2vw, 18px); color: ${t.muted};
+          font-size: clamp(17px, 2.2vw, 22px); color: ${t.muted};
           line-height: 1.8; max-width: 480px; margin: 0 auto 48px;
           animation: fadeUp 0.8s 0.2s ease both;
         }
@@ -351,12 +351,11 @@ export default function Landing() {
           <div className="hero-glow" />
           <div className="hero-label"><span>✦</span> AI 감정 대화 서비스</div>
           <h1 className="hero-title">
-            직장에서 치이고 집에 와서<br />
-            <span>아무한테도 말 못 하는 날</span><br />
-            있잖아요.
+            털어놓고 싶은데<br />
+            <span>털어놓을 데가 없어요.</span><br />
           </h1>
           <p className="hero-sub">
-            그냥 털어놔요.<br />
+            Mind Echo에 털어놔요.<br />
             말하다 보면 내가 뭐에 힘든지<br />
             보이기 시작해요.
           </p>
