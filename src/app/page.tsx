@@ -453,7 +453,7 @@ export default function Landing() {
         {/* CTA */}
         <section className="cta-section">
           <div className="cta-card">
-            <h2 className="cta-title">오늘 열받거나 지쳤죠?</h2>
+            <h2 className="cta-title">오늘 열받거나 지쳤나요?</h2>
             <p className="cta-sub">
               참지 말고 그냥 털어놔요.<br />
               말하다 보면 알게 돼요.
