@@ -470,11 +470,11 @@ export default function FormClient() {
       setHasNewMessage(true)
       fetchTodayEntries()
 
-      // 첫 세션: 유저 메시지 5개 도달 시 즉시 자동 추출
+      // 첫 세션: 유저 메시지 첫 3개 도달 시 즉시 자동 추출
       if (isFirstSession && !firstSessionExtracted) {
         const userCount = [...newMessages, { role: 'ai', content: data.reply }]
           .filter(m => m.role === 'user').length
-        if (userCount >= 5 && data.sessionId) {
+        if (userCount >= 3 && data.sessionId) {
           setFirstSessionExtracted(true)
           fetch('/api/chat/extract', {
             method: 'POST',
