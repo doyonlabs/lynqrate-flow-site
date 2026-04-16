@@ -177,7 +177,8 @@ export default function FormClient() {
     const checkViewport = () => {
       const mobile = window.innerWidth < 1024
       setIsMobile(mobile)
-      setSidebarOpen(!mobile) // 데스크탑: 열림 / 모바일: 닫힘
+      setSidebarOpen(!mobile)
+      if (!mobile) setView(prev => prev === 'records' ? 'chat' : prev)
     }
     checkViewport()
     window.addEventListener('resize', checkViewport)
@@ -1462,7 +1463,7 @@ export default function FormClient() {
                       justifyContent: 'space-between', gap: 12,
                     }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>이번 달 요약</p>
+                        <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>감정 인사이트</p>
                         <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }}>{insightText}</p>
                       </div>
                       <button onClick={() => { setView('chat'); handleNewChat() }} style={{
@@ -1489,7 +1490,7 @@ export default function FormClient() {
                           <>
                             <div style={{ flex: 1 }}>
                               <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 8 }}>
-                                이번 달 {monthlyCount}/10회 사용
+                                이번 달 {monthlyCount}/10회 사용 · 5회 이상부터 패턴이 보이기 시작해요
                               </p>
                               <div style={{ height: 4, borderRadius: 2, background: t.border }}>
                                 <div style={{
