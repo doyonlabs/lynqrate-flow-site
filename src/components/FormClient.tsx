@@ -121,7 +121,7 @@ export default function FormClient() {
 
   // 채팅 상태
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요. 대화가 쌓이면 내 감정 패턴을 볼 수 있어요.' },
+    { role: 'ai', content: '안녕하세요. 오늘 어땠어요? 좋았던 것도, 별로였던 것도 편하게 얘기해줘요.' },
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -159,6 +159,8 @@ export default function FormClient() {
   const [limitModalOpen, setLimitModalOpen] = useState(false)
 
   const [monthlyCount, setMonthlyCount] = useState(0)
+
+  const [standardEmotions, setStandardEmotions] = useState<string[]>([])
 
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -398,13 +400,14 @@ export default function FormClient() {
       supabase.from('emotion_entries')
         .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
         .order('created_at', { ascending: true }).limit(50),
-      supabase.from('standard_emotions').select('name, color_code'),
+      supabase.from('standard_emotions').select('name, color_code').order('soft_order'),
     ])
     if (entries) setDashboardData(entries)
     if (emotions) {
       const map: Record<string, string> = {}
       emotions.forEach(e => { map[e.name] = e.color_code })
       setEmotionColors(map)
+      setStandardEmotions(emotions.map(e => e.name))
     }
 
     // 공휴일 fetch
@@ -1347,27 +1350,6 @@ export default function FormClient() {
             <div style={{ padding: isMobile ? '16px 12px 80px' : '28px 32px 40px', minHeight: '100%', background: t.bg }}>
               {dashboardLoading ? (
                 <p style={{ color: t.muted, fontSize: 14 }}>불러오는 중...</p>
-              ) : dashboardData.length === 0 ? (
-                <div style={{ height: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa22, #60a5fa22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {Icons.chart(t.muted)}
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: 16, color: t.text, fontWeight: 600, marginBottom: 8 }}>오늘 어떤 하루였나요?</p>
-                    <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>
-                      첫 대화를 나누면 감정이 자동으로 기록돼요.<br />
-                      일주일만 써보면 내 패턴이 보이기 시작해요.
-                    </p>
-                  </div>
-                  <button onClick={() => { setView('chat'); handleNewChat() }} style={{
-                    marginTop: 8, padding: '12px 28px', borderRadius: 24,
-                    background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-                    border: 'none', color: '#fff', fontSize: 14, fontWeight: 600,
-                    cursor: 'pointer', fontFamily: 'inherit',
-                  }}>
-                    지금 시작하기
-                  </button>
-                </div>
               ) : (() => {
                 const total = dashboardData.length
                 const freq: Record<string, number> = {}
@@ -1375,7 +1357,10 @@ export default function FormClient() {
                 const top3 = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 3)
                 const topEmotion = top3[0]
                 const avgIntensity = (dashboardData.reduce((s, e) => s + e.intensity, 0) / total).toFixed(1)
-                const barData = Object.entries(freq).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }))
+                const barData = standardEmotions
+                  .map(name => ({ name, count: freq[name] ?? 0 }))
+                  .sort((a, b) => b.count - a.count)
+                  .filter(({ count }) => count > 0)
 
                 const now = new Date()
                 const startOfThisWeek = new Date(now); startOfThisWeek.setDate(now.getDate() - now.getDay())
@@ -1415,6 +1400,7 @@ export default function FormClient() {
                 const euro = (s: string) => hasFinalConsonant(s) ? '으로' : '로'
 
                 const insightText = (() => {
+                if (!topEmotion) return '대화하다 보면 감정이 자동으로 기록돼요. 매일 조금씩 쌓이면 내 패턴이 보이기 시작해요.'
                 const topEmotionName = topEmotion[0]
                 const topEmotionCount = topEmotion[1]
                 const isNegative = NEGATIVE_EMOTIONS.includes(topEmotionName)
@@ -1483,7 +1469,7 @@ export default function FormClient() {
                         cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
                         alignSelf: isMobile ? 'flex-start' : 'center',
                       }}>
-                        오늘 털어놓기
+                        {total === 0 ? '첫 대화 시작하기' : '오늘 털어놓기'}
                       </button>
                     </div>
 
@@ -1622,7 +1608,7 @@ export default function FormClient() {
                         onNext = () => setCalMonth(new Date(year, month + 1))
                       }
 
-                      const emotionList = [...new Set(dashboardData.map(e => e.raw_emotion))]
+                      const emotionList = standardEmotions
 
                       const heatData: Record<string, { count: number; totalIntensity: number }> = {}
                       dashboardData.forEach(e => {
@@ -1845,16 +1831,14 @@ export default function FormClient() {
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
                       <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정별 평균 강도</p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {Object.entries(
-                          dashboardData.reduce((acc, e) => {
-                            if (!acc[e.raw_emotion]) acc[e.raw_emotion] = { sum: 0, count: 0 }
-                            acc[e.raw_emotion].sum += e.intensity
-                            acc[e.raw_emotion].count += 1
-                            return acc
-                          }, {} as Record<string, { sum: number; count: number }>)
-                        )
-                        .map(([emotion, { sum, count }]) => ({ emotion, avg: sum / count }))
+                        {dashboardData.length === 0 && <p style={{ fontSize: 13, color: t.muted }}>아직 기록이 없어요.</p>}
+                        {standardEmotions
+                        .map(emotion => {
+                          const entries = dashboardData.filter(e => e.raw_emotion === emotion)
+                          return { emotion, avg: entries.length ? entries.reduce((s, e) => s + e.intensity, 0) / entries.length : 0 }
+                        })
                         .sort((a, b) => b.avg - a.avg)
+                        .filter(({ avg }) => avg > 0)
                         .map(({ emotion, avg }) => (
                           <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: emotionColors[emotion] ?? '#a78bfa' }} />
@@ -1871,6 +1855,9 @@ export default function FormClient() {
                     {/* 4. 감정 빈도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
                       <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 8 }}>감정 빈도</p>
+                      {barData.length === 0 ? (
+                        <p style={{ fontSize: 13, color: t.muted }}>아직 기록이 없어요.</p>
+                      ) : (
                       <ResponsiveContainer width="100%" height={Math.max(160, barData.length * 32)}>
                         <BarChart data={barData} barSize={20} layout="vertical">
                           <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
@@ -1883,10 +1870,13 @@ export default function FormClient() {
                           />
                         </BarChart>
                       </ResponsiveContainer>
+                      )}
                     </div>
 
                     {/* ⑤ 이번주 vs 지난주 */}
-                    {(thisWeekTop || lastWeekTop) && (
+
+                    {/* ⑤ 이번주 vs 지난주 */}
+                    {true && (
                       <div style={{
                         background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
                         display: 'flex', flexDirection: 'column', gap: 16,
