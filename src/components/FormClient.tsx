@@ -1490,7 +1490,7 @@ export default function FormClient() {
                           <>
                             <div style={{ flex: 1 }}>
                               <p style={{ fontSize: 13, color: t.text, fontWeight: 500, marginBottom: 8 }}>
-                                이번 달 {monthlyCount}/10회 사용 · 5회 이상부터 패턴이 보이기 시작해요
+                                이번 달 {monthlyCount}/10회 사용 · 쌓일수록 패턴이 선명해져요
                               </p>
                               <div style={{ height: 4, borderRadius: 2, background: t.border }}>
                                 <div style={{
