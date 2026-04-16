@@ -50,6 +50,9 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+// 채팅창 온보딩 문구
+const INITIAL_AI_MESSAGE = '안녕하세요. 오늘 어땠어요? 좋았던 것도, 별로였던 것도 편하게 얘기해줘요.'
+
 // ─── 아이콘 ──────────────────────────────────────────────────────────────────
 
 const Icons = {
@@ -121,7 +124,7 @@ export default function FormClient() {
 
   // 채팅 상태
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', content: '안녕하세요. 오늘 어땠어요? 좋았던 것도, 별로였던 것도 편하게 얘기해줘요.' },
+    { role: 'ai', content: INITIAL_AI_MESSAGE },
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -521,7 +524,7 @@ export default function FormClient() {
       }).catch(() => {})
     }
 
-    setMessages([{ role: 'ai', content: '안녕하세요. 오늘 어떠세요? 편하게 털어놔 보세요. 대화가 쌓이면 내 감정 패턴을 볼 수 있어요.' }])
+    setMessages([{ role: 'ai', content: INITIAL_AI_MESSAGE }])
     setInput('')
     setSessionEnded(false)
     setHasNewMessage(false)
@@ -1872,8 +1875,6 @@ export default function FormClient() {
                       </ResponsiveContainer>
                       )}
                     </div>
-
-                    {/* ⑤ 이번주 vs 지난주 */}
 
                     {/* ⑤ 이번주 vs 지난주 */}
                     {true && (
