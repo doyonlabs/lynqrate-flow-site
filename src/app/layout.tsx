@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import { ThemeProvider } from '@/context/ThemeContext'
+import { Analytics } from '@vercel/analytics/react';
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default async function RootLayout({
         <ThemeProvider defaultTheme={defaultTheme}>
           {children}
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
