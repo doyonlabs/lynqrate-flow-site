@@ -363,6 +363,40 @@ export default function Landing() {
             <a href="/form" className="btn-primary">지금 털어놓기</a>
             <a href="#features" className="btn-secondary">어떻게 달라요?</a>
           </div>
+          <p style={{ fontSize: 12, color: t.muted, marginTop: 16 }}>
+            🔒 기록은 나만 볼 수 있어요 · 광고 없음
+          </p>
+          <div style={{
+            marginTop: 64,
+            width: '100%',
+            maxWidth: 900,
+            position: 'relative',
+            zIndex: 1,
+          }}>
+            <div style={{
+              borderRadius: 20,
+              overflow: 'hidden',
+              border: `1px solid ${t.cardHoverBorder}`,
+              boxShadow: isDark
+                ? '0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(167,139,250,0.1)'
+                : '0 40px 80px rgba(124,58,237,0.1), 0 0 0 1px rgba(124,58,237,0.08)',
+            }}>
+              <img
+                src="/screenshots/dashboard1.png"
+                alt="감정 패턴 대시보드"
+                style={{ width: '100%', display: 'block' }}
+              />
+            </div>
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 120,
+              background: `linear-gradient(to top, ${t.bg}, transparent)`,
+              borderRadius: '0 0 20px 20px',
+            }} />
+          </div>
         </section>
 
         {/* 특징 */}
@@ -459,6 +493,9 @@ export default function Landing() {
               말하다 보면 알게 돼요.
             </p>
             <a href="/form" className="btn-primary" style={{ display: 'inline-block', position: 'relative' }}>지금 시작하기</a>
+            <p style={{ fontSize: 12, color: t.muted, marginTop: 16, position: 'relative' }}>
+              🔒 기록은 나만 볼 수 있어요 · 광고 없음
+            </p>
           </div>
         </section>
 
