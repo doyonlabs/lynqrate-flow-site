@@ -1,11 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect  } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 
 export default function Landing() {
   const { isDark } = useTheme()
   const [modalSrc, setModalSrc] = useState<string | null>(null)
+
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        videoRef.current?.play()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   const t = isDark ? {
     bg: '#0d0d1a',
@@ -382,6 +394,7 @@ export default function Landing() {
                 : '0 40px 80px rgba(124,58,237,0.1), 0 0 0 1px rgba(124,58,237,0.08)',
             }}>
               <video
+                ref={videoRef}
                 src="/demo.webm"
                 autoPlay
                 loop
