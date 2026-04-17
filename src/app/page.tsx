@@ -369,7 +369,7 @@ export default function Landing() {
           <div style={{
             marginTop: 64,
             width: '100%',
-            maxWidth: 900,
+            maxWidth: 450,
             position: 'relative',
             zIndex: 1,
           }}>
@@ -381,9 +381,12 @@ export default function Landing() {
                 ? '0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(167,139,250,0.1)'
                 : '0 40px 80px rgba(124,58,237,0.1), 0 0 0 1px rgba(124,58,237,0.08)',
             }}>
-              <img
-                src="/screenshots/dashboard1.png"
-                alt="감정 패턴 대시보드"
+              <video
+                src="/demo.webm"
+                autoPlay
+                loop
+                muted
+                playsInline
                 style={{ width: '100%', display: 'block' }}
               />
             </div>
@@ -443,27 +446,6 @@ export default function Landing() {
               <div className="step-title">패턴이 보여요</div>
               <div className="step-desc">대화가 쌓이면 대시보드에서 내 감정 흐름이 보이기 시작해요.</div>
             </div>
-          </div>
-        </section>
-
-        {/* 스크린샷 */}
-        <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 100px', position: 'relative', zIndex: 1 }}>
-          <div className="section-label">서비스 화면</div>
-          <h2 className="section-title">이렇게 생겼어요</h2>
-          <p style={{ fontSize: 13, color: t.muted, marginTop: 8, marginBottom: 40 }}>이미지를 클릭하시면 크게 보실 수 있어요</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-            {[
-              { src: '/screenshots/chat.png', label: 'AI와 감정 대화' },
-              { src: '/screenshots/dashboard1.png', label: '감정 패턴 대시보드' },
-              { src: '/screenshots/dashboard2.png', label: '대시보드 하단' },
-              { src: '/screenshots/dashboard-modal.png', label: '날짜별 감정 상세 보기' },
-            ].map(({ src, label }) => (
-              <div key={src} className="screenshot-card" onClick={() => setModalSrc(src)}>
-                <img src={src} alt={label} style={{ width: '100%', display: 'block' }} />
-                <div style={{ padding: '14px 16px', fontSize: 13, color: t.muted }}>{label}</div>
-                <div className="screenshot-hint">클릭하시면 크게 보실 수 있어요</div>
-              </div>
-            ))}
           </div>
         </section>
         
