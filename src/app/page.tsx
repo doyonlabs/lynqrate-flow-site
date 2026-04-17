@@ -385,7 +385,7 @@ export default function Landing() {
                 : '0 40px 80px rgba(124,58,237,0.1), 0 0 0 1px rgba(124,58,237,0.08)',
             }}>
               <video
-                src="/demo.webm"
+                src="/demo720p30.mp4"
                 autoPlay
                 loop
                 muted
