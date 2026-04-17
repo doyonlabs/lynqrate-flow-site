@@ -1,11 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 
 export default function Landing() {
   const { isDark } = useTheme()
   const [modalSrc, setModalSrc] = useState<string | null>(null)
+
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        videoRef.current?.play().catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
 
   const t = isDark ? {
     bg: '#0d0d1a',
@@ -386,6 +398,7 @@ export default function Landing() {
             }}>
               <video
                 src="/demo720p30.mp4"
+                ref={videoRef}
                 autoPlay
                 loop
                 muted
