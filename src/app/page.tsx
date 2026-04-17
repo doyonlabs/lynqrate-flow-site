@@ -108,7 +108,7 @@ export default function Landing() {
 
         .hero-title {
           font-family: 'Gowun Batang', serif;
-          font-size: clamp(36px, 6vw, 68px); font-weight: 700;
+          font-size: clamp(32px, 6vw, 68px); font-weight: 700;
           color: ${t.text}; line-height: 1.4; margin-bottom: 24px;
           animation: fadeUp 0.8s 0.1s ease both;
         }
