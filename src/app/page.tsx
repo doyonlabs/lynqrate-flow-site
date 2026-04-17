@@ -9,10 +9,26 @@ export default function Landing() {
 
   const videoRef = useRef<HTMLVideoElement>(null)
 
+  const [isPaused, setIsPaused] = useState(false)
+
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         videoRef.current?.play()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        videoRef.current?.play().catch(() => {
+          setIsPaused(true)
+        })
+      } else {
+        setIsPaused(false)
       }
     }
     document.addEventListener('visibilitychange', handleVisibility)
@@ -385,14 +401,7 @@ export default function Landing() {
             position: 'relative',
             zIndex: 1,
           }}>
-            <div style={{
-              borderRadius: 20,
-              overflow: 'hidden',
-              border: `1px solid ${t.cardHoverBorder}`,
-              boxShadow: isDark
-                ? '0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(167,139,250,0.1)'
-                : '0 40px 80px rgba(124,58,237,0.1), 0 0 0 1px rgba(124,58,237,0.08)',
-            }}>
+            <div style={{ position: 'relative' }}>
               <video
                 ref={videoRef}
                 src="/demo.webm"
@@ -402,6 +411,28 @@ export default function Landing() {
                 playsInline
                 style={{ width: '100%', display: 'block' }}
               />
+              {isPaused && (
+                <div
+                  onClick={() => {
+                    videoRef.current?.play()
+                    setIsPaused(false)
+                  }}
+                  style={{
+                    position: 'absolute', inset: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(0,0,0,0.3)',
+                    cursor: 'pointer',
+                    borderRadius: 20,
+                  }}
+                >
+                  <div style={{
+                    width: 56, height: 56, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.9)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 20,
+                  }}>▶</div>
+                </div>
+              )}
             </div>
             <div style={{
               position: 'absolute',
