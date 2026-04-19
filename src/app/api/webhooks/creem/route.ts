@@ -108,27 +108,38 @@ export async function POST(req: NextRequest) {
   // 구독 취소 — 환불로 인한 canceled는 refund.created에서 처리하므로 여기선 만료일 미래인 경우만
   if (eventType === 'subscription.canceled') {
     const expiresAt = object?.current_period_end_date
-    const isAlreadyExpired = expiresAt && new Date(expiresAt) < new Date()
 
-    if (!isAlreadyExpired) {
-      // 이미 환불로 free 처리된 경우 덮어쓰지 않도록 현재 plan 확인
-      const { data: current } = await supabaseAdmin
+    const { data: current } = await supabaseAdmin
+      .from('subscriptions')
+      .select('plan, status')
+      .eq('user_id', userId)
+      .single()
+
+    if (current?.plan !== 'pro') {
+      // 이미 환불로 free 처리된 경우 스킵
+    } else if (current?.status === 'scheduled_cancel') {
+      // scheduled_cancel 만료 → 완전히 free로 초기화
+      await supabaseAdmin
         .from('subscriptions')
-        .select('plan')
+        .update({
+          plan: 'free',
+          status: 'active',
+          expires_at: null,
+          canceled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq('user_id', userId)
-        .single()
-
-      if (current?.plan === 'pro') {
-        await supabaseAdmin
-          .from('subscriptions')
-          .update({
-            status: 'canceled',
-            canceled_at: object?.canceled_at ?? new Date().toISOString(),
-            expires_at: object?.current_period_end_date ?? null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', userId)
-      }
+    } else {
+      // 즉시 취소 → canceled 상태로 만료일까지 유지
+      await supabaseAdmin
+        .from('subscriptions')
+        .update({
+          status: 'canceled',
+          canceled_at: object?.canceled_at ?? new Date().toISOString(),
+          expires_at: expiresAt ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
     }
   }
 
