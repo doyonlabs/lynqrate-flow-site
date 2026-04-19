@@ -1,23 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 
 export default function Landing() {
   const { isDark } = useTheme()
   const [modalSrc, setModalSrc] = useState<string | null>(null)
-
-  const videoRef = useRef<HTMLVideoElement>(null)
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        videoRef.current?.play().catch(() => {})
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
 
   const t = isDark ? {
     bg: '#0d0d1a',
@@ -381,41 +369,25 @@ export default function Landing() {
           <div style={{
             marginTop: 64,
             width: '100%',
-            maxWidth: 450,
+            maxWidth: 900,
             position: 'relative',
             zIndex: 1,
           }}>
-            <p style={{ fontSize: 14, color: t.muted, marginBottom: 12, textAlign: 'left' }}>
+            <p style={{ fontSize: 14, color: t.muted, marginBottom: 16, textAlign: 'left' }}>
               실제 서비스 화면이에요
             </p>
-            <div style={{
-              borderRadius: 20,
-              overflow: 'hidden',
-              border: `1px solid ${t.cardHoverBorder}`,
-              boxShadow: isDark
-                ? '0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(167,139,250,0.1)'
-                : '0 40px 80px rgba(124,58,237,0.1), 0 0 0 1px rgba(124,58,237,0.08)',
-            }}>
-              <video
-                src="/demo720p30.mp4"
-                ref={videoRef}
-                autoPlay
-                loop
-                muted
-                playsInline
-                controls
-                style={{ width: '100%', display: 'block' }}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              {[
+                { src: '/screenshots/chat.png', label: 'AI와 감정 대화' },
+                { src: '/screenshots/dashboard-top.png', label: '감정 패턴 대시보드' },
+                { src: '/screenshots/heatmap-cell.png', label: '날짜별 감정 상세' },
+              ].map(({ src, label }) => (
+                <div key={src} className="screenshot-card" onClick={() => setModalSrc(src)}>
+                  <img src={src} alt={label} style={{ width: '100%', display: 'block' }} />
+                  <div className="screenshot-hint">크게 보기</div>
+                </div>
+              ))}
             </div>
-            <div style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 120,
-              background: `linear-gradient(to top, ${t.bg}, transparent)`,
-              borderRadius: '0 0 20px 20px',
-            }} />
           </div>
         </section>
 
