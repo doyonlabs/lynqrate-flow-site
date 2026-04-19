@@ -48,13 +48,14 @@ export default function LoginPage() {
       }}>
 
         {/* 로고 */}
-        <div style={{
+        <a href="/" style={{
           width: 48, height: 48, borderRadius: '50%',
           background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 22, color: '#fff', marginBottom: 24,
           boxShadow: '0 4px 24px rgba(167,139,250,0.25)',
-        }}>✦</div>
+          textDecoration: 'none',
+        }}>✦</a>
 
         {/* 타이틀 */}
         <h1 style={{
