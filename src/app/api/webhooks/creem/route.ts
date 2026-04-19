@@ -105,7 +105,8 @@ export async function POST(req: NextRequest) {
       .eq('user_id', userId)
   }
 
-  // 구독 취소 — 환불로 인한 canceled는 refund.created에서 처리하므로 여기선 만료일 미래인 경우만
+  // 구독 취소 — 환불로 인한 canceled는 refund.created에서 처리(plan free 체크로 스킵)
+  // scheduled_cancel 만료 시 free 초기화, 즉시 취소 시 canceled 상태로 만료일까지 유지
   if (eventType === 'subscription.canceled') {
     const expiresAt = object?.current_period_end_date
 
