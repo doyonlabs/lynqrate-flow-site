@@ -327,6 +327,7 @@ export default function Landing() {
           .step { border-right: none; border-bottom: 1px solid ${t.border}; }
           .step:last-child { border-bottom: none; }
           .story-inner { grid-template-columns: 1fr; gap: 40px; }
+          footer { flex-direction: column; gap: 12px; padding: 24px 16px; text-align: center; }
         }
       `}</style>
 
