@@ -328,6 +328,11 @@ export default function Landing() {
           .step:last-child { border-bottom: none; }
           .story-inner { grid-template-columns: 1fr; gap: 40px; }
           footer { flex-direction: column; gap: 12px; padding: 24px 16px; text-align: center; }
+          #price-grid { gap: 8px; }
+          #price-grid .feature-card { padding: 16px 10px; }
+          #price-grid .feature-title { font-size: 13px; }
+          #price-grid .btn-primary { padding: 10px 8px; font-size: 12px; border-radius: 16px; }
+          #price-grid ul { font-size: 11px; line-height: 1.8; }
         }
       `}</style>
 
@@ -442,7 +447,7 @@ export default function Landing() {
         <section style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px 100px', position: 'relative', zIndex: 1 }}>
           <div className="section-label">요금제</div>
           <h2 className="section-title">심플한 가격</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 40 }}>
+          <div id="price-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 40 }}>
             <div className="feature-card">
               <div className="feature-title" style={{ textAlign: 'center' }}>무료</div>
               <div style={{ fontSize: 32, fontWeight: 700, color: t.text, margin: '16px 0', textAlign: 'center' }}>$0</div>
