@@ -344,7 +344,7 @@ export default function Landing() {
             <div className="nav-logo-mark">✦</div>
             Mind Echo
           </a>
-          <a href="/form" className="nav-cta">지금 시작하기</a>
+          <a href="/login" className="nav-cta">지금 시작하기</a>
         </nav>
 
         {/* 히어로 */}
@@ -361,7 +361,7 @@ export default function Landing() {
             보이기 시작해요.
           </p>
           <div className="hero-actions">
-            <a href="/form" className="btn-primary">지금 털어놓기</a>
+            <a href="/login" className="btn-primary">지금 털어놓기</a>
             <a href="#features" className="btn-secondary">어떻게 달라요?</a>
           </div>
           <p style={{ fontSize: 12, color: t.muted, marginTop: 16 }}>
@@ -444,14 +444,28 @@ export default function Landing() {
           <h2 className="section-title">심플한 가격</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 40 }}>
             <div className="feature-card">
-              <div className="feature-title">무료</div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: t.text, margin: '16px 0' }}>$0</div>
-              <div className="feature-desc">월 10회 채팅 + 기본 기록</div>
+              <div className="feature-title" style={{ textAlign: 'center' }}>무료</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: t.text, margin: '16px 0', textAlign: 'center' }}>$0</div>
+              <ul style={{ fontSize: 13, color: t.muted, lineHeight: 2, listStyle: 'none', marginBottom: 24, textAlign: 'center' }}>
+                <li>✓ 월 10회 감정 기록</li>
+                <li>✓ 감정 히트맵 · 대시보드</li>
+                <li style={{ color: t.accent }}>→ 패턴 보이면 Pro로</li>
+              </ul>
+              <div style={{ textAlign: 'center' }}>
+                <a href="/login" className="btn-primary" style={{ display: 'inline-block', textAlign: 'center' }}>무료로 시작하기</a>
+              </div>
             </div>
             <div className="feature-card" style={{ border: `1px solid ${t.cardHoverBorder}` }}>
-              <div className="feature-title">Pro</div>
-              <div style={{ fontSize: 32, fontWeight: 700, color: t.accent, margin: '16px 0' }}>$6.99<span style={{ fontSize: 14, color: t.muted }}>/월</span></div>
-              <div className="feature-desc">무제한 채팅 + 감정 패턴 대시보드 + 무제한 기록</div>
+              <div className="feature-title" style={{ textAlign: 'center' }}>Pro</div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: t.accent, margin: '16px 0', textAlign: 'center' }}>$6.99<span style={{ fontSize: 14, color: t.muted }}>/월</span></div>
+              <ul style={{ fontSize: 13, color: t.muted, lineHeight: 2, listStyle: 'none', marginBottom: 24, textAlign: 'center' }}>
+                <li>✓ 무제한 감정 기록</li>
+                <li>✓ 무제한 대화</li>
+                <li>✓ 쌓일수록 패턴이 선명해져요</li>
+              </ul>
+              <div style={{ textAlign: 'center' }}>
+                <a href="/login" className="btn-primary" style={{ display: 'inline-block', textAlign: 'center' }}>시작하기</a>
+              </div>
             </div>
           </div>
         </section>
@@ -464,7 +478,7 @@ export default function Landing() {
               참지 말고 그냥 털어놔요.<br />
               말하다 보면 알게 돼요.
             </p>
-            <a href="/form" className="btn-primary" style={{ display: 'inline-block', position: 'relative' }}>지금 시작하기</a>
+            <a href="/login" className="btn-primary" style={{ display: 'inline-block', position: 'relative' }}>지금 털어놓기</a>
             <p style={{ fontSize: 12, color: t.muted, marginTop: 16, position: 'relative' }}>
               🔒 기록은 나만 볼 수 있어요 · 광고 없음
             </p>
