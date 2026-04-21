@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
+        .eq('plan', 'pro')
     }
   }
 
