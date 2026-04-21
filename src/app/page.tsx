@@ -334,6 +334,10 @@ export default function Landing() {
           #price-grid .btn-primary { padding: 10px 16px; font-size: 12px; border-radius: 16px; }
           #price-grid ul { font-size: 11px; line-height: 1.8; }
         }
+
+        @media (max-width: 375px) {
+          #price-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       {modalSrc && (
