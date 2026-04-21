@@ -331,7 +331,7 @@ export default function Landing() {
           #price-grid { gap: 8px; }
           #price-grid .feature-card { padding: 16px 10px; }
           #price-grid .feature-title { font-size: 13px; }
-          #price-grid .btn-primary { padding: 10px 8px; font-size: 12px; border-radius: 16px; }
+          #price-grid .btn-primary { padding: 10px 16px; font-size: 12px; border-radius: 16px; }
           #price-grid ul { font-size: 11px; line-height: 1.8; }
         }
       `}</style>
@@ -466,7 +466,7 @@ export default function Landing() {
               <ul style={{ fontSize: 13, color: t.muted, lineHeight: 2, listStyle: 'none', marginBottom: 24, textAlign: 'center' }}>
                 <li>✓ 무제한 감정 기록</li>
                 <li>✓ 무제한 대화</li>
-                <li>✓ 쌓일수록 패턴이 선명해져요</li>
+                <li>✓ 감정 패턴 시각화</li>
               </ul>
               <div style={{ textAlign: 'center' }}>
                 <a href="/login" className="btn-primary" style={{ display: 'inline-block', textAlign: 'center' }}>시작하기</a>
