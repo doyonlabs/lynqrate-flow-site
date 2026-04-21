@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
         plan: 'free',
         status: 'active',
         expires_at: null,
-        canceled_at: new Date().toISOString(),
+        canceled_at: null,
         updated_at: new Date().toISOString(),
       })
 
