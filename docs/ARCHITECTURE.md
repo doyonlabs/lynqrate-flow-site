@@ -454,6 +454,8 @@ supabase/
 - [x] CTA 버튼 하단 프라이버시 문구 추가
 - [x] 로그인 페이지 로고 클릭 시 랜딩으로 이동
 - [x] 웹훅 subscription.canceled 처리 로직 수정 (scheduled_cancel 만료 시 free/active로 초기화)
+- [x] 환불 시 canceled_at null 초기화 누락 버그 수정 (refund.created 핸들러)
+- [x] 환불 시 subscription.canceled 레이스 컨디션 방어 추가 (plan: pro 조건으로 덮어쓰기 방지)
 - [ ] 모바일 뷰에서 글 입력시 하단 탭바 가려지게 처리
 - [ ] 구독 취소 UX 개선 (대시보드 취소 버튼 제거 → 설정 페이지에서만 취소 가능 + 혜택 리마인드 모달, scheduled_cancel 상태 시 대시보드에 철회 버튼 노출 + 즉시 철회)
 - [ ] 회원 탈퇴 UX 개선 (탈퇴 전 혜택 리마인드 + 재고 유도 모달 추가)
