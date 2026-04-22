@@ -89,21 +89,10 @@ const Icons = {
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
-  back: (color: string) => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <line x1="19" y1="12" x2="5" y2="12" />
-      <polyline points="12 19 5 12 12 5" />
-    </svg>
-  ),
   send: (color: string) => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="22" y1="2" x2="11" y2="13" />
       <polygon points="22 2 15 22 11 13 2 9 22 2" />
-    </svg>
-  ),
-  stop: (color: string) => (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" />
     </svg>
   ),
 }
@@ -169,8 +158,6 @@ export default function FormClient() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollInstant = useRef(false)
-
-  const hasUserMessage = messages.some(m => m.role === 'user')
 
   // [FIX] mount 후 뷰포트 감지 → SSR hydration 불일치 없음
   useEffect(() => {
@@ -604,28 +591,10 @@ export default function FormClient() {
     }}>✦</div>
   )
 
-  const IntensityBar = ({ value }: { value: number }) => (
-    <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
-      {[1, 2, 3, 4, 5].map(n => (
-        <div key={n} style={{
-          width: 20, height: 5, borderRadius: 3,
-          background: n <= value ? `hsl(${260 - n * 16}, 80%, ${isDark ? '65%' : '55%'})` : t.border,
-          transition: 'background 0.2s',
-        }} />
-      ))}
-    </div>
-  )
-
   const SidebarItem = ({ icon, label, active, onClick }: {
     icon: React.ReactNode; label: string; active: boolean; onClick: () => void
   }) => (
-    <button onClick={onClick} style={{
-      width: '100%', padding: '9px 12px', borderRadius: 8,
-      background: active ? t.hover : 'transparent',
-      border: 'none', cursor: 'pointer',
-      fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 8,
-      textAlign: 'left',
-    }}>
+    <button onClick={onClick} className={`sidebar-item${active ? ' sidebar-item--active' : ''}`}>
       {icon}
       <span style={{ fontSize: 13, color: active ? t.text : t.muted }}>{label}</span>
     </button>
@@ -701,7 +670,7 @@ export default function FormClient() {
                 계속 기록하고 싶다면 Pro로 이어갈 수 있어요.
               </p>
             </div>
-            <button
+            <button className="btn-action"
               onClick={async () => {
                 setLimitModalOpen(false)
                 const res = await fetch('/api/checkout', { method: 'POST' })
@@ -717,7 +686,7 @@ export default function FormClient() {
             >
               계속 기록하기
             </button>
-            <button
+            <button className="btn-action"
               onClick={() => setLimitModalOpen(false)}
               style={{
                 width: '100%', padding: '12px', borderRadius: 14,
@@ -756,7 +725,7 @@ export default function FormClient() {
               }}>✦</div>
               <span style={{ fontSize: 14, fontWeight: 600, color: t.text }}>Mind Echo</span>
             </div>
-            <button onClick={handleNewChat} style={{
+            <button className="btn-action" onClick={handleNewChat} style={{
               width: '100%', padding: '8px 12px', borderRadius: 8,
               background: 'transparent', border: `1px solid ${t.border}`,
               color: t.text, fontSize: 13, cursor: 'pointer',
@@ -807,10 +776,10 @@ export default function FormClient() {
                 boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.12)',
                 zIndex: 100,
               }}>
-                <button onClick={() => { setSettingsOpen(false); setView('settings'); closeSidebarOnMobile() }} style={{
+                <button className="list-btn" onClick={() => { setSettingsOpen(false); setView('settings'); closeSidebarOnMobile() }} style={{
                   width: '100%', padding: '11px 14px',
                   display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'transparent', border: 'none',
+                  border: 'none',
                   color: t.text, fontSize: 13, cursor: 'pointer',
                   fontFamily: 'inherit', textAlign: 'left',
                 }}>
@@ -818,7 +787,7 @@ export default function FormClient() {
                 </button>
                 <div style={{ height: 1, background: t.border }} />
                 {subscription.plan === 'free' ? (
-                  <button onClick={async () => {
+                  <button className="list-btn" onClick={async () => {
                     setSettingsOpen(false)
                     const res = await fetch('/api/checkout', { method: 'POST' })
                     const data = await res.json()
@@ -826,7 +795,7 @@ export default function FormClient() {
                   }} style={{
                     width: '100%', padding: '11px 14px',
                     display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'transparent', border: 'none',
+                    border: 'none',
                     color: '#a78bfa', fontSize: 13, cursor: 'pointer',
                     fontFamily: 'inherit', textAlign: 'left',
                   }}>
@@ -841,14 +810,14 @@ export default function FormClient() {
                     ✦ Pro · {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료 예정
                   </div>
                 ) : (
-                  <button onClick={() => {
+                  <button className="list-btn" onClick={() => {
                     setSettingsOpen(false)
                     setView('settings')
                     closeSidebarOnMobile()
                   }} style={{
                     width: '100%', padding: '11px 14px',
                     display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'transparent', border: 'none',
+                    border: 'none',
                     color: t.text, fontSize: 13, cursor: 'pointer',
                     fontFamily: 'inherit', textAlign: 'left',
                   }}>
@@ -856,10 +825,10 @@ export default function FormClient() {
                   </button>
                 )}
                 <div style={{ height: 1, background: t.border }} />
-                <button onClick={handleLogout} style={{
+                <button className="list-btn" onClick={handleLogout} style={{
                   width: '100%', padding: '11px 14px',
                   display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'transparent', border: 'none',
+                  border: 'none',
                   color: '#f87171', fontSize: 13, cursor: 'pointer',
                   fontFamily: 'inherit', textAlign: 'left',
                 }}>
@@ -867,11 +836,9 @@ export default function FormClient() {
                 </button>
               </div>
             )}
-            <button onClick={() => setSettingsOpen(!settingsOpen)} style={{
-              width: '100%', padding: '8px 10px', borderRadius: 8,
-              display: 'flex', alignItems: 'center', gap: 10,
-              background: settingsOpen ? t.hover : 'transparent',
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+            <button onClick={() => setSettingsOpen(!settingsOpen)} className="list-btn" style={{
+              padding: '8px 10px', borderRadius: 8,
+              border: 'none',
             }}>
               <div style={{
                 width: 30, height: 30, borderRadius: '50%',
@@ -911,12 +878,12 @@ export default function FormClient() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 12, color: '#fff', marginBottom: 8,
           }}>✦</div>
-          <button onClick={handleNewChat} title="새 대화" style={{
+          <button className="icon-btn" onClick={handleNewChat} title="새 대화" style={{
             width: 32, height: 32, borderRadius: 8,
             background: 'transparent', border: `1px solid ${t.border}`,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>{Icons.plus(t.muted)}</button>
-          <button onClick={() => setView('dashboard')} title="대시보드" style={{
+          <button className="icon-btn" onClick={() => setView('dashboard')} title="대시보드" style={{
             width: 32, height: 32, borderRadius: 8,
             background: view === 'dashboard' ? t.hover : 'transparent',
             border: 'none', cursor: 'pointer',
@@ -945,8 +912,8 @@ export default function FormClient() {
           background: t.bg, flexShrink: 0,
         }}>
           {!isMobile && (
-            <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0,
+            <button className="icon-btn" onClick={() => setSidebarOpen(!sidebarOpen)} style={{
+              border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0,
             }}>{Icons.menu(isMobile ? t.text : t.muted)}</button>
           )}
 
@@ -959,7 +926,7 @@ export default function FormClient() {
             </span>
           </div>
           {isMobile && view !== 'dashboard' && (
-            <button onClick={handleNewChat} style={{
+            <button className="btn-action" onClick={handleNewChat} style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '6px 12px', borderRadius: 8,
               background: 'transparent', border: `1px solid ${t.border}`,
@@ -1060,14 +1027,15 @@ export default function FormClient() {
                 ) : 0
 
                 return (
-                  <div
+                  <button
                     onClick={() => setView('dashboard')}
+                    className="btn-action"
                     style={{
                       maxWidth: 680, margin: '0 auto 6px',
                       padding: '8px 14px', borderRadius: 10,
                       background: t.hover, border: `1px solid ${t.border}`,
                       display: 'flex', alignItems: 'center', gap: 10,
-                      cursor: 'pointer',
+                      cursor: 'pointer', width: '100%', fontFamily: 'inherit',
                     }}
                   >
                     <span style={{ fontSize: 11, color: t.muted, flexShrink: 0 }}>
@@ -1096,7 +1064,7 @@ export default function FormClient() {
                       )}
                     </div>
                     <span style={{ fontSize: 11, color: t.muted, flexShrink: 0 }}>대시보드 보기 →</span>
-                  </div>
+                  </button>
                 )
               })()}
                 <div style={{ maxWidth: 680, margin: '0 auto' }}>
@@ -1126,7 +1094,7 @@ export default function FormClient() {
                         }
                       }}
                     />
-                    <button onClick={handleSend} disabled={!input.trim() || isLoading} style={{
+                    <button className="btn-action" onClick={handleSend} disabled={!input.trim() || isLoading} style={{
                       width: 34, height: 34, borderRadius: 10, flexShrink: 0,
                       background: input.trim() && !isLoading ? 'linear-gradient(135deg, #a78bfa, #60a5fa)' : t.border,
                       border: 'none',
@@ -1188,14 +1156,14 @@ export default function FormClient() {
                 </div>
                 <div style={{ height: 1, background: t.border }} />
                 {subscription.plan === 'free' ? (
-                  <button onClick={async () => {
+                  <button className="list-btn" onClick={async () => {
                     const res = await fetch('/api/checkout', { method: 'POST' })
                     const data = await res.json()
                     if (data.checkout_url) window.open(data.checkout_url, '_blank')
                   }} style={{
                     width: '100%', padding: '14px 16px',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: 'transparent', border: 'none',
+                    border: 'none',
                     color: '#a78bfa', fontSize: 14, cursor: 'pointer',
                     fontFamily: 'inherit', textAlign: 'left',
                   }}>
@@ -1208,7 +1176,7 @@ export default function FormClient() {
                     <div style={{ fontSize: 12, color: t.muted }}>
                       {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
                     </div>
-                    <button onClick={async () => {
+                    <button className="btn-action" onClick={async () => {
                       const res = await fetch('/api/subscription/resume', { method: 'POST' })
                       if (res.ok) {
                         await fetchSubscription()
@@ -1233,7 +1201,7 @@ export default function FormClient() {
                     <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>만료 후 다시 구독할 수 있어요</div>
                   </div>
                 ) : (
-                  <button onClick={async () => {
+                  <button className="btn-action" onClick={async () => {
                     const res = await fetch('/api/subscription/cancel', { method: 'POST' })
                     if (res.ok) {
                       await fetchSubscription()
@@ -1265,20 +1233,20 @@ export default function FormClient() {
                   }}>{initial}</div>
                 </div>
                 <div style={{ height: 1, background: t.border }} />
-                <button onClick={handleLogout} style={{
+                <button className="list-btn" onClick={handleLogout} style={{
                   width: '100%', padding: '14px 16px',
                   display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'transparent', border: 'none',
+                  border: 'none',
                   color: '#f87171', fontSize: 14, cursor: 'pointer',
                   fontFamily: 'inherit', textAlign: 'left',
                 }}>
                   {Icons.logout('#f87171')} 로그아웃
                 </button>
                 <div style={{ height: 1, background: t.border }} />
-                <button onClick={handleDeleteAccount} style={{
+                <button className="list-btn" onClick={handleDeleteAccount} style={{
                   width: '100%', padding: '14px 16px',
                   display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'transparent', border: 'none',
+                  border: 'none',
                   color: '#f87171', fontSize: 14, cursor: 'pointer',
                   fontFamily: 'inherit', textAlign: 'left', opacity: 0.6,
                 }}>
@@ -1292,6 +1260,7 @@ export default function FormClient() {
                   href="https://tally.so/r/aQG2jX"
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="list-btn"
                   style={{
                     padding: '14px 16px',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1350,7 +1319,6 @@ export default function FormClient() {
                 dashboardData.forEach(e => { freq[e.raw_emotion] = (freq[e.raw_emotion] ?? 0) + 1 })
                 const top3 = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 3)
                 const topEmotion = top3[0]
-                const avgIntensity = (dashboardData.reduce((s, e) => s + e.intensity, 0) / total).toFixed(1)
                 const barData = standardEmotions
                   .map(name => ({ name, count: freq[name] ?? 0 }))
                   .sort((a, b) => b.count - a.count)
@@ -1372,15 +1340,6 @@ export default function FormClient() {
                 const thisWeekTop = getTopEmotion(thisWeekData)
                 const lastWeekTop = getTopEmotion(lastWeekData)
                 
-                const emotionList = [...new Set(dashboardData.map(e => e.raw_emotion))]
-                const timelineData = dashboardData.map((e, i) => ({
-                  x: i, y: emotionList.indexOf(e.raw_emotion),
-                  z: Math.pow(e.intensity, 2) * 8 + 20,
-                  emotion: e.raw_emotion, intensity: e.intensity,
-                  date: new Date(e.created_at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
-                  color: emotionColors[e.raw_emotion] ?? '#a78bfa',
-                }))
-
                 const NEGATIVE_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움']
                 const POSITIVE_EMOTIONS = ['설렘', '기쁨', '감사', '평온']
                 
@@ -1437,7 +1396,6 @@ export default function FormClient() {
                 const cols = isMobile ? '1fr' : '1fr 1fr 1fr'
                 const gap = isMobile ? 12 : 16
                 const fullSpan = isMobile ? undefined : '1 / 4'
-                const halfSpan = isMobile ? undefined : '1 / 3'
 
                 return (
                   <div style={{ display: 'grid', gridTemplateColumns: cols, gap }}>
@@ -1456,7 +1414,7 @@ export default function FormClient() {
                         <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>감정 인사이트</p>
                         <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }}>{insightText}</p>
                       </div>
-                      <button onClick={() => { setView('chat'); handleNewChat() }} style={{
+                      <button className="btn-action" onClick={() => { setView('chat'); handleNewChat() }} style={{
                         flexShrink: 0, padding: '11px 22px', borderRadius: 20,
                         background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                         border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
@@ -1491,7 +1449,7 @@ export default function FormClient() {
                                 }} />
                               </div>
                             </div>
-                            <button onClick={async () => {
+                            <button className="btn-action" onClick={async () => {
                               const res = await fetch('/api/checkout', { method: 'POST' })
                               const data = await res.json()
                               if (data.checkout_url) window.open(data.checkout_url, '_blank')
@@ -1512,7 +1470,7 @@ export default function FormClient() {
                                 {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}까지 이용 가능해요
                               </p>
                             </div>
-                            <button onClick={async () => {
+                            <button className="btn-action" onClick={async () => {
                               const res = await fetch('/api/subscription/resume', { method: 'POST' })
                               if (res.ok) {
                                 await fetchSubscription()
@@ -1550,7 +1508,7 @@ export default function FormClient() {
                           <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>✦ Pro 구독 중</p>
                           <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>무제한 감정 기록</p>
                         </div>
-                        <button onClick={async () => {
+                        <button className="btn-action" onClick={async () => {
                           const res = await fetch('/api/subscription/cancel', { method: 'POST' })
                           if (res.ok) {
                             await fetchSubscription()
@@ -1684,13 +1642,10 @@ export default function FormClient() {
                                           setCalModalOpen(true)
                                         }
                                       }}
+                                      className={`heatmap-cell${cell ? ' heatmap-cell--clickable' : ' heatmap-cell--empty'}`}
                                       style={{
-                                        height: 32, borderRadius: 6,
                                         background: `${color}${alphaHex}`,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: 11, fontWeight: 700,
                                         color: cell ? (avgIntensity >= 3 ? '#fff' : isDark ? '#fff' : '#333') : 'transparent',
-                                        cursor: cell ? 'pointer' : 'default',
                                         opacity: isFuture ? 0.3 : 1,
                                       }}
                                     >
@@ -1971,16 +1926,46 @@ export default function FormClient() {
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        button:active { transform: translateY(2px); opacity: 0.8; transition: transform 0.1s, opacity 0.1s; }
+        .btn-action:active { transform: translateY(2px); opacity: 0.8; transition: transform 0.1s, opacity 0.1s; }
         .session-item {
           padding: 11px 12px; border-radius: 8px; margin-bottom: 2px;
           cursor: pointer; font-size: 13px; font-weight: 500;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          transition: background 0.15s;
-          color: ${isDark ? '#e8e8e8' : '#111'};
+          transition: background 0.15s; color: ${isDark ? '#e8e8e8' : '#111'};
         }
         .session-item:hover { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; }
+        .session-item:active { background: ${isDark ? '#333' : '#d4d4d4'}; }
         .session-item--active { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; }
+        .sidebar-item {
+          width: 100%; padding: 9px 12px; border-radius: 8px;
+          background: transparent; border: none; cursor: pointer;
+          font-family: inherit; display: flex; align-items: center; gap: 8px;
+          text-align: left; transition: background 0.15s;
+        }
+        .sidebar-item:hover { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; }
+        .sidebar-item:active { transform: none; opacity: 1; }
+        .sidebar-item--active { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; }
+        .heatmap-cell {
+          height: 32px; border-radius: 6px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 700; transition: filter 0.15s;
+        }
+        .heatmap-cell--clickable { cursor: pointer; }
+        .heatmap-cell--clickable:hover { filter: brightness(1.3); }
+        .heatmap-cell--empty { cursor: default; }
+        .icon-btn {
+          background: none; border: none; cursor: pointer;
+          border-radius: 8px; padding: 4px; transition: background 0.15s;
+        }
+        .icon-btn:hover { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; }
+        .icon-btn:active { transform: translateY(1px); opacity: 0.8; transition: transform 0.1s, opacity 0.1s; }
+        .list-btn {
+          width: 100%; display: flex; align-items: center;
+          background: transparent; border: none; cursor: pointer;
+          font-family: inherit; text-align: left; transition: background 0.15s;
+        }
+        .list-btn:hover { background: ${isDark ? '#1e1e1e' : '#f0f0f0'}; }
+        .list-btn:active { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; transform: none; opacity: 1; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.4); border-radius: 2px; }

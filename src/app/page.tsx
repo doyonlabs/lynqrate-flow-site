@@ -22,8 +22,6 @@ export default function Landing() {
     ctaGlow: '#a78bfa15',
     navBg: 'rgba(8, 8, 16, 0.85)',
     techHighlightBg: '#a78bfa11',
-    techHighlightBorder: '#a78bfa44',
-    storyBg: '#0f0f20',
   } : {
     bg: '#f5f5fa',
     surface: '#ffffff',
@@ -39,8 +37,6 @@ export default function Landing() {
     ctaGlow: '#a78bfa10',
     navBg: 'rgba(245, 245, 250, 0.85)',
     techHighlightBg: '#ede9fe',
-    techHighlightBorder: '#7c3aed44',
-    storyBg: '#f0eeff',
   }
 
   return (
@@ -152,40 +148,6 @@ export default function Landing() {
           
         .btn-secondary:hover { border-color: ${t.accent}; color: ${t.accent}; }
         .btn-secondary:active { transform: translateY(2px); opacity: 0.8; }
-
-        /* 스토리 섹션 */
-        .story {
-          background: ${t.storyBg};
-          border-top: 1px solid ${t.border};
-          border-bottom: 1px solid ${t.border};
-          padding: 100px 24px;
-          position: relative; z-index: 1;
-        }
-
-        .story-inner {
-          max-width: 720px; margin: 0 auto;
-          display: grid; grid-template-columns: 1fr 1fr;
-          gap: 64px; align-items: center;
-        }
-
-        .story-text p {
-          font-size: 15px; color: ${t.muted};
-          line-height: 2; margin-bottom: 20px;
-        }
-
-        .story-text p:last-child { margin-bottom: 0; }
-
-        .story-text strong {
-          color: ${t.text}; font-weight: 600;
-        }
-
-        .story-screenshot {
-          border-radius: 16px; overflow: hidden;
-          border: 1px solid ${t.border};
-          box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-        }
-
-        .story-screenshot img { width: 100%; display: block; }
 
         .features {
           max-width: 1100px; margin: 0 auto;
