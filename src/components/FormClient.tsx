@@ -780,7 +780,7 @@ export default function FormClient() {
           {/* 대화 목록 */}
           <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', minHeight: 0 }}>
             <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>최근 기록</p>
-            <div style={{ minHeight: '100%' }}>
+            <ul style={{ listStyle: 'none', minHeight: '100%' }}>
               {sessions.length === 0 ? (
                 <p style={{ fontSize: 12, color: t.muted, padding: '8px 12px' }}>아직 대화 기록이 없어요</p>
               ) : (
@@ -788,22 +788,13 @@ export default function FormClient() {
                   const label = s.title ?? new Date(s.started_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
                   const isActive = activeSessionId === s.id
                   return (
-                    <div key={s.id} onClick={() => handleLoadSession(s)} style={{
-                      padding: '11px 12px', borderRadius: 8,  // 9px → 11px
-                      cursor: 'pointer', marginBottom: 2,
-                      background: isActive ? t.hover : 'transparent',
-                      transition: 'background 0.15s',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                        <span style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-                          {label}
-                        </span>
-                      </div>
-                    </div>
+                    <li key={s.id} className={`session-item${isActive ? ' session-item--active' : ''}`} onClick={() => handleLoadSession(s)}>
+                      <span>{label}</span>
+                    </li>
                   )
                 })
               )}
-            </div>
+            </ul>
           </div>
 
           {/* 하단 유저/설정 */}
@@ -1250,11 +1241,10 @@ export default function FormClient() {
                       setTimeout(() => setToast(null), 4000)
                     }
                   }} style={{
-                    width: '100%', padding: '14px 16px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    background: 'transparent', border: 'none',
-                    color: t.text, fontSize: 14, cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'left',
+                    padding: '8px 16px', borderRadius: 20,
+                    background: 'transparent', border: '1px solid #a78bfa44',
+                    color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                    margin: '14px 16px',
                   }}>
                     <span>구독 취소</span>
                   </button>
@@ -1981,6 +1971,16 @@ export default function FormClient() {
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        button:active { transform: translateY(2px); opacity: 0.8; transition: transform 0.1s, opacity 0.1s; }
+        .session-item {
+          padding: 11px 12px; border-radius: 8px; margin-bottom: 2px;
+          cursor: pointer; font-size: 13px; font-weight: 500;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          transition: background 0.15s;
+          color: ${isDark ? '#e8e8e8' : '#111'};
+        }
+        .session-item:hover { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; }
+        .session-item--active { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.4); border-radius: 2px; }
@@ -2003,9 +2003,9 @@ export default function FormClient() {
 
 const dark = {
   bg: '#0a0a0a', sidebar: '#0f0f0f', text: '#e8e8e8', muted: '#aaa',
-  border: '#2a2a2a', aiMsg: '#161616', input: '#111', hover: '#1e1e1e', popup: '#161616',
+  border: '#2a2a2a', aiMsg: '#161616', input: '#111', hover: '#2a2a2a', popup: '#161616',
 }
 const light = {
   bg: '#ffffff', sidebar: '#f9f9f9', text: '#111', muted: '#666',
-  border: '#e5e5e5', aiMsg: '#f4f4f4', input: '#f9f9f9', hover: '#f0f0f0', popup: '#ffffff',
+  border: '#e5e5e5', aiMsg: '#f4f4f4', input: '#f9f9f9', hover: '#e4e4e4', popup: '#ffffff',
 }

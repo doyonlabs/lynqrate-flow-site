@@ -81,7 +81,9 @@ export default function Landing() {
           text-decoration: none; font-family: inherit;
           transition: opacity 0.2s;
         }
+
         .nav-cta:hover { opacity: 0.85; }
+        .nav-cta:active { transform: translateY(2px); opacity: 0.8; }
 
         .hero {
           position: relative; min-height: 100vh;
@@ -136,7 +138,9 @@ export default function Landing() {
           text-decoration: none; font-family: inherit;
           transition: transform 0.2s, opacity 0.2s;
         }
+
         .btn-primary:hover { transform: translateY(-2px); opacity: 0.9; }
+        .btn-primary:active { transform: translateY(2px); opacity: 0.8; }
 
         .btn-secondary {
           padding: 14px 32px; border-radius: 24px;
@@ -145,7 +149,9 @@ export default function Landing() {
           text-decoration: none; font-family: inherit;
           transition: border-color 0.2s, color 0.2s;
         }
+          
         .btn-secondary:hover { border-color: ${t.accent}; color: ${t.accent}; }
+        .btn-secondary:active { transform: translateY(2px); opacity: 0.8; }
 
         /* 스토리 섹션 */
         .story {

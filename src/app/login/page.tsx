@@ -90,7 +90,7 @@ export default function LoginPage() {
             fontSize: 14, fontWeight: 500, color: t.btnText,
             cursor: loading ? 'not-allowed' : 'pointer',
             transition: 'all 0.15s ease',
-            transform: pressed ? 'scale(0.98)' : 'scale(1)',
+            transform: pressed ? 'translateY(2px) scale(0.98)' : 'scale(1)',
             boxShadow: pressed ? 'none' : isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
             opacity: loading ? 0.6 : 1,
             fontFamily: 'inherit',
