@@ -154,6 +154,8 @@ export default function FormClient() {
 
   const [standardEmotions, setStandardEmotions] = useState<string[]>([])
 
+  const [messagesSinceExtract, setMessagesSinceExtract] = useState(0)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -306,8 +308,13 @@ export default function FormClient() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: sid }),
+          keepalive: true,
         }).then(res => {
-          if (res.ok) refreshAll(true)
+          if (res.ok) {
+            setHasNewMessage(false)
+            setMessagesSinceExtract(0)
+            refreshAll(true)
+          }
         }).catch(() => {})
       }
       if (document.visibilityState === 'visible') {
@@ -462,6 +469,7 @@ export default function FormClient() {
       }
       setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요. 페이지를 새로고침 후 다시 시도해주세요.' }])
       setHasNewMessage(true)
+      setMessagesSinceExtract(prev => prev + 1)
       fetchTodayEntries()
 
       // 첫 세션: 유저 메시지 첫 3개 도달 시 즉시 자동 추출
@@ -495,6 +503,26 @@ export default function FormClient() {
       setMessages(prev => [...prev, { role: 'ai', content: '오류가 발생했어요. 페이지를 새로고침 후 다시 시도해주세요.' }])
     }
   }
+
+  // ─── 감정 담기 ────────────────────────────────────────────────────────────
+  const handleExtract = useCallback(async () => {
+    if (!hasNewMessage || !sessionId) return
+    const sid = sessionId
+    const res = await fetch('/api/chat/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: sid }),
+    })
+    const result = await res.json()
+    if (res.ok && !result.skipped) {
+      setHasNewMessage(false)
+      setMessagesSinceExtract(0)
+      await refreshAll(true)
+      setToast('감정이 기록됐어요.')
+      setTimeout(() => setToast(null), 3000)
+    }
+  }, [hasNewMessage, sessionId])
+
   // ─── 새 대화 ────────────────────────────────────────────────────────────
 
   const handleNewChat = useCallback(() => {
@@ -516,6 +544,7 @@ export default function FormClient() {
     setInput('')
     setSessionEnded(false)
     setHasNewMessage(false)
+    setMessagesSinceExtract(0)
     setView('chat')
     setSessionId(null)
     setActiveSessionId(null)
@@ -523,9 +552,7 @@ export default function FormClient() {
   }, [messages, sessionEnded, sessionId, closeSidebarOnMobile])
 
   // ─── 과거 세션 불러오기 ──────────────────────────────────────────────────
-
   const handleLoadSession = async (session: ChatSession) => {
-    // 현재 세션에 새 메시지 있으면 백그라운드 extract
     if (hasNewMessage && sessionId && sessionId !== session.id) {
       const sid = sessionId
       fetch('/api/chat/extract', {
@@ -536,7 +563,10 @@ export default function FormClient() {
         if (res.ok) refreshAll(true)
       }).catch(() => {})
     }
-    setHasNewMessage(false)
+    if (sessionId !== session.id) {
+      setHasNewMessage(false)
+      setMessagesSinceExtract(0)
+    }
 
     if (activeSessionId === session.id) { 
       setView('chat')
@@ -554,7 +584,6 @@ export default function FormClient() {
     setSessionId(session.id)
     setActiveSessionId(session.id)
     setSessionEnded(!!session.ended_at)
-    setHasNewMessage(false)
     setView('chat')
     scrollInstant.current = true
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior }), 0)
@@ -917,25 +946,52 @@ export default function FormClient() {
             }}>{Icons.menu(isMobile ? t.text : t.muted)}</button>
           )}
 
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-            <span style={{ fontSize: 14, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ 
+              fontSize: 14, color: t.text, 
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              flex: 1
+            }}>
               {view === 'settings' ? '설정'
                 : view === 'dashboard' ? '대시보드'
                 : view === 'records' ? '기록'
                 : sessions.find(s => s.id === activeSessionId)?.title ?? '새 대화'}
             </span>
+            {!isMobile && view === 'chat' && hasNewMessage && sessionId && 
+              messagesSinceExtract >= 5 && (
+              <button className="btn-action" onClick={handleExtract} style={{
+                padding: '5px 14px', borderRadius: 8,
+                background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                border: 'none', color: '#fff', fontSize: 13,
+                cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+              }}>
+                감정 담기
+              </button>
+            )}
           </div>
-          {isMobile && view !== 'dashboard' && (
-            <button className="btn-action" onClick={handleNewChat} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 12px', borderRadius: 8,
-              background: 'transparent', border: `1px solid ${t.border}`,
-              color: t.text, fontSize: 13, cursor: 'pointer',
-              fontFamily: 'inherit', flexShrink: 0,
-            }}>
-              {Icons.plus(t.text)}
-              <span>새 대화</span>
-            </button>
+          {isMobile && view === 'chat' && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {hasNewMessage && sessionId && messagesSinceExtract >= 5 && (
+                <button className="btn-action" onClick={handleExtract} style={{
+                  padding: '6px 12px', borderRadius: 8,
+                  background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                  border: 'none', color: '#fff', fontSize: 13,
+                  cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                }}>
+                  감정 담기
+                </button>
+              )}
+              <button className="btn-action" onClick={handleNewChat} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', borderRadius: 8,
+                background: 'transparent', border: `1px solid ${t.border}`,
+                color: t.text, fontSize: 13, cursor: 'pointer',
+                fontFamily: 'inherit', flexShrink: 0,
+              }}>
+                {Icons.plus(t.text)}
+                <span>새 대화</span>
+              </button>
+            </div>
           )}
         </div>
 
