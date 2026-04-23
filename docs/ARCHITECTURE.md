@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-04-21
+> 마지막 업데이트: 2026-04-23
 
 ---
 
@@ -125,6 +125,7 @@ www.lynqrateflow.com → app.lynqrateflow.com으로 영구 리다이렉트 (308)
 safe-area: env(safe-area-inset-top/bottom) → 노치/홈바 영역 대응
 iOS 확대 방지: textarea fontSize 16px 이상 유지
 헤더 새 대화 버튼: 모바일에서만 표시 (대시보드 탭 제외)
+감정 담기 버튼: 데스크탑 헤더 우측 / 모바일 헤더 새 대화 버튼 좌측 — messagesSinceExtract >= 5 조건 충족 시 노출
 ```
 
 > iOS Safari theme-color 동적 변경은 브라우저 제한으로 페이지 로드 시에만 반영됨.
@@ -138,10 +139,11 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 
 | 트리거 | 설명 |
 |--------|------|
+| 감정 담기 버튼 클릭 | 헤더에 노출되는 메인 추출 트리거. 세션 내 유저 메시지 5개 이상 누적 시 버튼 노출 (messagesSinceExtract 기준) |
 | 새 대화 버튼 클릭 | 현재 세션에 새 메시지가 있고 유저 메시지 5개 이상일 때 |
 | 다른 세션 클릭 | 현재 세션에 새 메시지가 있고 유저 메시지 5개 이상일 때 이동 전 실행 |
-| visibilitychange | 브라우저 탭 전환 / 앱 전환 / 화면 잠금 시 (sendBeacon 적용 예정) |
-| 첫 세션 즉시 추출 | 가입 후 첫 세션에서 유저 메시지 3개 도달 시 즉시 추출 + 토스트 (이후 추출은 5개 이상 + 탭전환/재로그인/새대화 트리거) |
+| visibilitychange | 브라우저 탭 전환 / 앱 전환 / 화면 잠금 시 (keepalive: true 적용, sendBeacon 추가 예정) |
+| 첫 세션 즉시 추출 | 가입 후 첫 세션에서 유저 메시지 3개 도달 시 즉시 추출 + 토스트 (이후 추출은 5개 이상 + 탭전환/재로그인/새대화/감정담기 트리거) |
 | 로그인 시 | last_extracted_at=null 또는 last_extracted_at < updated_at인 미완료 세션 최대 5개 일괄 처리 |
 
 ### N:M 구조
@@ -456,6 +458,11 @@ supabase/
 - [x] 웹훅 subscription.canceled 처리 로직 수정 (scheduled_cancel 만료 시 free/active로 초기화)
 - [x] 환불 시 canceled_at null 초기화 누락 버그 수정 (refund.created 핸들러)
 - [x] 환불 시 subscription.canceled 레이스 컨디션 방어 추가 (plan: pro 조건으로 덮어쓰기 방지)
+- [x] 감정 담기 버튼 추가 (헤더, 5턴 이상 시 노출)
+- [x] 온보딩 모달 추가 (첫 방문 1회 노출)
+- [x] 추출 완료 후 감정 담기 버튼 사라지지 않는 버그 수정
+- [x] 대시보드/설정 복귀 시 감정 담기 버튼 사라짐 버그 수정
+- [x] 헤더 타이틀 말줄임표 처리
 - [ ] 모바일 뷰에서 글 입력시 하단 탭바 가려지게 처리
 - [ ] 구독 취소 UX 개선 (대시보드 취소 버튼 제거 → 설정 페이지에서만 취소 가능 + 혜택 리마인드 모달, scheduled_cancel 상태 시 대시보드에 철회 버튼 노출 + 즉시 철회)
 - [ ] 회원 탈퇴 UX 개선 (탈퇴 전 혜택 리마인드 + 재고 유도 모달 추가)
