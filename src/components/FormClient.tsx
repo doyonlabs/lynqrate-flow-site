@@ -573,7 +573,6 @@ export default function FormClient() {
     }
     if (sessionId !== session.id) {
       setHasNewMessage(false)
-      setMessagesSinceExtract(0)
     }
 
     if (activeSessionId === session.id) { 
@@ -589,6 +588,10 @@ export default function FormClient() {
     if (!data || data.length === 0) return
     scrollInstant.current = true
     setMessages(data.map(m => ({ role: m.role === 'assistant' ? 'ai' : 'user' as Role, content: m.content })))
+    
+    const userMsgCount = data.filter(m => m.role === 'user').length
+    setMessagesSinceExtract(userMsgCount)
+
     setSessionId(session.id)
     setActiveSessionId(session.id)
     setSessionEnded(!!session.ended_at)
