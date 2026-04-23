@@ -461,13 +461,16 @@ supabase/
 - [x] 감정 담기 버튼 추가 (헤더, 5턴 이상 시 노출)
 - [x] 온보딩 모달 추가 (첫 방문 1회 노출)
 - [x] 추출 완료 후 감정 담기 버튼 사라지지 않는 버그 수정
-- [x] 대시보드/설정 복귀 시 감정 담기 버튼 사라짐 버그 수정
+- [x] 대시보드/설정에서 복귀 시 감정 담기 버튼 사라짐 버그 수정
 - [x] 헤더 타이틀 말줄임표 처리
+- [x] visibilitychange stale closure 수정 (useRef 기반으로 변경, 의존성 배열 고정)
+- [x] 세션 로드 시 last_extracted_at 기준 신규 메시지만 카운트 (감정 담기 버튼 노출 조건 정확도 개선)
+- [x] visibilitychange keepalive: true 적용 (fetch 끊김 방지)
 - [ ] 모바일 뷰에서 글 입력시 하단 탭바 가려지게 처리
 - [ ] 구독 취소 UX 개선 (대시보드 취소 버튼 제거 → 설정 페이지에서만 취소 가능 + 혜택 리마인드 모달, scheduled_cancel 상태 시 대시보드에 철회 버튼 노출 + 즉시 철회)
 - [ ] 회원 탈퇴 UX 개선 (탈퇴 전 혜택 리마인드 + 재고 유도 모달 추가)
 - [ ] 모든 기기 일괄 로그아웃 기능 (설정 탭, signOut scope: global)
-- [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 적용 예정)
+- [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 완전 적용 예정)
 - [ ] 카카오 로그인 추가
 - [ ] PWA manifest.json 추가
 - [ ] OG 이미지 추가 (카카오톡 링크 썸네일)
