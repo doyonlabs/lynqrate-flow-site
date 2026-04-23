@@ -995,7 +995,7 @@ export default function FormClient() {
             }}>{Icons.menu(t.muted)}</button>
           )}
 
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <span style={{
               fontSize: 14, color: t.text,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
