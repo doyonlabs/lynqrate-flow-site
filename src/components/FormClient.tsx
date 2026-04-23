@@ -156,6 +156,8 @@ export default function FormClient() {
 
   const [messagesSinceExtract, setMessagesSinceExtract] = useState(0)
 
+  const [onboardingOpen, setOnboardingOpen] = useState(false)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -210,6 +212,10 @@ export default function FormClient() {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
+      if (!localStorage.getItem('onboarding_done')) {
+        setOnboardingOpen(true)
+      }
 
       const { data: userData } = await supabase
         .from('users').select('display_name, email').eq('id', user.id).single()
@@ -485,6 +491,8 @@ export default function FormClient() {
           }).then(async (res) => {
             const result = await res.json()
             if (res.ok && !result.skipped) {
+              setHasNewMessage(false)
+              setMessagesSinceExtract(0)
               await refreshAll()
               setToast('첫 감정이 기록됐어요. 대화가 쌓이면 패턴이 보여요.')
               setTimeout(() => setToast(null), 4000)
@@ -666,6 +674,52 @@ export default function FormClient() {
           animation: 'fadeInUp 0.3s ease',
         }}>
           ✦ {toast}
+        </div>
+      )}
+
+      {/* 온보딩 모달 */}
+      {onboardingOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        }}>
+          <div style={{
+            background: t.popup, border: `1px solid ${t.border}`,
+            borderRadius: 20, padding: '32px 28px',
+            width: '100%', maxWidth: 360,
+            boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
+            display: 'flex', flexDirection: 'column', gap: 20,
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 12 }}>✦</div>
+              <p style={{ fontSize: 17, fontWeight: 700, color: t.text }}>Mind Echo 사용법</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { icon: '💬', text: '지금 마음을 털어놓아요' },
+                { icon: '✦', text: '한 대화에서 5번 이상 말하면 감정 담기 버튼이 나타나요' },
+                { icon: '🔄', text: '버튼을 누르지 않아도 다음에 돌아오면 자동으로 기록돼요' },
+                { icon: '📊', text: '기록이 쌓이면 대시보드에서 패턴이 보여요' },
+              ].map((item, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
+                  <p style={{ fontSize: 14, color: t.muted, lineHeight: 1.6 }}>{item.text}</p>
+                </div>
+              ))}
+            </div>
+            <button className="btn-action" onClick={() => {
+              localStorage.setItem('onboarding_done', 'true')
+              setOnboardingOpen(false)
+              setView('chat')
+            }} style={{
+              width: '100%', padding: '14px', borderRadius: 14,
+              background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+              border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              시작하기
+            </button>
+          </div>
         </div>
       )}
 
@@ -946,11 +1000,11 @@ export default function FormClient() {
             }}>{Icons.menu(isMobile ? t.text : t.muted)}</button>
           )}
 
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
             <span style={{ 
               fontSize: 14, color: t.text, 
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              flex: 1
+              flex: 1, minWidth: 0
             }}>
               {view === 'settings' ? '설정'
                 : view === 'dashboard' ? '대시보드'
@@ -964,6 +1018,7 @@ export default function FormClient() {
                 background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                 border: 'none', color: '#fff', fontSize: 13,
                 cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                position: 'relative', zIndex: 1,
               }}>
                 감정 담기
               </button>
@@ -1164,7 +1219,7 @@ export default function FormClient() {
                   {/* [FIX] 모바일에서 힌트 숨김 */}
                   {!isMobile && (
                     <p style={{ fontSize: 11, color: t.muted, textAlign: 'center', marginTop: 8 }}>
-                      Enter로 전송 · Shift+Enter 줄바꿈 · 새 대화 시작 시 자동으로 기록돼요
+                      Enter로 전송 · Shift+Enter 줄바꿈 · 5번 이상 대화하면 감정을 담을 수 있어요
                     </p>
                   )}
                 </div>
