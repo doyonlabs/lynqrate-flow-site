@@ -102,15 +102,12 @@ const Icons = {
 export default function FormClient() {
   const { isDark, toggleTheme } = useTheme()
   const t = isDark ? dark : light
-
   // [FIX] 모바일 감지 — SSR safe (false로 시작, mount 후 실제값)
   const [isMobile, setIsMobile] = useState(false)
-
   const [view, setView] = useState<View>('dashboard')
   // [FIX] 사이드바 초기값도 false로 시작, mount 후 뷰포트에 따라 세팅
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-
   // 채팅 상태
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', content: INITIAL_AI_MESSAGE },
@@ -119,12 +116,10 @@ export default function FormClient() {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionEnded, setSessionEnded] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
-
   // 사이드바 데이터
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [userInfo, setUserInfo] = useState<UserInfo>({ display_name: null, email: null })
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-
   // [FIX] dashboardLoading 초기값 true → 첫 렌더 empty state 플래시 방지
   const [dashboardData, setDashboardData] = useState<EmotionEntry[]>([])
   const [dashboardLoading, setDashboardLoading] = useState(true)
@@ -136,9 +131,7 @@ export default function FormClient() {
   const [holidays, setHolidays] = useState<Record<string, string>>({})
 
   const [calModalOpen, setCalModalOpen] = useState(false)
-
   const [todayEntries, setTodayEntries] = useState<EmotionEntry[]>([])
-
   const [lastEntry, setLastEntry] = useState<EmotionEntry | null>(null)
 
   const [hasNewMessage, setHasNewMessage] = useState(false)
@@ -147,15 +140,10 @@ export default function FormClient() {
   const [toast, setToast] = useState<string | null>(null)
 
   const [subscription, setSubscription] = useState<SubscriptionInfo>({ plan: 'free', status: 'active', expires_at: null })
-
   const [limitModalOpen, setLimitModalOpen] = useState(false)
-
   const [monthlyCount, setMonthlyCount] = useState(0)
-
   const [standardEmotions, setStandardEmotions] = useState<string[]>([])
-
   const [messagesSinceExtract, setMessagesSinceExtract] = useState(0)
-
   const [onboardingOpen, setOnboardingOpen] = useState(false)
 
   const settingsRef = useRef<HTMLDivElement>(null)
@@ -163,7 +151,20 @@ export default function FormClient() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollInstant = useRef(false)
 
-  // [FIX] mount 후 뷰포트 감지 → SSR hydration 불일치 없음
+  // [FIX] stale closure 방지용 ref — visibilitychange �핸들러에서 최신값 참조
+  const hasNewMessageRef = useRef(false)
+  const sessionIdRef = useRef<string | null>(null)
+
+  // ref 동기화 헬퍼
+  const setHasNewMessageWithRef = (value: boolean) => {
+    hasNewMessageRef.current = value
+    setHasNewMessage(value)
+  }
+  const setSessionIdWithRef = (value: string | null) => {
+    sessionIdRef.current = value
+    setSessionId(value)
+  }
+
   useEffect(() => {
     const checkViewport = () => {
       const mobile = window.innerWidth < 1024
@@ -175,7 +176,6 @@ export default function FormClient() {
     window.addEventListener('resize', checkViewport)
     return () => window.removeEventListener('resize', checkViewport)
   }, [])
-
   // 외부 클릭 감지
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -185,7 +185,6 @@ export default function FormClient() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
-
   // 자동 스크롤
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -193,7 +192,6 @@ export default function FormClient() {
     })
     scrollInstant.current = false
   }, [messages, isLoading])
-
   // textarea 자동 높이
   useEffect(() => {
     if (textareaRef.current) {
@@ -201,12 +199,10 @@ export default function FormClient() {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`
     }
   }, [input])
-
   // 포커스 복구 (데스크탑만)
   useEffect(() => {
     if (!isLoading && !isMobile) textareaRef.current?.focus()
   }, [isLoading, isMobile])
-
   // 초기 로드
   useEffect(() => {
     const load = async () => {
@@ -262,9 +258,6 @@ export default function FormClient() {
       ) ?? []
 
       const incompleteSessions = [...(nullSessions ?? []), ...newMessageSessions]
-//console.log('nullSessions:', nullSessions)
-//console.log('newMessageSessions:', newMessageSessions)
-//console.log('incompleteSessions:', incompleteSessions)
 
       if (incompleteSessions.length) {
         incompleteSessions.forEach(s => {
@@ -298,18 +291,17 @@ export default function FormClient() {
     if (view === 'records') fetchSessions()
     if (view === 'settings') fetchSubscription()
   }, [view])
-
   //풀 스크롤 방지
   useEffect(() => {
     document.body.style.overscrollBehavior = 'none'
     return () => { document.body.style.overscrollBehavior = '' }
   }, [])
 
-  // 탭/앱 전환 시 자동 감정 추출 + 복귀 시 요약바 갱신
+  // [FIX] ref 기반으로 stale closure 문제 해결 — 의존성 배열 []
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && hasNewMessage && sessionId) {
-        const sid = sessionId
+      if (document.visibilityState === 'hidden' && hasNewMessageRef.current && sessionIdRef.current) {
+        const sid = sessionIdRef.current
         fetch('/api/chat/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -317,7 +309,7 @@ export default function FormClient() {
           keepalive: true,
         }).then(res => {
           if (res.ok) {
-            setHasNewMessage(false)
+            setHasNewMessageWithRef(false)
             setMessagesSinceExtract(0)
             refreshAll(true)
           }
@@ -332,7 +324,7 @@ export default function FormClient() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [hasNewMessage, sessionId, messages])
+  }, [])
 
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
@@ -413,12 +405,10 @@ export default function FormClient() {
       setEmotionColors(map)
       setStandardEmotions(emotions.map(e => e.name))
     }
-
     // 공휴일 fetch
     try {
       const res = await fetch('https://holidays.hyunbin.page/2026.json')
       const data = await res.json()
-      //console.log('공휴일 데이터:', data)
       const map: Record<string, string> = {}
       Object.entries(data).forEach(([date, names]) => {
         const [, m, d] = date.split('-')
@@ -474,7 +464,7 @@ export default function FormClient() {
         return
       }
       setMessages(prev => [...prev, { role: 'ai', content: data.reply ?? '답장을 가져오지 못했어요. 페이지를 새로고침 후 다시 시도해주세요.' }])
-      setHasNewMessage(true)
+      setHasNewMessageWithRef(true)
       setMessagesSinceExtract(prev => prev + 1)
       fetchTodayEntries()
 
@@ -491,7 +481,7 @@ export default function FormClient() {
           }).then(async (res) => {
             const result = await res.json()
             if (res.ok && !result.skipped) {
-              setHasNewMessage(false)
+              setHasNewMessageWithRef(false)
               setMessagesSinceExtract(0)
               await refreshAll()
               setToast('첫 감정이 기록됐어요. 대화가 쌓이면 패턴이 보여요.')
@@ -502,7 +492,7 @@ export default function FormClient() {
       }
 
       if (data.sessionId && !sessionId) {
-        setSessionId(data.sessionId)
+        setSessionIdWithRef(data.sessionId)
         setActiveSessionId(data.sessionId)
         await fetchSessions()
       }
@@ -523,7 +513,7 @@ export default function FormClient() {
     })
     const result = await res.json()
     if (res.ok && !result.skipped) {
-      setHasNewMessage(false)
+      setHasNewMessageWithRef(false)
       setMessagesSinceExtract(0)
       await refreshAll(true)
       setToast('감정이 기록됐어요.')
@@ -534,10 +524,7 @@ export default function FormClient() {
   // ─── 새 대화 ────────────────────────────────────────────────────────────
 
   const handleNewChat = useCallback(() => {
-    // 현재 세션에 유저 메시지 있으면 백그라운드 extract
-    //console.log('handleNewChat 진입, sessionId:', sessionId, 'hasUser:', messages.some(m => m.role === 'user'))
     if (hasNewMessage && sessionId) {
-      //console.log('handleNewChat sessionId:', sessionId, 'messages:', messages.length)
       const sid = sessionId
       fetch('/api/chat/extract', {
         method: 'POST',
@@ -551,10 +538,10 @@ export default function FormClient() {
     setMessages([{ role: 'ai', content: INITIAL_AI_MESSAGE }])
     setInput('')
     setSessionEnded(false)
-    setHasNewMessage(false)
+    setHasNewMessageWithRef(false)
     setMessagesSinceExtract(0)
     setView('chat')
-    setSessionId(null)
+    setSessionIdWithRef(null)
     setActiveSessionId(null)
     closeSidebarOnMobile()
   }, [messages, sessionEnded, sessionId, closeSidebarOnMobile])
@@ -572,27 +559,35 @@ export default function FormClient() {
       }).catch(() => {})
     }
     if (sessionId !== session.id) {
-      setHasNewMessage(false)
+      setHasNewMessageWithRef(false)
     }
 
-    if (activeSessionId === session.id) { 
+    if (activeSessionId === session.id) {
       setView('chat')
       scrollInstant.current = true
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior }), 0)
       closeSidebarOnMobile()
-      return 
+      return
     }
-    const { data } = await supabase
-      .from('chat_messages').select('role, content')
-      .eq('chat_session_id', session.id).order('created_at', { ascending: true })
+    const [{ data }, { data: sessionData }] = await Promise.all([
+      supabase.from('chat_messages').select('role, content, created_at')
+        .eq('chat_session_id', session.id).order('created_at', { ascending: true }),
+      supabase.from('chat_sessions').select('last_extracted_at')
+        .eq('id', session.id).single(),
+    ])
     if (!data || data.length === 0) return
     scrollInstant.current = true
     setMessages(data.map(m => ({ role: m.role === 'assistant' ? 'ai' : 'user' as Role, content: m.content })))
-    
-    const userMsgCount = data.filter(m => m.role === 'user').length
-    setMessagesSinceExtract(userMsgCount)
 
-    setSessionId(session.id)
+    const lastExtractedAt = sessionData?.last_extracted_at
+    const newUserMsgCount = lastExtractedAt
+      ? data.filter(m => m.role === 'user' && new Date(m.created_at) > new Date(lastExtractedAt)).length
+      : data.filter(m => m.role === 'user').length
+    setMessagesSinceExtract(newUserMsgCount)
+    if (newUserMsgCount > 0) {
+      setHasNewMessageWithRef(true)
+    }
+    setSessionIdWithRef(session.id)
     setActiveSessionId(session.id)
     setSessionEnded(!!session.ended_at)
     setView('chat')
@@ -820,7 +815,6 @@ export default function FormClient() {
               {Icons.plus(t.text)} 새 대화
             </button>
           </div>
-
           {/* 대시보드 버튼 */}
           <div style={{ padding: '0 8px 8px' }}>
             <SidebarItem
@@ -831,7 +825,6 @@ export default function FormClient() {
             />
             <div style={{ height: 1, background: t.border, margin: '8px 4px' }} />
           </div>
-
           {/* 대화 목록 */}
           <div style={{ padding: '0 8px', flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', minHeight: 0 }}>
             <p style={{ fontSize: 11, color: t.muted, padding: '0 8px', marginBottom: 6, letterSpacing: '0.06em' }}>최근 기록</p>
@@ -851,7 +844,6 @@ export default function FormClient() {
               )}
             </ul>
           </div>
-
           {/* 하단 유저/설정 */}
           <div style={{ padding: '8px', position: 'relative' }} ref={settingsRef}>
             {settingsOpen && (
@@ -988,7 +980,7 @@ export default function FormClient() {
 
       {/* ── 메인 영역 ── */}
       {/* [FIX] minWidth: 0 → flex child가 제대로 줄어들게 */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
         {/* 헤더 */}
         <div style={{
@@ -1000,12 +992,12 @@ export default function FormClient() {
           {!isMobile && (
             <button className="icon-btn" onClick={() => setSidebarOpen(!sidebarOpen)} style={{
               border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0,
-            }}>{Icons.menu(isMobile ? t.text : t.muted)}</button>
+            }}>{Icons.menu(t.muted)}</button>
           )}
 
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-            <span style={{ 
-              fontSize: 14, color: t.text, 
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              fontSize: 14, color: t.text,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               flex: 1, minWidth: 0
             }}>
@@ -1014,7 +1006,7 @@ export default function FormClient() {
                 : view === 'records' ? '기록'
                 : sessions.find(s => s.id === activeSessionId)?.title ?? '새 대화'}
             </span>
-            {!isMobile && view === 'chat' && hasNewMessage && sessionId && 
+            {!isMobile && view === 'chat' && hasNewMessage && sessionId &&
               messagesSinceExtract >= 5 && (
               <button className="btn-action" onClick={handleExtract} style={{
                 padding: '5px 14px', borderRadius: 8,
@@ -1106,10 +1098,10 @@ export default function FormClient() {
               </div>
             </div>
 
-              <div style={{
-                padding: isMobile ? '10px 12px calc(56px + env(safe-area-inset-bottom, 0px))' : '12px 24px 16px',
-                background: t.bg, borderTop: `1px solid ${t.border}`, flexShrink: 0,
-              }}>
+            <div style={{
+              padding: isMobile ? '10px 12px calc(56px + env(safe-area-inset-bottom, 0px))' : '12px 24px 16px',
+              background: t.bg, borderTop: `1px solid ${t.border}`, flexShrink: 0,
+            }}>
               {(() => {
                 const RatingDots = ({ value, color }: { value: number; color: string }) => (
                   <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -1120,7 +1112,6 @@ export default function FormClient() {
                   </span>
                 )
                 const hasToday = todayEntries.length > 0
-
                 if (!hasToday && !lastEntry) return null
 
                 // 오늘 감정 그룹핑 (빈도 + 평균강도)
@@ -1134,7 +1125,7 @@ export default function FormClient() {
                 const groupedList = Object.entries(grouped).map(([emotion, { count, totalIntensity }]) => ({
                   emotion, count, avgIntensity: Math.round(totalIntensity / count),
                 }))
-
+                
                 // 마지막 기록 며칠 전인지
                 const daysAgo = lastEntry ? Math.floor(
                   (Date.now() - new Date(lastEntry.created_at).getTime()) / (1000 * 60 * 60 * 24)
@@ -1171,7 +1162,6 @@ export default function FormClient() {
                         </>
                       ) : (
                         <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: t.text }}>
-                          
                           {lastEntry!.raw_emotion}
                           <RatingDots value={lastEntry!.intensity} color={emotionColors[lastEntry!.raw_emotion] ?? '#a78bfa'} />
                         </span>
@@ -1181,52 +1171,52 @@ export default function FormClient() {
                   </button>
                 )
               })()}
-                <div style={{ maxWidth: 680, margin: '0 auto' }}>
-                  <div style={{
-                    display: 'flex', gap: 10, alignItems: 'flex-end',
-                    background: t.input, border: `1px solid ${t.border}`,
-                    borderRadius: 14, padding: '10px 12px',
+              <div style={{ maxWidth: 680, margin: '0 auto' }}>
+                <div style={{
+                  display: 'flex', gap: 10, alignItems: 'flex-end',
+                  background: t.input, border: `1px solid ${t.border}`,
+                  borderRadius: 14, padding: '10px 12px',
+                }}>
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    placeholder="지금 어떤 마음인지 말해보세요..."
+                    rows={1}
+                    disabled={isLoading}
+                    style={{
+                      flex: 1, background: 'transparent', border: 'none',
+                      color: t.text, fontSize: 14, lineHeight: 1.6,
+                      resize: 'none', outline: 'none',
+                      fontFamily: 'inherit', overflowY: 'hidden', minHeight: 24,
+                    }}
+                    onKeyDown={e => {
+                      // [FIX] 모바일 소프트 키보드 Enter 충돌 방지
+                      if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
+                        e.preventDefault()
+                        handleSend()
+                      }
+                    }}
+                  />
+                  <button className="btn-action" onClick={handleSend} disabled={!input.trim() || isLoading} style={{
+                    width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                    background: input.trim() && !isLoading ? 'linear-gradient(135deg, #a78bfa, #60a5fa)' : t.border,
+                    border: 'none',
+                    cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'background 0.2s',
                   }}>
-                    <textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={e => setInput(e.target.value)}
-                      placeholder="지금 어떤 마음인지 말해보세요..."
-                      rows={1}
-                      disabled={isLoading}
-                      style={{
-                        flex: 1, background: 'transparent', border: 'none',
-                        color: t.text, fontSize: 14, lineHeight: 1.6,
-                        resize: 'none', outline: 'none',
-                        fontFamily: 'inherit', overflowY: 'hidden', minHeight: 24,
-                      }}
-                      onKeyDown={e => {
-                        // [FIX] 모바일 소프트 키보드 Enter 충돌 방지
-                        if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
-                          e.preventDefault()
-                          handleSend()
-                        }
-                      }}
-                    />
-                    <button className="btn-action" onClick={handleSend} disabled={!input.trim() || isLoading} style={{
-                      width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                      background: input.trim() && !isLoading ? 'linear-gradient(135deg, #a78bfa, #60a5fa)' : t.border,
-                      border: 'none',
-                      cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'background 0.2s',
-                    }}>
-                      {Icons.send(input.trim() && !isLoading ? '#fff' : t.muted)}
-                    </button>
-                  </div>
-                  {/* [FIX] 모바일에서 힌트 숨김 */}
-                  {!isMobile && (
-                    <p style={{ fontSize: 11, color: t.muted, textAlign: 'center', marginTop: 8 }}>
-                      Enter로 전송 · Shift+Enter 줄바꿈 · 5번 이상 대화하면 감정을 담을 수 있어요
-                    </p>
-                  )}
+                    {Icons.send(input.trim() && !isLoading ? '#fff' : t.muted)}
+                  </button>
                 </div>
+                {/* [FIX] 모바일에서 힌트 숨김 */}
+                {!isMobile && (
+                  <p style={{ fontSize: 11, color: t.muted, textAlign: 'center', marginTop: 8 }}>
+                    Enter로 전송 · Shift+Enter 줄바꿈 · 5번 이상 대화하면 감정을 담을 수 있어요
+                  </p>
+                )}
               </div>
+            </div>
           </>
         )}
 
@@ -1453,10 +1443,10 @@ export default function FormClient() {
                 }
                 const thisWeekTop = getTopEmotion(thisWeekData)
                 const lastWeekTop = getTopEmotion(lastWeekData)
-                
+
                 const NEGATIVE_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움']
                 const POSITIVE_EMOTIONS = ['설렘', '기쁨', '감사', '평온']
-                
+
                 const hasFinalConsonant = (str: string) => {
                   const code = str.charCodeAt(str.length - 1) - 0xAC00
                   return code >= 0 && code % 28 !== 0
@@ -1467,45 +1457,44 @@ export default function FormClient() {
                 const euro = (s: string) => hasFinalConsonant(s) ? '으로' : '로'
 
                 const insightText = (() => {
-                if (!topEmotion) return '대화하다 보면 감정이 자동으로 기록돼요. 매일 조금씩 쌓이면 내 패턴이 보이기 시작해요.'
-                const topEmotionName = topEmotion[0]
-                const topEmotionCount = topEmotion[1]
-                const isNegative = NEGATIVE_EMOTIONS.includes(topEmotionName)
-                const isPositive = POSITIVE_EMOTIONS.includes(topEmotionName)
+                  if (!topEmotion) return '대화하다 보면 감정이 자동으로 기록돼요. 매일 조금씩 쌓이면 내 패턴이 보이기 시작해요.'
+                  const topEmotionName = topEmotion[0]
+                  const topEmotionCount = topEmotion[1]
+                  const isNegative = NEGATIVE_EMOTIONS.includes(topEmotionName)
+                  const isPositive = POSITIVE_EMOTIONS.includes(topEmotionName)
 
-                if (thisWeekTop && lastWeekTop && thisWeekTop[0] !== lastWeekTop[0]) {
-                  const prevIsNeg = NEGATIVE_EMOTIONS.includes(lastWeekTop[0])
-                  const currIsPos = POSITIVE_EMOTIONS.includes(thisWeekTop[0])
-                  const currIsNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
-                  if (prevIsNeg && currIsPos)
-                    return `지난 주 ${lastWeekTop[0]}${eul(lastWeekTop[0])} 비워냈더니 이번 주엔 ${thisWeekTop[0]}${i(thisWeekTop[0])} 찾아왔네요.`
-                  if (prevIsNeg && currIsNeg)
-                    return `지난 주 ${lastWeekTop[0]}에 이어 이번 주는 ${thisWeekTop[0]}${i(thisWeekTop[0])} 많네요. 꺼낼수록 가벼워져요.`
-                  return `지난 주 ${lastWeekTop[0]}에서 이번 주 ${thisWeekTop[0]}${euro(thisWeekTop[0])} 흘러가고 있어요.`
-                }
+                  if (thisWeekTop && lastWeekTop && thisWeekTop[0] !== lastWeekTop[0]) {
+                    const prevIsNeg = NEGATIVE_EMOTIONS.includes(lastWeekTop[0])
+                    const currIsPos = POSITIVE_EMOTIONS.includes(thisWeekTop[0])
+                    const currIsNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
+                    if (prevIsNeg && currIsPos)
+                      return `지난 주 ${lastWeekTop[0]}${eul(lastWeekTop[0])} 비워냈더니 이번 주엔 ${thisWeekTop[0]}${i(thisWeekTop[0])} 찾아왔네요.`
+                    if (prevIsNeg && currIsNeg)
+                      return `지난 주 ${lastWeekTop[0]}에 이어 이번 주는 ${thisWeekTop[0]}${i(thisWeekTop[0])} 많네요. 꺼낼수록 가벼워져요.`
+                    return `지난 주 ${lastWeekTop[0]}에서 이번 주 ${thisWeekTop[0]}${euro(thisWeekTop[0])} 흘러가고 있어요.`
+                  }
 
-                if (thisWeekTop && thisWeekData.length > lastWeekData.length) {
-                  const isNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
-                  if (isNeg)
-                    return `이번 주 ${thisWeekTop[0]}${i(thisWeekTop[0])} 자주 찾아왔어요. 꺼낼수록 조금씩 비워져요.`
-                  return `이번 주 ${thisWeekTop[0]}${i(thisWeekTop[0])} 가득한 한 주네요.`
-                }
+                  if (thisWeekTop && thisWeekData.length > lastWeekData.length) {
+                    const isNeg = NEGATIVE_EMOTIONS.includes(thisWeekTop[0])
+                    if (isNeg)
+                      return `이번 주 ${thisWeekTop[0]}${i(thisWeekTop[0])} 자주 찾아왔어요. 꺼낼수록 조금씩 비워져요.`
+                    return `이번 주 ${thisWeekTop[0]}${i(thisWeekTop[0])} 가득한 한 주네요.`
+                  }
 
-                if (isNegative) {
-                  if (topEmotionCount >= 5)
-                    return `${topEmotionName}${eul(topEmotionName)} ${topEmotionCount}번 꺼내놓았어요. 비울수록 가벼워져요.`
-                  return `${topEmotionName}${i(topEmotionName)} 자주 찾아온 시간이었어요. 꺼낼수록 조금씩 비워져요.`
-                }
+                  if (isNegative) {
+                    if (topEmotionCount >= 5)
+                      return `${topEmotionName}${eul(topEmotionName)} ${topEmotionCount}번 꺼내놓았어요. 비울수록 가벼워져요.`
+                    return `${topEmotionName}${i(topEmotionName)} 자주 찾아온 시간이었어요. 꺼낼수록 조금씩 비워져요.`
+                  }
 
-                if (isPositive) {
-                  if (topEmotionName === '평온')
-                    return `${topEmotionCount}번의 기록 중 평온이 가장 많았어요. 잔잔한 시간이 이어지고 있어요.`
-                  return `${topEmotionCount}번의 기록 중 ${topEmotionName}${i(topEmotionName)} 가장 많았어요. 좋은 감정이 차곡차곡 쌓이고 있어요.`
-                }
+                  if (isPositive) {
+                    if (topEmotionName === '평온')
+                      return `${topEmotionCount}번의 기록 중 평온이 가장 많았어요. 잔잔한 시간이 이어지고 있어요.`
+                    return `${topEmotionCount}번의 기록 중 ${topEmotionName}${i(topEmotionName)} 가장 많았어요. 좋은 감정이 차곡차곡 쌓이고 있어요.`
+                  }
 
-                return `${total}번의 감정을 기록했어요. 감정을 꺼내는 것만으로도 충분해요.`
-              })()
-
+                  return `${total}번의 감정을 기록했어요. 감정을 꺼내는 것만으로도 충분해요.`
+                })()
                 // [FIX] 모바일: 1열 / 데스크탑: 3열 — 인라인 스타일로 확실하게
                 const cols = isMobile ? '1fr' : '1fr 1fr 1fr'
                 const gap = isMobile ? 12 : 16
@@ -1675,7 +1664,6 @@ export default function FormClient() {
                       }
 
                       const emotionList = standardEmotions
-
                       const heatData: Record<string, { count: number; totalIntensity: number }> = {}
                       dashboardData.forEach(e => {
                         const d = new Date(e.created_at)
@@ -1725,7 +1713,6 @@ export default function FormClient() {
                                 </div>
                               )
                             })}
-
                             {/* 감정별 행 */}
                             {emotionList.map(emotion => {
                               const color = emotionColors[emotion] ?? '#a78bfa'
@@ -1734,7 +1721,6 @@ export default function FormClient() {
                                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
                                   <span style={{ fontSize: 11, color: t.text }}>{emotion}</span>
                                 </div>,
-
                                 ...displayDays.map((d, i) => {
                                   const isFuture = d > new Date()
                                   const dateKey = `${d.getMonth() + 1}-${d.getDate()}`
@@ -1745,7 +1731,6 @@ export default function FormClient() {
                                     ? Math.round((avgIntensity / 5) * 220 + 35).toString(16).padStart(2, '0')
                                     : '14'
                                   const fullDateKey = d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-
                                   return (
                                     <div
                                       key={i}
@@ -1770,7 +1755,6 @@ export default function FormClient() {
                               ]
                             })}
                           </div>
-
                           {/* 모달 */}
                           {calModalOpen && selectedDay && selectedEmotion && (() => {
                             const allEntries = dashboardData.filter(e =>
@@ -1779,7 +1763,6 @@ export default function FormClient() {
                             )
                             const parts = selectedDay.split('. ')
                             const dateLabel = `${parts[1]}월 ${parts[2]?.replace('.', '')}일`
-
                             return (
                               <div
                                 onClick={() => setCalModalOpen(false)}
@@ -1827,9 +1810,7 @@ export default function FormClient() {
                         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                         .slice(0, 5)
                         .filter(e => e.summary)
-
                       if (recentEntries.length === 0) return null
-
                       return (
                         <div style={{
                           gridColumn: fullSpan,
@@ -1839,49 +1820,29 @@ export default function FormClient() {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                             {recentEntries.map((e) => {
                               const createdDate = new Date(e.created_at)
-                              const timeLabel = createdDate.toLocaleTimeString('ko-KR', {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                                hour12: true,
-                              })
+                              const timeLabel = createdDate.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true })
                               const today = new Date()
                               today.setHours(0, 0, 0, 0)
                               const yesterday = new Date(today)
                               yesterday.setDate(today.getDate() - 1)
-
                               const dateLabel = createdDate >= today
                                 ? `오늘 ${timeLabel}`
                                 : createdDate >= yesterday
                                 ? '어제'
                                 : `${Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24))}일 전`
                               const color = emotionColors[e.raw_emotion] ?? '#a78bfa'
-
                               return (
-                                <div key={e.id} style={{
-                                  padding: '14px 16px',
-                                  borderRadius: 12,
-                                  background: t.bg,
-                                  border: `1px solid ${t.border}`,
-                                }}>
+                                <div key={e.id} style={{ padding: '14px 16px', borderRadius: 12, background: t.bg, border: `1px solid ${t.border}` }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color }}>
-                                      {e.raw_emotion}
-                                    </span>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color }}>{e.raw_emotion}</span>
                                     <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                                       {[1,2,3,4,5].map(n => (
-                                        <span key={n} style={{
-                                          width: 4, height: 4, borderRadius: '50%', display: 'inline-block',
-                                          background: n <= e.intensity ? color : t.border,
-                                        }} />
+                                        <span key={n} style={{ width: 4, height: 4, borderRadius: '50%', display: 'inline-block', background: n <= e.intensity ? color : t.border }} />
                                       ))}
                                     </span>
-                                    <span style={{ fontSize: 11, color: t.muted, marginLeft: 'auto' }}>
-                                      {dateLabel}
-                                    </span>
+                                    <span style={{ fontSize: 11, color: t.muted, marginLeft: 'auto' }}>{dateLabel}</span>
                                   </div>
-                                  <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, margin: 0 }}>
-                                    {e.summary}
-                                  </p>
+                                  <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6, margin: 0 }}>{e.summary}</p>
                                 </div>
                               )
                             })}
@@ -1896,78 +1857,76 @@ export default function FormClient() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {dashboardData.length === 0 && <p style={{ fontSize: 13, color: t.muted }}>아직 기록이 없어요.</p>}
                         {standardEmotions
-                        .map(emotion => {
-                          const entries = dashboardData.filter(e => e.raw_emotion === emotion)
-                          return { emotion, avg: entries.length ? entries.reduce((s, e) => s + e.intensity, 0) / entries.length : 0 }
-                        })
-                        .sort((a, b) => b.avg - a.avg)
-                        .filter(({ avg }) => avg > 0)
-                        .map(({ emotion, avg }) => (
-                          <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: emotionColors[emotion] ?? '#a78bfa' }} />
-                            <span style={{ fontSize: 13, color: t.text, width: 36, flexShrink: 0 }}>{emotion}</span>
-                            <div style={{ flex: 1, height: 6, borderRadius: 3, background: t.border }}>
-                              <div style={{ width: `${(avg / 5) * 100}%`, height: '100%', borderRadius: 3, background: emotionColors[emotion] ?? '#a78bfa' }} />
+                          .map(emotion => {
+                            const entries = dashboardData.filter(e => e.raw_emotion === emotion)
+                            return { emotion, avg: entries.length ? entries.reduce((s, e) => s + e.intensity, 0) / entries.length : 0 }
+                          })
+                          .sort((a, b) => b.avg - a.avg)
+                          .filter(({ avg }) => avg > 0)
+                          .map(({ emotion, avg }) => (
+                            <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: emotionColors[emotion] ?? '#a78bfa' }} />
+                              <span style={{ fontSize: 13, color: t.text, width: 36, flexShrink: 0 }}>{emotion}</span>
+                              <div style={{ flex: 1, height: 6, borderRadius: 3, background: t.border }}>
+                                <div style={{ width: `${(avg / 5) * 100}%`, height: '100%', borderRadius: 3, background: emotionColors[emotion] ?? '#a78bfa' }} />
+                              </div>
+                              <span style={{ fontSize: 12, color: t.muted, width: 28, textAlign: 'right', flexShrink: 0 }}>{avg.toFixed(1)}</span>
                             </div>
-                            <span style={{ fontSize: 12, color: t.muted, width: 28, textAlign: 'right', flexShrink: 0 }}>{avg.toFixed(1)}</span>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     </div>
 
-                    {/* 4. 감정 빈도 */}
+                    {/* ④ 감정 빈도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
                       <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 8 }}>감정 빈도</p>
                       {barData.length === 0 ? (
                         <p style={{ fontSize: 13, color: t.muted }}>아직 기록이 없어요.</p>
                       ) : (
-                      <ResponsiveContainer width="100%" height={Math.max(160, barData.length * 32)}>
-                        <BarChart data={barData} barSize={20} layout="vertical">
-                          <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
-                          <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: t.text }} axisLine={false} tickLine={false} width={44} />
-                          <Bar dataKey="count"
-                            shape={(props: any) => {
-                              const { x, y, width, height, payload } = props
-                              return <rect x={x} y={y} width={width} height={height} fill={emotionColors[payload.name] ?? '#a78bfa'} rx={4} ry={4} />
-                            }}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
+                        <ResponsiveContainer width="100%" height={Math.max(160, barData.length * 32)}>
+                          <BarChart data={barData} barSize={20} layout="vertical">
+                            <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
+                            <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: t.text }} axisLine={false} tickLine={false} width={44} />
+                            <Bar dataKey="count"
+                              shape={(props: any) => {
+                                const { x, y, width, height, payload } = props
+                                return <rect x={x} y={y} width={width} height={height} fill={emotionColors[payload.name] ?? '#a78bfa'} rx={4} ry={4} />
+                              }}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
                       )}
                     </div>
 
                     {/* ⑤ 이번주 vs 지난주 */}
-                    {true && (
-                      <div style={{
-                        background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
-                        display: 'flex', flexDirection: 'column', gap: 16,
-                      }}>
-                        <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>이번 주 vs 지난 주</p>
-                        <div>
-                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 최다 감정</p>
-                          <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
-                            {thisWeekTop
-                              ? <>{thisWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{thisWeekTop[1]}회</span></>
-                              : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
-                          </p>
-                        </div>
-                        <div style={{ height: 1, background: t.border }} />
-                        <div>
-                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>지난 주 최다 감정</p>
-                          <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
-                            {lastWeekTop
-                              ? <>{lastWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{lastWeekTop[1]}회</span></>
-                              : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
-                          </p>
-                        </div>
-                        <div style={{ height: 1, background: t.border }} />
-                        <div>
-                          <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>대화 횟수</p>
-                          <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
-                          <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
-                        </div>
+                    <div style={{
+                      background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
+                      display: 'flex', flexDirection: 'column', gap: 16,
+                    }}>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>이번 주 vs 지난 주</p>
+                      <div>
+                        <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 최다 감정</p>
+                        <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
+                          {thisWeekTop
+                            ? <>{thisWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{thisWeekTop[1]}회</span></>
+                            : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
+                        </p>
                       </div>
-                    )}
+                      <div style={{ height: 1, background: t.border }} />
+                      <div>
+                        <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>지난 주 최다 감정</p>
+                        <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
+                          {lastWeekTop
+                            ? <>{lastWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{lastWeekTop[1]}회</span></>
+                            : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
+                        </p>
+                      </div>
+                      <div style={{ height: 1, background: t.border }} />
+                      <div>
+                        <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>대화 횟수</p>
+                        <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
+                        <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
+                      </div>
+                    </div>
                   </div>
                 )
               })()}
@@ -1994,7 +1953,7 @@ export default function FormClient() {
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               ),
-              onClick: () => { 
+              onClick: () => {
                 scrollInstant.current = true
                 setView('chat')
                 setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as ScrollBehavior }), 0)
