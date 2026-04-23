@@ -2033,7 +2033,7 @@ export default function FormClient() {
         .icon-btn:hover { background: ${isDark ? '#2a2a2a' : '#e4e4e4'}; }
         .icon-btn:active { transform: translateY(1px); opacity: 0.8; transition: transform 0.1s, opacity 0.1s; }
         .list-btn {
-          width: 100%; display: flex; align-items: center;
+          width: 100%; display: flex; align-items: center; gap: 10px;
           background: transparent; border: none; cursor: pointer;
           font-family: inherit; text-align: left; transition: background 0.15s;
         }
