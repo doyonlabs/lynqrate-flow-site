@@ -675,6 +675,9 @@ export default function FormClient() {
       display: 'flex',
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
+      height: isMobile && keyboardVisible && window.visualViewport 
+        ? `${window.visualViewport.height}px` 
+        : undefined,
       overscrollBehavior: 'none',
       background: t.bg, color: t.text,
       fontFamily: "'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -1078,12 +1081,7 @@ export default function FormClient() {
         {/* ── 채팅 뷰 ── */}
         {view === 'chat' && (
           <>
-            <div style={{ 
-              flex: 1, overflowY: 'auto', overscrollBehavior: 'none', 
-              padding: isMobile ? '24px 0 80px' : '24px 0', 
-              background: t.bg, minHeight: 0,
-              height: isMobile && keyboardVisible ? `${window.visualViewport?.height}px` : undefined
-            }}>
+            <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', padding: isMobile ? '24px 0 80px' : '24px 0', background: t.bg, minHeight: 0 }}>
               {/* [FIX] 모바일 패딩 줄임 */}
               <div style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px', minHeight: '100%' }}>
 
