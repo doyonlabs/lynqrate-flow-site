@@ -673,6 +673,12 @@ export default function FormClient() {
       transition: 'background 0.3s, color 0.3s',
       overflow: 'hidden',
     }}>
+      
+      {isMobile && (
+        <div style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, background: 'red', color: '#fff', fontSize: 12, padding: 4 }}>
+          vh: {Math.round(window.visualViewport?.height ?? 0)} / ih: {window.innerHeight}
+        </div>
+      )}
 
       {/* 토스트 */}
       {toast && (
