@@ -1078,9 +1078,14 @@ export default function FormClient() {
         {/* ── 채팅 뷰 ── */}
         {view === 'chat' && (
           <>
-            <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'none', padding: isMobile ? '24px 0 80px' : '24px 0', background: t.bg, minHeight: 0 }}>
+            <div style={{ 
+              flex: 1, overflowY: 'auto', overscrollBehavior: 'none', 
+              padding: isMobile ? '24px 0 80px' : '24px 0', 
+              background: t.bg, minHeight: 0,
+              height: isMobile && keyboardVisible ? `${window.visualViewport?.height}px` : undefined
+            }}>
               {/* [FIX] 모바일 패딩 줄임 */}
-              <div style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px', minHeight: isMobile ? 'calc(100% + 300px)' : '100%' }}>
+              <div style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px', minHeight: '100%' }}>
 
                 {messages.map((msg, i) => (
                   <div key={i} style={{ marginBottom: 20 }}>
