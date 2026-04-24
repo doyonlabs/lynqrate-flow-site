@@ -348,6 +348,14 @@ export default function FormClient() {
     }
   }, [isMobile])
 
+  useEffect(() => {
+    if (keyboardVisible) {
+      setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    }
+  }, [keyboardVisible])
+
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
   const fetchSessions = async () => {
@@ -1211,13 +1219,6 @@ export default function FormClient() {
                       color: t.text, fontSize: 14, lineHeight: 1.6,
                       resize: 'none', outline: 'none',
                       fontFamily: 'inherit', overflowY: 'hidden', minHeight: 24,
-                    }}
-                    onFocus={() => {
-                      if (isMobile) {
-                        setTimeout(() => {
-                          bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-                        }, 500)
-                      }
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
