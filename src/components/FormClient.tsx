@@ -351,7 +351,7 @@ export default function FormClient() {
   useEffect(() => {
     if (keyboardVisible) {
       setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+        textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
       }, 100)
     }
   }, [keyboardVisible])
