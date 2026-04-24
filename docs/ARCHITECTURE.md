@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-04-23
+> 마지막 업데이트: 2026-04-24
 
 ---
 
@@ -466,7 +466,8 @@ supabase/
 - [x] visibilitychange stale closure 수정 (useRef 기반으로 변경, 의존성 배열 고정)
 - [x] 세션 로드 시 last_extracted_at 기준 신규 메시지만 카운트 (감정 담기 버튼 노출 조건 정확도 개선)
 - [x] visibilitychange keepalive: true 적용 (fetch 끊김 방지)
-- [ ] 모바일 뷰에서 글 입력시 하단 탭바 가려지게 처리
+- [x] 모바일 키보드 노출 시 탭바 숨김 (visualViewport.height / screen.height 비율 기반 감지)
+- [x] 키보드 노출 시 입력창 scrollIntoView (스크롤 있는 대화에서만 완전 동작, 빈 대화창은 미해결)
 - [ ] 구독 취소 UX 개선 (대시보드 취소 버튼 제거 → 설정 페이지에서만 취소 가능 + 혜택 리마인드 모달, scheduled_cancel 상태 시 대시보드에 철회 버튼 노출 + 즉시 철회)
 - [ ] 회원 탈퇴 UX 개선 (탈퇴 전 혜택 리마인드 + 재고 유도 모달 추가)
 - [ ] 모든 기기 일괄 로그아웃 기능 (설정 탭, signOut scope: global)
