@@ -335,6 +335,7 @@ export default function FormClient() {
     if (!viewport) return
     
     const handler = () => {
+      console.log('viewport.height:', viewport.height, 'innerHeight:', window.innerHeight)
       const isKeyboard = viewport.height < window.innerHeight - 100
       setKeyboardVisible(isKeyboard)
     }
