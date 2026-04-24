@@ -146,6 +146,8 @@ export default function FormClient() {
   const [messagesSinceExtract, setMessagesSinceExtract] = useState(0)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
 
+  const [keyboardVisible, setKeyboardVisible] = useState(false)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -324,6 +326,17 @@ export default function FormClient() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
+  }, [])
+
+  // 모바일 텍스트 입력시 하단 탭바 가리기
+  useEffect(() => {
+    if (!window.visualViewport) return
+    const handler = () => {
+      const isKeyboard = window.visualViewport!.height < window.innerHeight * 0.75
+      setKeyboardVisible(isKeyboard)
+    }
+    window.visualViewport.addEventListener('resize', handler)
+    return () => window.visualViewport!.removeEventListener('resize', handler)
   }, [])
 
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
@@ -1937,7 +1950,7 @@ export default function FormClient() {
       </div>
 
       {/* ── 모바일 하단 탭바 ── */}
-      {isMobile && (
+      {isMobile && !keyboardVisible && (
         <div style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
           height: `calc(56px + env(safe-area-inset-bottom, 0px))`,
