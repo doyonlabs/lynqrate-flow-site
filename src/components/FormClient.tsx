@@ -331,12 +331,20 @@ export default function FormClient() {
   // 모바일 텍스트 입력시 하단 탭바 가리기
   useEffect(() => {
     if (!isMobile) return
+    const viewport = window.visualViewport
+    if (!viewport) return
+    
     const handler = () => {
-      const isKeyboard = window.innerHeight < window.screen.height * 0.75
+      const isKeyboard = viewport.height < window.innerHeight - 100
       setKeyboardVisible(isKeyboard)
     }
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
+    
+    viewport.addEventListener('resize', handler)
+    viewport.addEventListener('scroll', handler)
+    return () => {
+      viewport.removeEventListener('resize', handler)
+      viewport.removeEventListener('scroll', handler)
+    }
   }, [isMobile])
 
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
@@ -1112,7 +1120,7 @@ export default function FormClient() {
             </div>
 
             <div style={{
-              padding: isMobile ? '10px 12px calc(56px + env(safe-area-inset-bottom, 0px))' : '12px 24px 16px',
+              padding: isMobile ? `10px 12px calc(${keyboardVisible ? '0px' : '56px'} + env(safe-area-inset-bottom, 0px))` : '12px 24px 16px',
               background: t.bg, borderTop: `1px solid ${t.border}`, flexShrink: 0,
             }}>
               {(() => {
@@ -1203,8 +1211,14 @@ export default function FormClient() {
                       resize: 'none', outline: 'none',
                       fontFamily: 'inherit', overflowY: 'hidden', minHeight: 24,
                     }}
+                    onFocus={() => {
+                      if (isMobile) {
+                        setTimeout(() => {
+                          bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+                        }, 300)
+                      }
+                    }}
                     onKeyDown={e => {
-                      // [FIX] 모바일 소프트 키보드 Enter 충돌 방지
                       if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
                         e.preventDefault()
                         handleSend()
