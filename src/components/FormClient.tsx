@@ -330,14 +330,14 @@ export default function FormClient() {
 
   // 모바일 텍스트 입력시 하단 탭바 가리기
   useEffect(() => {
-    if (!window.visualViewport) return
+    if (!isMobile) return
     const handler = () => {
-      const isKeyboard = window.visualViewport!.height < window.innerHeight * 0.75
+      const isKeyboard = window.innerHeight < window.screen.height * 0.75
       setKeyboardVisible(isKeyboard)
     }
-    window.visualViewport.addEventListener('resize', handler)
-    return () => window.visualViewport!.removeEventListener('resize', handler)
-  }, [])
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [isMobile])
 
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
 
