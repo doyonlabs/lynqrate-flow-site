@@ -1131,13 +1131,6 @@ export default function FormClient() {
             <div style={{
               padding: isMobile ? `10px 12px calc(${keyboardVisible ? '0px' : '56px'} + env(safe-area-inset-bottom, 0px))` : '12px 24px 16px',
               background: t.bg, borderTop: `1px solid ${t.border}`, flexShrink: 0,
-              ...(isMobile ? {
-                position: 'fixed' as const,
-                left: 0, right: 0,
-                bottom: keyboardVisible && window.visualViewport
-                  ? `${window.innerHeight - window.visualViewport.height}px`
-                  : 0,
-              } : {}),
             }}>
               {(() => {
                 const RatingDots = ({ value, color }: { value: number; color: string }) => (
