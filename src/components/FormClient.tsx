@@ -1216,7 +1216,7 @@ export default function FormClient() {
                       if (isMobile) {
                         setTimeout(() => {
                           bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-                        }, 300)
+                        }, 500)
                       }
                     }}
                     onKeyDown={e => {
