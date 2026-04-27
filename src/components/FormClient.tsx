@@ -146,6 +146,7 @@ export default function FormClient() {
   const [messagesSinceExtract, setMessagesSinceExtract] = useState(0)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
 
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
 
   const settingsRef = useRef<HTMLDivElement>(null)
@@ -811,6 +812,68 @@ export default function FormClient() {
         </div>
       )}
 
+      {cancelConfirmOpen && (
+        <div
+          onClick={() => setCancelConfirmOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: t.popup, border: `1px solid ${t.border}`,
+              borderRadius: 20, padding: '28px 28px 24px',
+              width: '100%', maxWidth: 360,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 12 }}>✦</div>
+              <p style={{ fontSize: 16, fontWeight: 700, color: t.text, marginBottom: 8 }}>
+                구독을 취소할까요?
+              </p>
+              <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.7 }}>
+                취소해도 만료일까지는 Pro를 이용할 수 있어요.<br />
+                쌓인 감정 데이터와 패턴 분석도 그대로예요.<br />
+                만료 후엔 월 10회 제한으로 돌아가요.
+              </p>
+            </div>
+            <button className="btn-action"
+              onClick={() => setCancelConfirmOpen(false)}
+              style={{
+                width: '100%', padding: '14px', borderRadius: 14,
+                background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              계속 이용할게요
+            </button>
+            <button className="btn-action"
+              onClick={async () => {
+                setCancelConfirmOpen(false)
+                const res = await fetch('/api/subscription/cancel', { method: 'POST' })
+                if (res.ok) {
+                  await fetchSubscription()
+                  setToast('구독 취소가 예약됐어요. 만료일까지 이용 가능해요.')
+                  setTimeout(() => setToast(null), 4000)
+                }
+              }}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 14,
+                background: 'transparent', border: `1px solid ${t.border}`,
+                color: t.muted, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              취소할게요
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── 사이드바 (열림) ── */}
       {sidebarOpen && !isMobile && (
         <div onClick={e => e.stopPropagation()} style={{
@@ -1334,14 +1397,7 @@ export default function FormClient() {
                     <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>만료 후 다시 구독할 수 있어요</div>
                   </div>
                 ) : (
-                  <button className="btn-action" onClick={async () => {
-                    const res = await fetch('/api/subscription/cancel', { method: 'POST' })
-                    if (res.ok) {
-                      await fetchSubscription()
-                      setToast('구독 취소가 예약됐어요. 만료일까지 이용 가능해요.')
-                      setTimeout(() => setToast(null), 4000)
-                    }
-                  }} style={{
+                  <button className="btn-action" onClick={() => setCancelConfirmOpen(true)} style={{
                     padding: '8px 16px', borderRadius: 20,
                     background: 'transparent', border: '1px solid #a78bfa44',
                     color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
@@ -1638,22 +1694,12 @@ export default function FormClient() {
                       }}>
                         <div>
                           <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>✦ Pro 구독 중</p>
-                          <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>무제한 감정 기록</p>
+                          <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>무제한 감정 기록 · 구독 관리는 설정에서</p>
                         </div>
-                        <button className="btn-action" onClick={async () => {
-                          const res = await fetch('/api/subscription/cancel', { method: 'POST' })
-                          if (res.ok) {
-                            await fetchSubscription()
-                            setToast('구독 취소가 예약됐어요. 만료일까지 이용 가능해요.')
-                            setTimeout(() => setToast(null), 4000)
-                          }
-                        }} style={{
-                          padding: '8px 16px', borderRadius: 20,
-                          background: 'transparent', border: '1px solid #a78bfa44',
-                          color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
-                        }}>
-                          구독 취소
-                        </button>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <p style={{ fontSize: 28, fontWeight: 700, color: '#a78bfa' }}>{monthlyCount}</p>
+                          <p style={{ fontSize: 11, color: t.muted }}>이번 달 기록</p>
+                        </div>
                       </div>
                     )}
 
@@ -1951,7 +1997,7 @@ export default function FormClient() {
                       </div>
                       <div style={{ height: 1, background: t.border }} />
                       <div>
-                        <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>대화 횟수</p>
+                        <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 기록 횟수</p>
                         <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
                         <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
                       </div>
