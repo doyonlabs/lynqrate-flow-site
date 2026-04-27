@@ -30,6 +30,7 @@ interface SubscriptionInfo {
   plan: 'free' | 'pro'
   status: string
   expires_at: string | null
+  creem_customer_id: string | null
 }
 
 interface EmotionEntry {
@@ -95,6 +96,12 @@ const Icons = {
       <polygon points="22 2 15 22 11 13 2 9 22 2" />
     </svg>
   ),
+  card: (color: string) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
+  ),
 }
 
 // ─── 컴포넌트 ────────────────────────────────────────────────────────────────
@@ -139,7 +146,12 @@ export default function FormClient() {
   const [firstSessionExtracted, setFirstSessionExtracted] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const [subscription, setSubscription] = useState<SubscriptionInfo>({ plan: 'free', status: 'active', expires_at: null })
+  const [subscription, setSubscription] = useState<SubscriptionInfo>({ 
+    plan: 'free', 
+    status: 'active', 
+    expires_at: null,
+    creem_customer_id: null,
+  })
   const [limitModalOpen, setLimitModalOpen] = useState(false)
   const [monthlyCount, setMonthlyCount] = useState(0)
   const [standardEmotions, setStandardEmotions] = useState<string[]>([])
@@ -221,7 +233,7 @@ export default function FormClient() {
       if (userData) setUserInfo(userData)
 
       const { data: subData } = await supabase
-        .from('subscriptions').select('plan, status, expires_at').eq('user_id', user.id).single()
+        .from('subscriptions').select('plan, status, expires_at, creem_customer_id').eq('user_id', user.id).single()
       if (subData) setSubscription(subData)
 
       const now = new Date()
@@ -378,7 +390,7 @@ export default function FormClient() {
 
   const fetchSubscription = async () => {
     const { data } = await supabase
-      .from('subscriptions').select('plan, status, expires_at')
+      .from('subscriptions').select('plan, status, expires_at, creem_customer_id')
       .single()
     if (data) {
       const isExpired = (data.status === 'canceled' || data.status === 'scheduled_cancel')
@@ -386,7 +398,7 @@ export default function FormClient() {
         && new Date(data.expires_at) < new Date()
 
       if (isExpired) {
-        setSubscription({ plan: 'free', status: 'active', expires_at: null })
+        setSubscription({ plan: 'free', status: 'active', expires_at: null, creem_customer_id: null })
       } else {
         setSubscription(data)
       }
@@ -947,16 +959,7 @@ export default function FormClient() {
                 boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.12)',
                 zIndex: 100,
               }}>
-                <button className="list-btn" onClick={() => { setSettingsOpen(false); setView('settings'); closeSidebarOnMobile() }} style={{
-                  width: '100%', padding: '11px 14px',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  border: 'none',
-                  color: t.text, fontSize: 13, cursor: 'pointer',
-                  fontFamily: 'inherit', textAlign: 'left',
-                }}>
-                  {Icons.settings(t.muted)} <span>설정</span>
-                </button>
-                <div style={{ height: 1, background: t.border }} />
+                {/* 1. 구독 상태 */}
                 {subscription.plan === 'free' ? (
                   <button className="list-btn" onClick={async () => {
                     setSettingsOpen(false)
@@ -981,20 +984,42 @@ export default function FormClient() {
                     ✦ Pro · {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료 예정
                   </div>
                 ) : (
-                  <button className="list-btn" onClick={() => {
-                    setSettingsOpen(false)
-                    setView('settings')
-                    closeSidebarOnMobile()
-                  }} style={{
-                    width: '100%', padding: '11px 14px',
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    border: 'none',
-                    color: t.text, fontSize: 13, cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'left',
-                  }}>
-                    ✦ Pro · 구독 관리
-                  </button>
+                  <div style={{ padding: '11px 14px', fontSize: 13, color: '#a78bfa' }}>
+                    ✦ Pro
+                  </div>
                 )}
+                {/* 2. 설정 */}
+                <div style={{ height: 1, background: t.border }} />
+                <button className="list-btn" onClick={() => { setSettingsOpen(false); setView('settings'); closeSidebarOnMobile() }} style={{
+                  width: '100%', padding: '11px 14px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  border: 'none',
+                  color: t.text, fontSize: 13, cursor: 'pointer',
+                  fontFamily: 'inherit', textAlign: 'left',
+                }}>
+                  {Icons.settings(t.muted)} <span>설정</span>
+                </button>
+                {/* 3. 결제 수단 변경 */}
+                {subscription.creem_customer_id && (
+                  <>
+                    <div style={{ height: 1, background: t.border }} />
+                    <button className="list-btn" onClick={async () => {
+                      setSettingsOpen(false)
+                      const res = await fetch('/api/portal', { method: 'POST' })
+                      const data = await res.json()
+                      if (data.portal_url) window.open(data.portal_url, '_blank')
+                    }} style={{
+                      width: '100%', padding: '11px 14px',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      border: 'none',
+                      color: t.text, fontSize: 13, cursor: 'pointer',
+                      fontFamily: 'inherit', textAlign: 'left',
+                    }}>
+                      {Icons.card(t.muted)} <span>결제 수단 변경</span>
+                    </button>
+                  </>
+                )}
+                {/* 4. 로그아웃 */}
                 <div style={{ height: 1, background: t.border }} />
                 <button className="list-btn" onClick={handleLogout} style={{
                   width: '100%', padding: '11px 14px',
@@ -1407,6 +1432,29 @@ export default function FormClient() {
                   </button>
                 )}
               </div>
+
+              {subscription.creem_customer_id && (
+                <>
+                  <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12, marginTop: 32 }}>결제</p>
+                  <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
+                    <button className="list-btn" onClick={async () => {
+                      const res = await fetch('/api/portal', { method: 'POST' })
+                      const data = await res.json()
+                      if (data.portal_url) window.open(data.portal_url, '_blank')
+                    }} style={{
+                      width: '100%', padding: '14px 16px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      border: 'none',
+                      color: t.text, fontSize: 14, cursor: 'pointer',
+                      fontFamily: 'inherit', textAlign: 'left',
+                    }}>
+                      <span>결제 수단 변경</span>
+                      <span style={{ color: t.muted, fontSize: 12 }}>→</span>
+                    </button>
+                  </div>
+                </>
+              )}
+
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>계정</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
