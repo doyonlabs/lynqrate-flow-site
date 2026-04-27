@@ -1137,29 +1137,27 @@ export default function FormClient() {
               </button>
             )}
           </div>
-          {isMobile && view === 'chat' && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              {hasNewMessage && sessionId && messagesSinceExtract >= 5 && (
-                <button className="btn-action" onClick={handleExtract} style={{
-                  padding: '6px 12px', borderRadius: 8,
-                  background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-                  border: 'none', color: '#fff', fontSize: 13,
-                  cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
-                }}>
-                  감정 담기
-                </button>
-              )}
-              <button className="btn-action" onClick={handleNewChat} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', borderRadius: 8,
-                background: 'transparent', border: `1px solid ${t.border}`,
-                color: t.text, fontSize: 13, cursor: 'pointer',
-                fontFamily: 'inherit', flexShrink: 0,
-              }}>
-                {Icons.plus(t.text)}
-                <span>새 대화</span>
-              </button>
-            </div>
+          {isMobile && view === 'chat' && hasNewMessage && sessionId && messagesSinceExtract >= 5 && (
+            <button className="btn-action" onClick={handleExtract} style={{
+              padding: '6px 12px', borderRadius: 8,
+              background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+              border: 'none', color: '#fff', fontSize: 13,
+              cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+            }}>
+              감정 담기
+            </button>
+          )}
+          {isMobile && (view === 'chat' || view === 'records') && (
+            <button className="btn-action" onClick={handleNewChat} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8,
+              background: 'transparent', border: `1px solid ${t.border}`,
+              color: t.text, fontSize: 13, cursor: 'pointer',
+              fontFamily: 'inherit', flexShrink: 0,
+            }}>
+              {Icons.plus(t.text)}
+              <span>새 대화</span>
+            </button>
           )}
         </div>
 
