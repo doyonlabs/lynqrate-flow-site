@@ -161,6 +161,9 @@ export default function FormClient() {
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
 
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [emotionCount, setEmotionCount] = useState(0)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -648,7 +651,14 @@ export default function FormClient() {
 
   // ─── 탈퇴하기 ────────────────────────────────────────────────────────────
   const handleDeleteAccount = async () => {
-    if (!confirm('정말 탈퇴하시겠어요? 모든 기록이 삭제되며 복구할 수 없어요. Pro 구독 중이라면 즉시 해지됩니다.')) return
+    const { count } = await supabase
+      .from('emotion_entries')
+      .select('*', { count: 'exact', head: true })
+    setEmotionCount(count ?? 0)
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
     const res = await fetch('/api/user/delete', { method: 'DELETE' })
     if (res.ok) {
       await supabase.auth.signOut()
@@ -824,6 +834,7 @@ export default function FormClient() {
         </div>
       )}
 
+      {/* 구독취소 리마인드 모달 */}
       {cancelConfirmOpen && (
         <div
           onClick={() => setCancelConfirmOpen(false)}
@@ -881,6 +892,61 @@ export default function FormClient() {
               }}
             >
               취소할게요
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 회원탈퇴 리마인드 모달 */}
+      {deleteModalOpen && (
+        <div
+          onClick={() => setDeleteModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: t.popup, border: `1px solid ${t.border}`,
+              borderRadius: 20, padding: '28px 28px 24px',
+              width: '100%', maxWidth: 360,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 12 }}>🗑️</div>
+              <p style={{ fontSize: 16, fontWeight: 700, color: t.text, marginBottom: 8 }}>
+                정말 탈퇴할까요?
+              </p>
+              <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.7 }}>
+                지금까지 쌓은 감정 기록 {emotionCount}개가 모두 삭제돼요.<br />
+                패턴 분석 데이터도 복구할 수 없어요.<br />
+                {subscription.plan === 'pro' && 'Pro 구독도 즉시 해지돼요.'}
+              </p>
+            </div>
+            <button className="btn-action"
+              onClick={() => setDeleteModalOpen(false)}
+              style={{
+                width: '100%', padding: '14px', borderRadius: 14,
+                background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              계속 이용할게요
+            </button>
+            <button className="btn-action"
+              onClick={handleDeleteConfirm}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 14,
+                background: 'transparent', border: `1px solid ${t.border}`,
+                color: '#f87171', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              탈퇴할게요
             </button>
           </div>
         </div>
