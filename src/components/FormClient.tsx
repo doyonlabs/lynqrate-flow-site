@@ -164,6 +164,8 @@ export default function FormClient() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [emotionCount, setEmotionCount] = useState(0)
 
+  const [isExtracting, setIsExtracting] = useState(false)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -539,7 +541,8 @@ export default function FormClient() {
 
   // ─── 감정 담기 ────────────────────────────────────────────────────────────
   const handleExtract = useCallback(async () => {
-    if (!hasNewMessage || !sessionId) return
+    if (!hasNewMessage || !sessionId || isExtracting) return
+    setIsExtracting(true)
     const sid = sessionId
     const res = await fetch('/api/chat/extract', {
       method: 'POST',
@@ -554,7 +557,8 @@ export default function FormClient() {
       setToast('감정이 기록됐어요.')
       setTimeout(() => setToast(null), 3000)
     }
-  }, [hasNewMessage, sessionId])
+    setIsExtracting(false)
+  }, [hasNewMessage, sessionId, isExtracting])
 
   // ─── 새 대화 ────────────────────────────────────────────────────────────
 
@@ -1181,25 +1185,25 @@ export default function FormClient() {
             </span>
             {!isMobile && view === 'chat' && hasNewMessage && sessionId &&
               messagesSinceExtract >= 5 && (
-              <button className="btn-action" onClick={handleExtract} style={{
+              <button className="btn-action" onClick={handleExtract} disabled={isExtracting} style={{
                 padding: '5px 14px', borderRadius: 8,
                 background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
                 border: 'none', color: '#fff', fontSize: 13,
                 cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
                 position: 'relative', zIndex: 1,
               }}>
-                감정 담기
+                {isExtracting ? '기록 중...' : '감정 담기'}
               </button>
             )}
           </div>
           {isMobile && view === 'chat' && hasNewMessage && sessionId && messagesSinceExtract >= 5 && (
-            <button className="btn-action" onClick={handleExtract} style={{
+            <button className="btn-action" onClick={handleExtract} disabled={isExtracting} style={{
               padding: '6px 12px', borderRadius: 8,
               background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
               border: 'none', color: '#fff', fontSize: 13,
               cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
             }}>
-              감정 담기
+              {isExtracting ? '기록 중...' : '감정 담기'}
             </button>
           )}
           {isMobile && (view === 'chat' || view === 'records') && (
