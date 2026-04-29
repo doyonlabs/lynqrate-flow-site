@@ -248,14 +248,27 @@ export default function FormClient() {
         .gte('created_at', `${yearMonth}-01`)
       if (count !== null) setMonthlyCount(count)
 
-      await fetchSessions()
-
       const { count: entryCount } = await supabase
         .from('emotion_entries')
         .select('*', { count: 'exact', head: true })
       if (!entryCount || entryCount === 0) setIsFirstSession(true)
 
-      await fetchTodayEntries()
+      // fetchSessions + fetchTodayEntries + fetchDashboardData 한번에
+      const initRes = await fetch('/api/init')
+      const initData = await initRes.json()
+      if (initData.sessions) setSessions(initData.sessions)
+      if (initData.todayEntries) setTodayEntries(initData.todayEntries)
+      if (initData.lastEntry) setLastEntry(initData.lastEntry)
+      if (initData.emotions) {
+        const map: Record<string, string> = {}
+        initData.emotions.forEach((e: { name: string; color_code: string }) => {
+          map[e.name] = e.color_code
+        })
+        setEmotionColors(map)
+        setStandardEmotions(initData.emotions.map((e: { name: string }) => e.name))
+      }
+      if (initData.dashboardEntries) setDashboardData(initData.dashboardEntries)
+      setDashboardLoading(false)
 
       const { data: nullSessions } = await supabase
         .from('chat_sessions')
