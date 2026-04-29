@@ -955,7 +955,7 @@ export default function FormClient() {
                 fontSize: 13, color: '#fff', flexShrink: 0, fontWeight: 600,
               }}>{initial}</div>
               <div style={{ flex: 1, textAlign: 'left', overflow: 'hidden' }}>
-                <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} data-clarity-mask="True">
                   {userInfo.display_name ?? '사용자'}
                 </div>
                 <div style={{ fontSize: 11, color: subscription.plan === 'pro' ? '#a78bfa' : t.muted }}>
@@ -1356,8 +1356,8 @@ export default function FormClient() {
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>{userInfo.display_name ?? '사용자'}</div>
-                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{userInfo.email ?? ''}</div>
+                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }} data-clarity-mask="True">{userInfo.display_name ?? '사용자'}</div>
+                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }} data-clarity-mask="True">{userInfo.email ?? ''}</div>
                   </div>
                   <div style={{
                     width: 36, height: 36, borderRadius: '50%',
