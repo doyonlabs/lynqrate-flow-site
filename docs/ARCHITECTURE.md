@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-04-27
+> 마지막 업데이트: 2026-04-29
 
 ---
 
@@ -88,7 +88,13 @@ Google 로그인 클릭
 | `src/app/api/portal/route.ts` | 고객 포털 링크 생성 |
 | `src/app/api/subscription/cancel/route.ts` | 구독 취소 예약 (scheduled_cancel) |
 | `src/app/api/subscription/resume/route.ts` | 구독 취소 철회 |
+| `src/app/api/chat/messages/route.ts` | 과거 세션 메시지 조회 + 복호화 |
+| `src/app/api/sessions/route.ts` | 세션 목록 조회 + 타이틀 복호화 |
+| `src/app/api/dashboard/route.ts` | 대시보드 데이터 조회 + 복호화 |
+| `src/app/api/today/route.ts` | 오늘 감정 데이터 조회 + 복호화 |
+| `src/app/api/init/route.ts` | 초기 로드 데이터 통합 조회 (sessions + today + dashboard 한번에) |
 | `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login, / 접근 시 /form 리다이렉트 |
+| `src/lib/crypto.ts` | AES-256-GCM 암호화/복호화 유틸 (encrypt, safeDecrypt) |
 
 ---
 
@@ -297,6 +303,7 @@ supabase/
 | `CREEM_PRODUCT_ID` | Creem 상품 ID | 서버만 |
 | `NEXT_PUBLIC_APP_URL` | 앱 베이스 URL (결제 완료 후 리다이렉트용) | 브라우저 + 서버 |
 | `CREEM_WEBHOOK_SECRET` | Creem 웹훅 서명 검증 키 | 서버만 |
+| `ENCRYPTION_KEY` | AES-256-GCM 암호화 키 (32바이트 hex) | 서버만 |
 
 ---
 
@@ -471,6 +478,14 @@ supabase/
 - [x] 구독 취소 UX 개선 (대시보드 취소 버튼 제거 → 설정 페이지에서만 취소 가능 + 혜택 리마인드 모달)
 - [x] 대시보드 Pro 카드 이번 달 기록 수 표시
 - [x] 이번 주 기록 횟수 라벨 수정
+- [x] 웹훅 subscription.canceled else 브랜치 수정 (즉시취소/결제실패 → 바로 free 초기화)
+- [x] 웹훅 subscription.expired 핸들러 → 로깅으로 교체 (재시도 중일 수 있어 free 초기화 금지)
+- [x] Microsoft Clarity 민감 정보 마스킹 (채팅 메시지, 이메일, 이름, 세션 제목, 히트맵 모달, 최근 기록)
+- [x] AES-256-GCM 암호화 적용 (chat_messages.content, emotion_entries.trigger_text/summary, chat_sessions.title)
+- [x] 데이터 조회 API Route 서버 이동 (클라이언트 직접 조회 → 서버 복호화 후 반환)
+- [x] 초기 로드 API 통합 (/api/init — sessions + today + dashboard 한번에 조회)
+- [x] 채팅 프롬프트 개선 (사용자 흐름 중심, 감정 억지 유도 제거)
+- [x] 감정 추출 프롬프트 개선 (사용자 발화 기준 추출, AI 발화 맥락용으로만 참고)
 - [ ] 회원 탈퇴 UX 개선 (탈퇴 전 혜택 리마인드 + 재고 유도 모달 추가)
 - [ ] 모든 기기 일괄 로그아웃 기능 (설정 탭, signOut scope: global)
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 완전 적용 예정)
