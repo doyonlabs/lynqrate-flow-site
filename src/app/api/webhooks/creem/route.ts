@@ -131,13 +131,14 @@ export async function POST(req: NextRequest) {
         })
         .eq('user_id', userId)
     } else {
-      // 즉시 취소 → canceled 상태로 만료일까지 유지
+      // 즉시 취소 또는 결제 실패 → 바로 free 초기화
       await supabaseAdmin
         .from('subscriptions')
         .update({
-          status: 'canceled',
-          canceled_at: object?.canceled_at ?? new Date().toISOString(),
-          expires_at: expiresAt ?? null,
+          plan: 'free',
+          status: 'active',
+          expires_at: null,
+          canceled_at: null,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', userId)
@@ -158,18 +159,9 @@ export async function POST(req: NextRequest) {
       .eq('user_id', userId)
   }
 
-  // 기간 만료 — 완전히 free로 초기화
+  // 구독 만료 — 재시도 중일 수 있으므로 무시, 최종 처리는 subscription.canceled에서
   if (eventType === 'subscription.expired') {
-    await supabaseAdmin
-      .from('subscriptions')
-      .update({
-        plan: 'free',
-        status: 'active',
-        expires_at: null,
-        canceled_at: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId)
+    console.log('subscription.expired received, waiting for canceled', { userId })
   }
 
   return NextResponse.json({ received: true })
