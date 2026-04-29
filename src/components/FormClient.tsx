@@ -1173,7 +1173,7 @@ export default function FormClient() {
               fontSize: 14, color: t.text,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               flex: 1, minWidth: 0
-            }}>
+            }} data-clarity-mask="True">
               {view === 'settings' ? '설정'
                 : view === 'dashboard' ? '대시보드'
                 : view === 'records' ? '기록'
@@ -1306,6 +1306,7 @@ export default function FormClient() {
                   <button
                     onClick={() => setView('dashboard')}
                     className="btn-action"
+                    data-clarity-mask="True"
                     style={{
                       maxWidth: 680, margin: '0 auto 6px',
                       padding: '8px 14px', borderRadius: 10,
@@ -1702,7 +1703,7 @@ export default function FormClient() {
                     }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>감정 인사이트</p>
-                        <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }}>{insightText}</p>
+                        <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }} data-clarity-mask="True">{insightText}</p>
                       </div>
                       <button className="btn-action" onClick={() => { setView('chat'); handleNewChat() }} style={{
                         flexShrink: 0, padding: '11px 22px', borderRadius: 20,
