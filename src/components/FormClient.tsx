@@ -1008,7 +1008,7 @@ export default function FormClient() {
                   const isActive = activeSessionId === s.id
                   return (
                     <li key={s.id} className={`session-item${isActive ? ' session-item--active' : ''}`} onClick={() => handleLoadSession(s)}>
-                      <span>{label}</span>
+                      <span data-clarity-mask="True">{label}</span>
                     </li>
                   )
                 })
@@ -1109,7 +1109,7 @@ export default function FormClient() {
                 fontSize: 13, color: '#fff', flexShrink: 0, fontWeight: 600,
               }}>{initial}</div>
               <div style={{ flex: 1, textAlign: 'left', overflow: 'hidden' }}>
-                <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: 13, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} data-clarity-mask="True">
                   {userInfo.display_name ?? '사용자'}
                 </div>
                 <div style={{ fontSize: 11, color: subscription.plan === 'pro' ? '#a78bfa' : t.muted }}>
@@ -1245,7 +1245,7 @@ export default function FormClient() {
                           padding: '12px 16px', fontSize: 14, lineHeight: 1.7, color: t.text,
                           maxWidth: '80%', whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word', overflowWrap: 'break-word',
-                        }}>
+                        }} data-clarity-mask="True">
                           {msg.content}
                         </div>
                       </div>
@@ -1257,7 +1257,7 @@ export default function FormClient() {
                           padding: '12px 16px', fontSize: 14, lineHeight: 1.7, color: '#fff',
                           maxWidth: '80%', whiteSpace: 'pre-wrap',
                           wordBreak: 'break-word', overflowWrap: 'break-word',
-                        }}>
+                        }} data-clarity-mask="True">
                           {msg.content}
                         </div>
                       </div>
@@ -1366,6 +1366,7 @@ export default function FormClient() {
                     placeholder="지금 어떤 마음인지 말해보세요..."
                     rows={1}
                     disabled={isLoading}
+                    data-clarity-mask="True"
                     style={{
                       flex: 1, background: 'transparent', border: 'none',
                       color: t.text, fontSize: 14, lineHeight: 1.6,
@@ -1523,8 +1524,8 @@ export default function FormClient() {
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>{userInfo.display_name ?? '사용자'}</div>
-                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>{userInfo.email ?? ''}</div>
+                    <div style={{ fontSize: 14, color: t.text, fontWeight: 500 }} data-clarity-mask="True">{userInfo.display_name ?? '사용자'}</div>
+                    <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }} data-clarity-mask="True">{userInfo.email ?? ''}</div>
                   </div>
                   <div style={{
                     width: 36, height: 36, borderRadius: '50%',
@@ -1595,7 +1596,7 @@ export default function FormClient() {
                       cursor: 'pointer',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                        <span style={{ fontSize: 14, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                        <span style={{ fontSize: 14, color: t.text, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }} data-clarity-mask="True">
                           {label}
                         </span>
                       </div>
@@ -1976,7 +1977,7 @@ export default function FormClient() {
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
                                     {allEntries.map(e => (
-                                      <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }}>
+                                      <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }} data-clarity-mask="True">
                                         <span style={{ fontSize: 12, color: '#a78bfa' }}>강도 {e.intensity}</span>
                                         {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, opacity: 0.7 }}>{e.trigger_text}</p>}
                                         {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{e.summary}</p>}
@@ -2019,7 +2020,7 @@ export default function FormClient() {
                                 : `${Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24))}일 전`
                               const color = emotionColors[e.raw_emotion] ?? '#a78bfa'
                               return (
-                                <div key={e.id} style={{ padding: '14px 16px', borderRadius: 12, background: t.bg, border: `1px solid ${t.border}` }}>
+                                <div key={e.id} style={{ padding: '14px 16px', borderRadius: 12, background: t.bg, border: `1px solid ${t.border}` }} data-clarity-mask="True">
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                     <span style={{ fontSize: 12, fontWeight: 600, color }}>{e.raw_emotion}</span>
                                     <span style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
