@@ -374,7 +374,7 @@ export default function Landing() {
           <div className="section-label">왜 Mind Echo인가</div>
           <h2 className="section-title">말하는 것 이상이 일어나요</h2>
           <p className="section-sub">털어놓은 감정이 사라지지 않고 데이터가 돼요. 쌓이다 보면 내가 보여요.</p>
-          <div className="feature-grid">
+          <div className="feature-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
             <div className="feature-card">
               <div className="feature-icon">💬</div>
               <div className="feature-title">판단 없이 들어요</div>
@@ -389,6 +389,11 @@ export default function Landing() {
               <div className="feature-icon">✦</div>
               <div className="feature-title">내가 보여요</div>
               <div className="feature-desc">어떤 날 힘든지, 어떤 상황에서 무너지는지 — 데이터가 쌓이면 패턴이 보여요.</div>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">🔒</div>
+              <div className="feature-title">안전하게 보관돼요</div>
+              <div className="feature-desc">대화 내용은 암호화되어 저장돼요. 탈퇴하면 모든 기록이 즉시 삭제돼요.</div>
             </div>
           </div>
         </section>

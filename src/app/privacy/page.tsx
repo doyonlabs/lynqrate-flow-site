@@ -18,7 +18,7 @@ export default function Privacy() {
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <a href="/" style={{ fontSize: 13, color: t.accent, textDecoration: 'none', display: 'block', marginBottom: 40 }}>← Mind Echo로 돌아가기</a>
         <h1 style={{ fontSize: 28, fontWeight: 700, color: t.text, marginBottom: 8 }}>개인정보처리방침</h1>
-        <p style={{ fontSize: 13, color: t.muted, marginBottom: 48 }}>최종 업데이트: 2026년 3월 30일</p>
+        <p style={{ fontSize: 13, color: t.muted, marginBottom: 48 }}>최종 업데이트: 2026년 4월 29일</p>
 
         {[
           {
@@ -31,18 +31,26 @@ export default function Privacy() {
           },
           {
             title: '3. 개인정보 보관 및 처리',
-            content: '수집된 데이터는 Supabase (미국 서버)에 저장됩니다. 회원 탈퇴 시 모든 데이터는 즉시 삭제됩니다. 대화 내용 및 감정 데이터는 본인 외에 열람할 수 없습니다.'
+            content: '수집된 데이터는 Supabase(미국 서버)에 저장됩니다.\n대화 내용, 감정 기록, 세션 제목은 AES-256 암호화되어 저장됩니다.\n회원 탈퇴 시 모든 데이터는 즉시 삭제됩니다.'
           },
           {
             title: '4. 제3자 제공',
-            content: '수집한 개인정보는 원칙적으로 제3자에게 제공하지 않습니다. 단, 결제 처리를 위해 Creem에 필요한 최소한의 정보가 전달됩니다.'
+            content: '수집한 개인정보는 원칙적으로 제3자에게 제공하지 않습니다.\n단, 결제 처리를 위해 Creem에 필요한 최소한의 정보가 전달됩니다.'
           },
           {
             title: '5. 이용자의 권리',
             content: '이용자는 언제든지 다음 권리를 행사할 수 있습니다.\n\n• 개인정보 열람 요청\n• 개인정보 삭제 요청 (서비스 내 회원 탈퇴 기능)\n• 개인정보 처리 정지 요청\n\n문의: hello@lynqrateflow.com'
           },
           {
-            title: '6. 문의',
+            title: '6. AI 및 외부 서비스',
+            content: '대화 내용은 감정 분석을 위해 OpenAI API로 전송됩니다. OpenAI는 API를 통해 전달된 데이터를 모델 학습에 사용하지 않습니다.\n\n행동 분석 도구로 Microsoft Clarity를 사용합니다. 대화 내용 등 민감 정보는 Clarity에 전달되지 않도록 마스킹 처리되어 있습니다.'
+          },
+          {
+            title: '7. 데이터 국외 이전',
+            content: '서비스 이용 시 데이터가 미국 서버로 이전될 수 있습니다.\n이용 서비스: Supabase, OpenAI, Microsoft Clarity, Creem, Vercel'
+          },
+          {
+            title: '8. 문의',
             content: '개인정보 처리에 관한 문의는 아래로 연락 주세요.\n\n이메일: hello@lynqrateflow.com\n운영자: 김도영'
           },
         ].map(({ title, content }) => (
