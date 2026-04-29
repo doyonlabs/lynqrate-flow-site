@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabaseServer'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { encrypt, safeDecrypt } from '@/lib/crypto'
 
 const SYSTEM_PROMPT = `당신은 Mind Echo입니다.
 사용자가 오늘 느낀 감정을 편하게 털어놓는 공간입니다.
 
 - 자연스러운 한국말로 짧게 답하세요. 2~3문장이면 충분합니다.
 - 뻔한 위로는 하지 마세요.
-- 감정 이야기를 중심으로 대화를 이어가세요.
+- 사용자가 말하는 흐름을 따라가세요. 감정을 억지로 끌어내려 하지 마세요.
+- 사용자의 발화를 중심으로 반응하세요. AI가 먼저 감정을 단정짓거나 과장하지 마세요.
 - 결론으로 마무리하지 마세요. 사용자가 더 말하고 싶어지는 여운을 남기세요.
 - 질문은 3번 중 1번 이하로만 하세요.
-- 항상 존댓말을 유지하세요.`
+- 항상 존댓말을 유지하세요.
+- 감정과 무관한 주제가 나와도 그 안에서 감정을 자연스럽게 찾아가세요.`
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
@@ -51,17 +54,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 세션 없으면 새로 생성
   let currentSessionId = sessionId
   if (!currentSessionId) {
     const firstUserMessage = messages.find((m: { role: string }) => m.role === 'user')
     const title = firstUserMessage?.content?.slice(0, 30) ?? null
 
     const { data: session, error } = await supabaseAdmin
-        .from('chat_sessions')
-        .insert({ user_id: user.id, title })
-        .select('id')
-        .single()
+      .from('chat_sessions')
+      .insert({ user_id: user.id, title: title ? encrypt(title) : null })
+      .select('id')
+      .single()
 
     if (error || !session) {
       console.error('[/api/chat] session create error:', error)
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest) {
     currentSessionId = session.id
   }
 
-  // 유저 메시지 저장 (마지막 메시지)
+  // 유저 메시지 암호화 저장
   const lastUserMessage = messages[messages.length - 1]
   if (lastUserMessage?.role === 'user') {
     await supabaseAdmin
@@ -79,10 +81,9 @@ export async function POST(req: NextRequest) {
         chat_session_id: currentSessionId,
         user_id: user.id,
         role: 'user',
-        content: lastUserMessage.content,
+        content: encrypt(lastUserMessage.content),
       })
 
-    // 세션 updated_at 갱신
     await supabaseAdmin
       .from('chat_sessions')
       .update({ updated_at: new Date().toISOString() })
@@ -91,47 +92,47 @@ export async function POST(req: NextRequest) {
 
   try {
     const { data: recentEmotions } = await supabaseAdmin
-        .from('emotion_entries')
-        .select('raw_emotion, intensity, trigger_text, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5)
+      .from('emotion_entries')
+      .select('raw_emotion, intensity, trigger_text, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5)
 
     const contextPrompt = recentEmotions?.length
-        ? `\n\n이 사용자의 최근 감정 기록:\n` +
+      ? `\n\n이 사용자의 최근 감정 기록:\n` +
         recentEmotions.map(e =>
-            `- ${e.raw_emotion} (강도 ${e.intensity})${e.trigger_text ? `: ${e.trigger_text}` : ''}`
+          `- ${e.raw_emotion} (강도 ${e.intensity})${e.trigger_text ? `: ${safeDecrypt(e.trigger_text)}` : ''}`
         ).join('\n')
-        : ''
+      : ''
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
+      method: 'POST',
+      headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
+      },
+      body: JSON.stringify({
         model: 'gpt-4.1',
         messages: [
-            { role: 'system', content: SYSTEM_PROMPT + contextPrompt },
-            ...messages.slice(-20),
+          { role: 'system', content: SYSTEM_PROMPT + contextPrompt },
+          ...messages.slice(-20),
         ],
         max_tokens: 500,
         temperature: 0.7,
-        }),
+      }),
     })
 
     const data = await response.json()
     const reply = data.choices?.[0]?.message?.content ?? '답장을 가져오지 못했어요.'
 
-    // AI 답변 저장
+    // AI 답변 암호화 저장
     await supabaseAdmin
       .from('chat_messages')
       .insert({
         chat_session_id: currentSessionId,
         user_id: user.id,
         role: 'assistant',
-        content: reply,
+        content: encrypt(reply),
       })
 
     return NextResponse.json({ reply, sessionId: currentSessionId })

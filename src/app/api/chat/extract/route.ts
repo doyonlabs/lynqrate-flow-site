@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabaseServer'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { encrypt, safeDecrypt } from '@/lib/crypto'
 
 const STANDARD_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움', '설렘', '기쁨', '감사', '평온']
 
@@ -20,9 +21,11 @@ Markdown, 설명, 추가 텍스트 없이 JSON 객체만 반환하세요.
 - emotion은 반드시 위 10개 중 하나. 절대 다른 단어 사용 금지.
 - "공허함"→"무기력", "짜증"→"분노", "걱정"→"불안", "우울"→"슬픔", "무서움"→"두려움" 처럼 가장 가까운 감정으로 매핑.
 - 가장 핵심적인 감정 하나만 선택. 복합 감정이면 더 강한 쪽으로.
-- intensity 판단 기준: 사용자 표현의 강도, 반복성, 상황의 심각도를 종합
-- trigger는 사실 기반으로, 판단이나 평가 없이 간결하게
-- summary는 공감과 따뜻함을 담되 번역체 금지`
+- intensity 판단 기준: 사용자 표현의 강도, 반복성, 상황의 심각도를 종합.
+- trigger는 사실 기반으로, 판단이나 평가 없이 간결하게.
+- summary는 공감과 따뜻함을 담되 번역체 금지.
+- 대화에서 "사용자:"로 시작하는 발화만 기준으로 감정 추출. "AI:"로 시작하는 발화는 맥락 파악용으로만 참고.
+- 사용자가 긍정으로 표현했다면 부정 맥락이 있어도 긍정 감정 우선.`
 
 const MIN_USER_MESSAGES = 5 // 최소 유저 메시지 수
 
@@ -63,7 +66,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'no new messages' }, { status: 400 })
   }
 
-  // 최소 유저 메시지 수 체크 (force=true면 스킵 — 첫 세션 즉시 추출용)
   if (!force) {
     const userMessageCount = newMessages.filter(m => m.role === 'user').length
     if (userMessageCount < MIN_USER_MESSAGES) {
@@ -71,8 +73,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // 복호화 후 GPT에 전달
   const conversationText = newMessages
-    .map(m => `${m.role === 'assistant' ? 'AI' : '사용자'}: ${m.content}`)
+    .map(m => `${m.role === 'assistant' ? 'AI' : '사용자'}: ${safeDecrypt(m.content)}`)
     .join('\n')
 
   try {
@@ -104,7 +107,6 @@ export async function POST(req: NextRequest) {
       extracted = { emotion: null, intensity: 3, trigger: '', summary: '오늘 대화를 나눠줘서 고마워요.' }
     }
 
-    // 표준 감정 검증 — 포함 안 되면 스킵
     if (!STANDARD_EMOTIONS.includes(extracted.emotion)) {
       await supabaseAdmin
         .from('chat_sessions')
@@ -116,7 +118,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ skipped: true })
     }
 
-    // emotion_entries 저장
+    // trigger_text, summary 암호화 저장
     await supabaseAdmin
       .from('emotion_entries')
       .insert({
@@ -124,11 +126,10 @@ export async function POST(req: NextRequest) {
         chat_session_id: sessionId,
         raw_emotion: extracted.emotion,
         intensity: extracted.intensity,
-        trigger_text: extracted.trigger ?? null,
-        summary: extracted.summary ?? null,
+        trigger_text: extracted.trigger ? encrypt(extracted.trigger) : null,
+        summary: extracted.summary ? encrypt(extracted.summary) : null,
       })
 
-    // last_extracted_at + ended_at 업데이트
     await supabaseAdmin
       .from('chat_sessions')
       .update({

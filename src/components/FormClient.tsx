@@ -373,12 +373,10 @@ export default function FormClient() {
   }, [keyboardVisible])
 
   // ─── 데이터 조회 ──────────────────────────────────────────────────────────
-
   const fetchSessions = async () => {
-    const { data } = await supabase
-      .from('chat_sessions').select('id, title, started_at, ended_at')
-      .order('created_at', { ascending: false }).limit(30)
-    if (data) setSessions(data)
+    const res = await fetch('/api/sessions')
+    const data = await res.json()
+    if (data.sessions) setSessions(data.sessions)
   }
 
   const fetchMonthlyCount = async () => {
@@ -409,61 +407,38 @@ export default function FormClient() {
   }
 
   const fetchTodayEntries = async () => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const [{ data: entries }, { data: emotions }, { data: lastData }] = await Promise.all([
-      supabase
-        .from('emotion_entries')
-        .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
-        .gte('created_at', today.toISOString())
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('standard_emotions')
-        .select('name, color_code'),
-      supabase
-        .from('emotion_entries')
-        .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
-        .lt('created_at', today.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1),
-    ])
-    if (entries) setTodayEntries(entries)
-    if (lastData && lastData.length > 0) setLastEntry(lastData[0])
-    if (emotions) {
+    const res = await fetch('/api/today')
+    const data = await res.json()
+    if (data.entries) setTodayEntries(data.entries)
+    if (data.lastEntry) setLastEntry(data.lastEntry)
+    if (data.emotions) {
       const map: Record<string, string> = {}
-      emotions.forEach(e => { map[e.name] = e.color_code })
+      data.emotions.forEach((e: { name: string; color_code: string }) => { map[e.name] = e.color_code })
       setEmotionColors(map)
     }
   }
 
   const fetchDashboardData = async (silent = false) => {
     if (!silent) setDashboardLoading(true)
-    const [{ data: entries }, { data: emotions }] = await Promise.all([
-      supabase.from('emotion_entries')
-        .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
-        .order('created_at', { ascending: true }).limit(50),
-      supabase.from('standard_emotions').select('name, color_code').order('soft_order'),
-    ])
-    if (entries) setDashboardData(entries)
-    if (emotions) {
+    const res = await fetch('/api/dashboard')
+    const data = await res.json()
+    if (data.entries) setDashboardData(data.entries)
+    if (data.emotions) {
       const map: Record<string, string> = {}
-      emotions.forEach(e => { map[e.name] = e.color_code })
+      data.emotions.forEach((e: { name: string; color_code: string }) => { map[e.name] = e.color_code })
       setEmotionColors(map)
-      setStandardEmotions(emotions.map(e => e.name))
+      setStandardEmotions(data.emotions.map((e: { name: string }) => e.name))
     }
-    // 공휴일 fetch
     try {
       const res = await fetch('https://holidays.hyunbin.page/2026.json')
-      const data = await res.json()
+      const holidayData = await res.json()
       const map: Record<string, string> = {}
-      Object.entries(data).forEach(([date, names]) => {
+      Object.entries(holidayData).forEach(([date, names]) => {
         const [, m, d] = date.split('-')
         map[`${parseInt(m)}-${parseInt(d)}`] = (names as string[])[0]
       })
       setHolidays(map)
-    } catch {
-      // 실패해도 하드코딩 fallback 유지
-    }
+    } catch {}
     setDashboardLoading(false)
   }
 
@@ -615,20 +590,20 @@ export default function FormClient() {
       closeSidebarOnMobile()
       return
     }
-    const [{ data }, { data: sessionData }] = await Promise.all([
-      supabase.from('chat_messages').select('role, content, created_at')
-        .eq('chat_session_id', session.id).order('created_at', { ascending: true }),
+    const [messagesRes, { data: sessionData }] = await Promise.all([
+      fetch(`/api/chat/messages?sessionId=${session.id}`).then(r => r.json()),
       supabase.from('chat_sessions').select('last_extracted_at')
         .eq('id', session.id).single(),
     ])
+    const data = messagesRes.messages
     if (!data || data.length === 0) return
     scrollInstant.current = true
-    setMessages(data.map(m => ({ role: m.role === 'assistant' ? 'ai' : 'user' as Role, content: m.content })))
+    setMessages(data.map((m: any) => ({ role: m.role === 'assistant' ? 'ai' : 'user' as Role, content: m.content })))
 
     const lastExtractedAt = sessionData?.last_extracted_at
     const newUserMsgCount = lastExtractedAt
-      ? data.filter(m => m.role === 'user' && new Date(m.created_at) > new Date(lastExtractedAt)).length
-      : data.filter(m => m.role === 'user').length
+      ? data.filter((m: { role: string; created_at: string }) => m.role === 'user' && new Date(m.created_at) > new Date(lastExtractedAt)).length
+      : data.filter((m: { role: string }) => m.role === 'user').length
     setMessagesSinceExtract(newUserMsgCount)
     if (newUserMsgCount > 0) {
       setHasNewMessageWithRef(true)
