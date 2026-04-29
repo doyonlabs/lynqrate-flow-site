@@ -316,12 +316,13 @@ export default function FormClient() {
 
   useEffect(() => {
     if (view === 'dashboard') {
-      fetchDashboardData()
+      fetchDashboardData(true)  // silent=true로 변경
       refreshAll()
     }
     if (view === 'records') fetchSessions()
     if (view === 'settings') fetchSubscription()
   }, [view])
+
   //풀 스크롤 방지
   useEffect(() => {
     document.body.style.overscrollBehavior = 'none'
