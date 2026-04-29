@@ -30,6 +30,7 @@ interface SubscriptionInfo {
   plan: 'free' | 'pro'
   status: string
   expires_at: string | null
+  creem_customer_id: string | null
 }
 
 interface EmotionEntry {
@@ -95,6 +96,12 @@ const Icons = {
       <polygon points="22 2 15 22 11 13 2 9 22 2" />
     </svg>
   ),
+  card: (color: string) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
+  ),
 }
 
 // ─── 컴포넌트 ────────────────────────────────────────────────────────────────
@@ -139,14 +146,23 @@ export default function FormClient() {
   const [firstSessionExtracted, setFirstSessionExtracted] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const [subscription, setSubscription] = useState<SubscriptionInfo>({ plan: 'free', status: 'active', expires_at: null })
+  const [subscription, setSubscription] = useState<SubscriptionInfo>({ 
+    plan: 'free', 
+    status: 'active', 
+    expires_at: null,
+    creem_customer_id: null,
+  })
   const [limitModalOpen, setLimitModalOpen] = useState(false)
   const [monthlyCount, setMonthlyCount] = useState(0)
   const [standardEmotions, setStandardEmotions] = useState<string[]>([])
   const [messagesSinceExtract, setMessagesSinceExtract] = useState(0)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
 
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
   const [keyboardVisible, setKeyboardVisible] = useState(false)
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [emotionCount, setEmotionCount] = useState(0)
 
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -220,7 +236,7 @@ export default function FormClient() {
       if (userData) setUserInfo(userData)
 
       const { data: subData } = await supabase
-        .from('subscriptions').select('plan, status, expires_at').eq('user_id', user.id).single()
+        .from('subscriptions').select('plan, status, expires_at, creem_customer_id').eq('user_id', user.id).single()
       if (subData) setSubscription(subData)
 
       const now = new Date()
@@ -377,7 +393,7 @@ export default function FormClient() {
 
   const fetchSubscription = async () => {
     const { data } = await supabase
-      .from('subscriptions').select('plan, status, expires_at')
+      .from('subscriptions').select('plan, status, expires_at, creem_customer_id')
       .single()
     if (data) {
       const isExpired = (data.status === 'canceled' || data.status === 'scheduled_cancel')
@@ -385,7 +401,7 @@ export default function FormClient() {
         && new Date(data.expires_at) < new Date()
 
       if (isExpired) {
-        setSubscription({ plan: 'free', status: 'active', expires_at: null })
+        setSubscription({ plan: 'free', status: 'active', expires_at: null, creem_customer_id: null })
       } else {
         setSubscription(data)
       }
@@ -635,7 +651,14 @@ export default function FormClient() {
 
   // ─── 탈퇴하기 ────────────────────────────────────────────────────────────
   const handleDeleteAccount = async () => {
-    if (!confirm('정말 탈퇴하시겠어요? 모든 기록이 삭제되며 복구할 수 없어요. Pro 구독 중이라면 즉시 해지됩니다.')) return
+    const { count } = await supabase
+      .from('emotion_entries')
+      .select('*', { count: 'exact', head: true })
+    setEmotionCount(count ?? 0)
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
     const res = await fetch('/api/user/delete', { method: 'DELETE' })
     if (res.ok) {
       await supabase.auth.signOut()
@@ -811,6 +834,124 @@ export default function FormClient() {
         </div>
       )}
 
+      {/* 구독취소 리마인드 모달 */}
+      {cancelConfirmOpen && (
+        <div
+          onClick={() => setCancelConfirmOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: t.popup, border: `1px solid ${t.border}`,
+              borderRadius: 20, padding: '28px 28px 24px',
+              width: '100%', maxWidth: 360,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 12 }}>✦</div>
+              <p style={{ fontSize: 16, fontWeight: 700, color: t.text, marginBottom: 8 }}>
+                구독을 취소할까요?
+              </p>
+              <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.7 }}>
+                취소해도 만료일까지는 Pro를 이용할 수 있어요.<br />
+                쌓인 감정 데이터와 패턴 분석도 그대로예요.<br />
+                만료 후엔 월 10회 제한으로 돌아가요.
+              </p>
+            </div>
+            <button className="btn-action"
+              onClick={() => setCancelConfirmOpen(false)}
+              style={{
+                width: '100%', padding: '14px', borderRadius: 14,
+                background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              계속 이용할게요
+            </button>
+            <button className="btn-action"
+              onClick={async () => {
+                setCancelConfirmOpen(false)
+                const res = await fetch('/api/subscription/cancel', { method: 'POST' })
+                if (res.ok) {
+                  await fetchSubscription()
+                  setToast('구독 취소가 예약됐어요. 만료일까지 이용 가능해요.')
+                  setTimeout(() => setToast(null), 4000)
+                }
+              }}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 14,
+                background: 'transparent', border: `1px solid ${t.border}`,
+                color: t.muted, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              취소할게요
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 회원탈퇴 리마인드 모달 */}
+      {deleteModalOpen && (
+        <div
+          onClick={() => setDeleteModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: t.popup, border: `1px solid ${t.border}`,
+              borderRadius: 20, padding: '28px 28px 24px',
+              width: '100%', maxWidth: 360,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 12 }}>🗑️</div>
+              <p style={{ fontSize: 16, fontWeight: 700, color: t.text, marginBottom: 8 }}>
+                정말 탈퇴할까요?
+              </p>
+              <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.7 }}>
+                지금까지 쌓은 감정 기록 {emotionCount}개가 모두 삭제돼요.<br />
+                패턴 분석 데이터도 복구할 수 없어요.<br />
+                {subscription.plan === 'pro' && 'Pro 구독도 즉시 해지돼요.'}
+              </p>
+            </div>
+            <button className="btn-action"
+              onClick={() => setDeleteModalOpen(false)}
+              style={{
+                width: '100%', padding: '14px', borderRadius: 14,
+                background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                border: 'none', color: '#fff', fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              계속 이용할게요
+            </button>
+            <button className="btn-action"
+              onClick={handleDeleteConfirm}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 14,
+                background: 'transparent', border: `1px solid ${t.border}`,
+                color: '#f87171', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              탈퇴할게요
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── 사이드바 (열림) ── */}
       {sidebarOpen && !isMobile && (
         <div onClick={e => e.stopPropagation()} style={{
@@ -884,16 +1025,7 @@ export default function FormClient() {
                 boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.12)',
                 zIndex: 100,
               }}>
-                <button className="list-btn" onClick={() => { setSettingsOpen(false); setView('settings'); closeSidebarOnMobile() }} style={{
-                  width: '100%', padding: '11px 14px',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  border: 'none',
-                  color: t.text, fontSize: 13, cursor: 'pointer',
-                  fontFamily: 'inherit', textAlign: 'left',
-                }}>
-                  {Icons.settings(t.muted)} <span>설정</span>
-                </button>
-                <div style={{ height: 1, background: t.border }} />
+                {/* 1. 구독 상태 */}
                 {subscription.plan === 'free' ? (
                   <button className="list-btn" onClick={async () => {
                     setSettingsOpen(false)
@@ -918,20 +1050,42 @@ export default function FormClient() {
                     ✦ Pro · {new Date(subscription.expires_at!).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 만료 예정
                   </div>
                 ) : (
-                  <button className="list-btn" onClick={() => {
-                    setSettingsOpen(false)
-                    setView('settings')
-                    closeSidebarOnMobile()
-                  }} style={{
-                    width: '100%', padding: '11px 14px',
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    border: 'none',
-                    color: t.text, fontSize: 13, cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'left',
-                  }}>
-                    ✦ Pro · 구독 관리
-                  </button>
+                  <div style={{ padding: '11px 14px', fontSize: 13, color: '#a78bfa' }}>
+                    ✦ Pro
+                  </div>
                 )}
+                {/* 2. 설정 */}
+                <div style={{ height: 1, background: t.border }} />
+                <button className="list-btn" onClick={() => { setSettingsOpen(false); setView('settings'); closeSidebarOnMobile() }} style={{
+                  width: '100%', padding: '11px 14px',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  border: 'none',
+                  color: t.text, fontSize: 13, cursor: 'pointer',
+                  fontFamily: 'inherit', textAlign: 'left',
+                }}>
+                  {Icons.settings(t.muted)} <span>설정</span>
+                </button>
+                {/* 3. 결제 수단 변경 */}
+                {subscription.creem_customer_id && (
+                  <>
+                    <div style={{ height: 1, background: t.border }} />
+                    <button className="list-btn" onClick={async () => {
+                      setSettingsOpen(false)
+                      const res = await fetch('/api/portal', { method: 'POST' })
+                      const data = await res.json()
+                      if (data.portal_url) window.open(data.portal_url, '_blank')
+                    }} style={{
+                      width: '100%', padding: '11px 14px',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      border: 'none',
+                      color: t.text, fontSize: 13, cursor: 'pointer',
+                      fontFamily: 'inherit', textAlign: 'left',
+                    }}>
+                      {Icons.card(t.muted)} <span>결제 수단 변경</span>
+                    </button>
+                  </>
+                )}
+                {/* 4. 로그아웃 */}
                 <div style={{ height: 1, background: t.border }} />
                 <button className="list-btn" onClick={handleLogout} style={{
                   width: '100%', padding: '11px 14px',
@@ -1049,29 +1203,27 @@ export default function FormClient() {
               </button>
             )}
           </div>
-          {isMobile && view === 'chat' && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              {hasNewMessage && sessionId && messagesSinceExtract >= 5 && (
-                <button className="btn-action" onClick={handleExtract} style={{
-                  padding: '6px 12px', borderRadius: 8,
-                  background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-                  border: 'none', color: '#fff', fontSize: 13,
-                  cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
-                }}>
-                  감정 담기
-                </button>
-              )}
-              <button className="btn-action" onClick={handleNewChat} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', borderRadius: 8,
-                background: 'transparent', border: `1px solid ${t.border}`,
-                color: t.text, fontSize: 13, cursor: 'pointer',
-                fontFamily: 'inherit', flexShrink: 0,
-              }}>
-                {Icons.plus(t.text)}
-                <span>새 대화</span>
-              </button>
-            </div>
+          {isMobile && view === 'chat' && hasNewMessage && sessionId && messagesSinceExtract >= 5 && (
+            <button className="btn-action" onClick={handleExtract} style={{
+              padding: '6px 12px', borderRadius: 8,
+              background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+              border: 'none', color: '#fff', fontSize: 13,
+              cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+            }}>
+              감정 담기
+            </button>
+          )}
+          {isMobile && (view === 'chat' || view === 'records') && (
+            <button className="btn-action" onClick={handleNewChat} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', borderRadius: 8,
+              background: 'transparent', border: `1px solid ${t.border}`,
+              color: t.text, fontSize: 13, cursor: 'pointer',
+              fontFamily: 'inherit', flexShrink: 0,
+            }}>
+              {Icons.plus(t.text)}
+              <span>새 대화</span>
+            </button>
           )}
         </div>
 
@@ -1335,14 +1487,7 @@ export default function FormClient() {
                     <div style={{ fontSize: 12, color: t.muted, marginTop: 2 }}>만료 후 다시 구독할 수 있어요</div>
                   </div>
                 ) : (
-                  <button className="btn-action" onClick={async () => {
-                    const res = await fetch('/api/subscription/cancel', { method: 'POST' })
-                    if (res.ok) {
-                      await fetchSubscription()
-                      setToast('구독 취소가 예약됐어요. 만료일까지 이용 가능해요.')
-                      setTimeout(() => setToast(null), 4000)
-                    }
-                  }} style={{
+                  <button className="btn-action" onClick={() => setCancelConfirmOpen(true)} style={{
                     padding: '8px 16px', borderRadius: 20,
                     background: 'transparent', border: '1px solid #a78bfa44',
                     color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
@@ -1352,6 +1497,29 @@ export default function FormClient() {
                   </button>
                 )}
               </div>
+
+              {subscription.creem_customer_id && (
+                <>
+                  <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12, marginTop: 32 }}>결제</p>
+                  <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 32 }}>
+                    <button className="list-btn" onClick={async () => {
+                      const res = await fetch('/api/portal', { method: 'POST' })
+                      const data = await res.json()
+                      if (data.portal_url) window.open(data.portal_url, '_blank')
+                    }} style={{
+                      width: '100%', padding: '14px 16px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      border: 'none',
+                      color: t.text, fontSize: 14, cursor: 'pointer',
+                      fontFamily: 'inherit', textAlign: 'left',
+                    }}>
+                      <span>결제 수단 변경</span>
+                      <span style={{ color: t.muted, fontSize: 12 }}>→</span>
+                    </button>
+                  </div>
+                </>
+              )}
+
               <p style={{ fontSize: 11, color: t.muted, letterSpacing: '0.08em', marginBottom: 12 }}>계정</p>
               <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 14, overflow: 'hidden' }}>
                 <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1639,22 +1807,12 @@ export default function FormClient() {
                       }}>
                         <div>
                           <p style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>✦ Pro 구독 중</p>
-                          <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>무제한 감정 기록</p>
+                          <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>무제한 감정 기록 · 구독 관리는 설정에서</p>
                         </div>
-                        <button className="btn-action" onClick={async () => {
-                          const res = await fetch('/api/subscription/cancel', { method: 'POST' })
-                          if (res.ok) {
-                            await fetchSubscription()
-                            setToast('구독 취소가 예약됐어요. 만료일까지 이용 가능해요.')
-                            setTimeout(() => setToast(null), 4000)
-                          }
-                        }} style={{
-                          padding: '8px 16px', borderRadius: 20,
-                          background: 'transparent', border: '1px solid #a78bfa44',
-                          color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
-                        }}>
-                          구독 취소
-                        </button>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <p style={{ fontSize: 28, fontWeight: 700, color: '#a78bfa' }}>{monthlyCount}</p>
+                          <p style={{ fontSize: 11, color: t.muted }}>이번 달 기록</p>
+                        </div>
                       </div>
                     )}
 
@@ -1952,7 +2110,7 @@ export default function FormClient() {
                       </div>
                       <div style={{ height: 1, background: t.border }} />
                       <div>
-                        <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>대화 횟수</p>
+                        <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 기록 횟수</p>
                         <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
                         <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
                       </div>

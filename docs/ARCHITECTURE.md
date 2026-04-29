@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-04-24
+> 마지막 업데이트: 2026-04-27
 
 ---
 
@@ -468,7 +468,9 @@ supabase/
 - [x] visibilitychange keepalive: true 적용 (fetch 끊김 방지)
 - [x] 모바일 키보드 노출 시 탭바 숨김 (visualViewport.height / screen.height 비율 기반 감지)
 - [x] 키보드 노출 시 입력창 scrollIntoView (스크롤 있는 대화에서만 완전 동작, 빈 대화창은 미해결)
-- [ ] 구독 취소 UX 개선 (대시보드 취소 버튼 제거 → 설정 페이지에서만 취소 가능 + 혜택 리마인드 모달, scheduled_cancel 상태 시 대시보드에 철회 버튼 노출 + 즉시 철회)
+- [x] 구독 취소 UX 개선 (대시보드 취소 버튼 제거 → 설정 페이지에서만 취소 가능 + 혜택 리마인드 모달)
+- [x] 대시보드 Pro 카드 이번 달 기록 수 표시
+- [x] 이번 주 기록 횟수 라벨 수정
 - [ ] 회원 탈퇴 UX 개선 (탈퇴 전 혜택 리마인드 + 재고 유도 모달 추가)
 - [ ] 모든 기기 일괄 로그아웃 기능 (설정 탭, signOut scope: global)
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon 완전 적용 예정)
