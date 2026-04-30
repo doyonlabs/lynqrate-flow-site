@@ -3,29 +3,44 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { safeDecrypt } from '@/lib/crypto'
 
-export async function GET() {
+export async function GET(req: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const [{ data: entries }, { data: emotions }] = await Promise.all([
+  const { searchParams } = new URL(req.url)
+  const start = searchParams.get('start')
+  const end = searchParams.get('end')
+
+  const [{ data: entries }, { data: recentData }, { data: emotions }] = await Promise.all([
+    (() => {
+      let query = supabaseAdmin
+        .from('emotion_entries')
+        .select('id, raw_emotion, intensity, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+      if (start) query = query.gte('created_at', new Date(start).toISOString())
+      if (end) query = query.lt('created_at', new Date(end).toISOString())
+      return query
+    })(),
     supabaseAdmin
       .from('emotion_entries')
-      .select('id, raw_emotion, intensity, created_at, summary, trigger_text')
+      .select('id, raw_emotion, intensity, created_at, summary')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .limit(50),
+      .order('created_at', { ascending: false })
+      .limit(5),
     supabaseAdmin
       .from('standard_emotions')
       .select('name, color_code')
       .order('soft_order'),
   ])
 
-  const decryptedEntries = (entries ?? []).map(e => ({
-    ...e,
-    trigger_text: e.trigger_text ? safeDecrypt(e.trigger_text) : null,
-    summary: e.summary ? safeDecrypt(e.summary) : null,
-  }))
-
-  return NextResponse.json({ entries: decryptedEntries, emotions: emotions ?? [] })
+  return NextResponse.json({
+    entries: entries ?? [],
+    recentEntries: (recentData ?? []).map(e => ({
+      ...e,
+      summary: e.summary ? safeDecrypt(e.summary) : null,
+    })),
+    emotions: emotions ?? [],
+  })
 }

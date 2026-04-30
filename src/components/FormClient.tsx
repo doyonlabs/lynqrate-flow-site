@@ -166,6 +166,13 @@ export default function FormClient() {
 
   const [isExtracting, setIsExtracting] = useState(false)
 
+  const [recentEntries, setRecentEntries] = useState<EmotionEntry[]>([])
+
+  const [modalEntries, setModalEntries] = useState<{id: string, trigger_text: string | null, summary: string | null}[]>([])
+  const [modalLoading, setModalLoading] = useState(false)
+
+  const calMonthRef = useRef(calMonth)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -269,7 +276,6 @@ export default function FormClient() {
         setEmotionColors(map)
         setStandardEmotions(initData.emotions.map((e: { name: string }) => e.name))
       }
-      if (initData.dashboardEntries) setDashboardData(initData.dashboardEntries)
       setDashboardLoading(false)
 
       const { data: nullSessions } = await supabase
@@ -317,10 +323,8 @@ export default function FormClient() {
   }, [])
 
   useEffect(() => {
-    if (view === 'dashboard') {
-      fetchDashboardData(true)  // silent=true로 변경
-      refreshAll()
-    }
+    if (view === 'dashboard') fetchDashboardData(true)
+    if (view === 'chat') fetchTodayEntries()
     if (view === 'records') fetchSessions()
     if (view === 'settings') fetchSubscription()
   }, [view])
@@ -350,14 +354,13 @@ export default function FormClient() {
         }).catch(() => {})
       }
       if (document.visibilityState === 'visible') {
-        refreshAll(true)
+        fetchTodayEntries()
+        fetchDashboardData(true)
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   // 모바일 텍스트 입력시 하단 탭바 가리기
@@ -434,20 +437,41 @@ export default function FormClient() {
     }
   }
 
-  const fetchDashboardData = async (silent = false) => {
+  const fetchDashboardData = async (silent = false, targetMonth = calMonth) => {
     if (!silent) setDashboardLoading(true)
-    const res = await fetch('/api/dashboard')
-    const data = await res.json()
-    if (data.entries) setDashboardData(data.entries)
-    if (data.emotions) {
-      const map: Record<string, string> = {}
-      data.emotions.forEach((e: { name: string; color_code: string }) => { map[e.name] = e.color_code })
-      setEmotionColors(map)
-      setStandardEmotions(data.emotions.map((e: { name: string }) => e.name))
+
+    let start: Date
+    let end: Date
+
+    if (isMobile) {
+      const weekStart = new Date(targetMonth)
+      weekStart.setDate(targetMonth.getDate() - targetMonth.getDay())
+      weekStart.setHours(0, 0, 0, 0)
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 7)
+      start = weekStart
+      end = weekEnd
+    } else {
+      start = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1)
+      end = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 1)
     }
+
     try {
-      const res = await fetch('https://holidays.hyunbin.page/2026.json')
-      const holidayData = await res.json()
+      const year = targetMonth.getFullYear()
+      const [dashboardRes, holidayRes] = await Promise.all([
+        fetch(`/api/dashboard?start=${start.toISOString()}&end=${end.toISOString()}`),
+        fetch(`https://holidays.hyunbin.page/${year}.json`),
+      ])
+      const data = await dashboardRes.json()
+      if (data.entries) setDashboardData(data.entries)
+      if (data.recentEntries) setRecentEntries(data.recentEntries)
+      if (data.emotions) {
+        const map: Record<string, string> = {}
+        data.emotions.forEach((e: { name: string; color_code: string }) => { map[e.name] = e.color_code })
+        setEmotionColors(map)
+        setStandardEmotions(data.emotions.map((e: { name: string }) => e.name))
+      }
+      const holidayData = await holidayRes.json()
       const map: Record<string, string> = {}
       Object.entries(holidayData).forEach(([date, names]) => {
         const [, m, d] = date.split('-')
@@ -455,17 +479,14 @@ export default function FormClient() {
       })
       setHolidays(map)
     } catch {}
+
     setDashboardLoading(false)
   }
 
   const refreshAll = useCallback(async (withDashboard = false) => {
-    await Promise.all([
-      fetchSessions(),
-      fetchTodayEntries(),
-      fetchMonthlyCount(),
-      fetchSubscription(),
-    ])
-    if (withDashboard) fetchDashboardData(true)
+    const tasks = [fetchTodayEntries(), fetchMonthlyCount()]
+    if (withDashboard) tasks.push(fetchDashboardData(true))
+    await Promise.all(tasks)
   }, [])
 
   // ─── 헬퍼 ────────────────────────────────────────────────────────────────
@@ -520,7 +541,7 @@ export default function FormClient() {
             if (res.ok && !result.skipped) {
               setHasNewMessageWithRef(false)
               setMessagesSinceExtract(0)
-              await refreshAll()
+              await refreshAll(true)
               setToast('첫 감정이 기록됐어요. 대화가 쌓이면 패턴이 보여요.')
               setTimeout(() => setToast(null), 4000)
             }
@@ -1835,14 +1856,36 @@ export default function FormClient() {
                         })
                         const last = displayDays[6]
                         headerLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${last.getMonth() + 1}/${last.getDate()}`
-                        onPrev = () => { const d = new Date(calMonth); d.setDate(d.getDate() - 7); setCalMonth(d) }
-                        onNext = () => { const d = new Date(calMonth); d.setDate(d.getDate() + 7); setCalMonth(d) }
+                        onPrev = () => { 
+                          const d = new Date(calMonth)
+                          d.setDate(d.getDate() - 7)
+                          setCalMonth(d)
+                          calMonthRef.current = d
+                          fetchDashboardData(true, d)
+                        }
+                        onNext = () => { 
+                          const d = new Date(calMonth)
+                          d.setDate(d.getDate() + 7)
+                          setCalMonth(d)
+                          calMonthRef.current = d
+                          fetchDashboardData(true, d)
+                        }
                       } else {
                         const daysInMonth = new Date(year, month + 1, 0).getDate()
                         displayDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1))
                         headerLabel = `${year}년 ${month + 1}월`
-                        onPrev = () => setCalMonth(new Date(year, month - 1))
-                        onNext = () => setCalMonth(new Date(year, month + 1))
+                        onPrev = () => { 
+                          const d = new Date(year, month - 1)
+                          setCalMonth(d)
+                          calMonthRef.current = d
+                          fetchDashboardData(true, d)
+                        }
+                        onNext = () => { 
+                          const d = new Date(year, month + 1)
+                          setCalMonth(d)
+                          calMonthRef.current = d
+                          fetchDashboardData(true, d)
+                        }
                       }
 
                       const emotionList = standardEmotions
@@ -1916,11 +1959,26 @@ export default function FormClient() {
                                   return (
                                     <div
                                       key={i}
-                                      onClick={() => {
+                                      onClick={async () => {
                                         if (cell) {
                                           setSelectedDay(fullDateKey)
                                           setSelectedEmotion(emotion)
                                           setCalModalOpen(true)
+                                          setModalLoading(true)
+
+                                          // 해당 셀의 entry id 목록 수집
+                                          const dateKey = `${d.getMonth() + 1}-${d.getDate()}`
+                                          const ids = dashboardData
+                                            .filter(e => {
+                                              const ed = new Date(e.created_at)
+                                              return `${ed.getMonth() + 1}-${ed.getDate()}` === dateKey && e.raw_emotion === emotion
+                                            })
+                                            .map(e => e.id)
+
+                                          const res = await fetch(`/api/entry?ids=${ids.join(',')}`)
+                                          const data = await res.json()
+                                          if (data.entries) setModalEntries(data.entries)
+                                          setModalLoading(false)
                                         }
                                       }}
                                       className={`heatmap-cell${cell ? ' heatmap-cell--clickable' : ' heatmap-cell--empty'}`}
@@ -1939,15 +1997,11 @@ export default function FormClient() {
                           </div>
                           {/* 모달 */}
                           {calModalOpen && selectedDay && selectedEmotion && (() => {
-                            const allEntries = dashboardData.filter(e =>
-                              new Date(e.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) === selectedDay
-                              && e.raw_emotion === selectedEmotion
-                            )
                             const parts = selectedDay.split('. ')
                             const dateLabel = `${parts[1]}월 ${parts[2]?.replace('.', '')}일`
                             return (
                               <div
-                                onClick={() => setCalModalOpen(false)}
+                                onClick={() => { setCalModalOpen(false); setModalEntries([]) }}
                                 style={{
                                   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
                                   zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
@@ -1967,16 +2021,21 @@ export default function FormClient() {
                                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: emotionColors[selectedEmotion] ?? '#a78bfa' }} />
                                       <span style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{dateLabel} · {selectedEmotion}</span>
                                     </div>
-                                    <button onClick={() => setCalModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
+                                    <button onClick={() => { setCalModalOpen(false); setModalEntries([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
-                                    {allEntries.map(e => (
-                                      <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }} data-clarity-mask="True">
-                                        <span style={{ fontSize: 12, color: '#a78bfa' }}>강도 {e.intensity}</span>
-                                        {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, opacity: 0.7 }}>{e.trigger_text}</p>}
-                                        {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{e.summary}</p>}
-                                      </div>
-                                    ))}
+                                    {modalLoading ? (
+                                      <p style={{ fontSize: 13, color: t.muted, textAlign: 'center', padding: '12px 0' }}>불러오는 중...</p>
+                                    ) : modalEntries.map(e => {
+                                      const dashEntry = dashboardData.find(d => d.id === e.id)
+                                      return (
+                                        <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }} data-clarity-mask="True">
+                                          {dashEntry && <span style={{ fontSize: 12, color: '#a78bfa' }}>강도 {dashEntry.intensity}</span>}
+                                          {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, opacity: 0.7 }}>{e.trigger_text}</p>}
+                                          {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{e.summary}</p>}
+                                        </div>
+                                      )
+                                    })}
                                   </div>
                                 </div>
                               </div>
@@ -1988,11 +2047,8 @@ export default function FormClient() {
 
                     {/* ② 최근 기록 */}
                     {(() => {
-                      const recentEntries = [...dashboardData]
-                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                        .slice(0, 5)
-                        .filter(e => e.summary)
-                      if (recentEntries.length === 0) return null
+                      const recentEntriesFiltered = recentEntries.filter(e => e.summary)
+                      if (recentEntriesFiltered.length === 0) return null
                       return (
                         <div style={{
                           gridColumn: fullSpan,
@@ -2000,7 +2056,7 @@ export default function FormClient() {
                         }}>
                           <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>최근 기록</p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {recentEntries.map((e) => {
+                            {recentEntriesFiltered.map((e) => {
                               const createdDate = new Date(e.created_at)
                               const timeLabel = createdDate.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true })
                               const today = new Date()
