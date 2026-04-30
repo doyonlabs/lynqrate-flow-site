@@ -236,9 +236,9 @@ export default function FormClient() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      if (!localStorage.getItem('onboarding_done')) {
+      /* if (!localStorage.getItem('onboarding_done')) {
         setOnboardingOpen(true)
-      }
+      } */
 
       const { data: userData } = await supabase
         .from('users').select('display_name, email').eq('id', user.id).single()
