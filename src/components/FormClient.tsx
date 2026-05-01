@@ -456,7 +456,7 @@ export default function FormClient() {
     let start: Date
     let end: Date
 
-    if (isMobile) {
+    if (isMobileRef.current) {
       const weekStart = new Date(targetMonth)
       weekStart.setDate(targetMonth.getDate() - targetMonth.getDay())
       weekStart.setHours(0, 0, 0, 0)
