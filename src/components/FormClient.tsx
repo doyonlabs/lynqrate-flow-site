@@ -272,6 +272,8 @@ export default function FormClient() {
         setStandardEmotions(initData.emotions.map((e: { name: string }) => e.name))
       }
       if (initData.dashboardEntries) setDashboardData(initData.dashboardEntries)
+      if (initData.thisWeekEntries) setThisWeekEntries(initData.thisWeekEntries)
+      if (initData.lastWeekEntries) setLastWeekEntries(initData.lastWeekEntries)
       setDashboardLoading(false)
 
       if (initData.incompleteSessions?.length) {
@@ -299,7 +301,6 @@ export default function FormClient() {
   }, [])
 
   useEffect(() => {
-    if (view === 'dashboard') fetchDashboardData(true)
     if (view === 'chat') fetchTodayEntries()
     if (view === 'records') fetchSessions()
     if (view === 'settings') fetchSubscription()

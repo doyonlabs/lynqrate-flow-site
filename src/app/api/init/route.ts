@@ -13,6 +13,12 @@ export async function GET() {
   const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
+  const startOfThisWeek = new Date(now)
+  startOfThisWeek.setDate(now.getDate() - now.getDay())
+  startOfThisWeek.setHours(0, 0, 0, 0)
+  const startOfLastWeek = new Date(startOfThisWeek)
+  startOfLastWeek.setDate(startOfThisWeek.getDate() - 7)
+
   const [
     { data: sessions },
     { data: emotions },
@@ -23,6 +29,8 @@ export async function GET() {
     { count: totalEntryCount },
     { data: nullSessions },
     { data: incompleteSessions },
+    { data: thisWeekData },
+    { data: lastWeekData },
   ] = await Promise.all([
     supabaseAdmin
       .from('chat_sessions')
@@ -74,6 +82,19 @@ export async function GET() {
       .not('last_extracted_at', 'is', null)
       .order('created_at', { ascending: false })
       .limit(5),
+    supabaseAdmin
+      .from('emotion_entries')
+      .select('id, raw_emotion, intensity, created_at')
+      .eq('user_id', user.id)
+      .gte('created_at', startOfThisWeek.toISOString())
+      .order('created_at', { ascending: true }),
+    supabaseAdmin
+      .from('emotion_entries')
+      .select('id, raw_emotion, intensity, created_at')
+      .eq('user_id', user.id)
+      .gte('created_at', startOfLastWeek.toISOString())
+      .lt('created_at', startOfThisWeek.toISOString())
+      .order('created_at', { ascending: true }),
   ])
 
   const newMessageSessions = incompleteSessions?.filter(s =>
@@ -95,5 +116,7 @@ export async function GET() {
       ...(nullSessions ?? []),
       ...newMessageSessions,
     ],
+    thisWeekEntries: thisWeekData ?? [],
+    lastWeekEntries: lastWeekData ?? [],
   })
 }
