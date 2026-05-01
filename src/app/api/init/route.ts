@@ -19,6 +19,8 @@ export async function GET() {
   const startOfLastWeek = new Date(startOfThisWeek)
   startOfLastWeek.setDate(startOfThisWeek.getDate() - 7)
 
+  const startOfData = startOfThisWeek < startOfMonth ? startOfThisWeek : startOfMonth
+
   const [
     { data: sessions },
     { data: emotions },
@@ -47,7 +49,7 @@ export async function GET() {
       .from('emotion_entries')
       .select('id, raw_emotion, intensity, created_at')
       .eq('user_id', user.id)
-      .gte('created_at', startOfMonth.toISOString())
+      .gte('created_at', startOfData.toISOString())
       .lt('created_at', startOfNextMonth.toISOString())
       .order('created_at', { ascending: true }),
     supabaseAdmin
