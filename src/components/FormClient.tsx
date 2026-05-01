@@ -243,7 +243,10 @@ export default function FormClient() {
       } */
 
       const initRes = await fetch('/api/init')
-      if (!initRes.ok) return
+      if (!initRes.ok) {
+        setDashboardLoading(false)
+        return
+      }
       const initData = await initRes.json()
 
       if (initData.userInfo) setUserInfo(initData.userInfo)
