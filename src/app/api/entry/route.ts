@@ -17,9 +17,10 @@ export async function GET(req: Request) {
 
   const { data } = await supabaseAdmin
     .from('emotion_entries')
-    .select('id, trigger_text, summary')
+    .select('id, trigger_text, summary, created_at')
     .eq('user_id', user.id)
     .in('id', ids)
+    .order('created_at', { ascending: false })
 
   return NextResponse.json({
     entries: (data ?? []).map(e => ({

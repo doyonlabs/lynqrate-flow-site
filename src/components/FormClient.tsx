@@ -173,6 +173,8 @@ export default function FormClient() {
 
   const [modalEntries, setModalEntries] = useState<{id: string, trigger_text: string | null, summary: string | null}[]>([])
   const [modalLoading, setModalLoading] = useState(false)
+  const [modalCache, setModalCache] = useState<Record<string, {id: string, trigger_text: string | null, summary: string | null}[]>>({})
+  const [currentPeriod, setCurrentPeriod] = useState(true)
 
   const [insightLoading, setInsightLoading] = useState(false)
 
@@ -504,11 +506,18 @@ export default function FormClient() {
       setHolidays(holidayCache.current[year] ?? {})
     } catch {}
 
+    const now = new Date()
+    setCurrentPeriod(isMobileRef.current
+      ? targetMonth >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
+      : targetMonth.getFullYear() === now.getFullYear() && targetMonth.getMonth() === now.getMonth()
+    )
     setInsightLoading(false)
     setDashboardLoading(false)
   }
 
   const refreshAll = useCallback(async (withDashboard = false) => {
+    console.log('refreshAll 호출')
+    setModalCache({})
     const tasks = [fetchTodayEntries(), fetchMonthlyCount()]
     if (withDashboard) tasks.push(fetchDashboardData(true))
     await Promise.all(tasks)
@@ -1914,6 +1923,7 @@ export default function FormClient() {
                           d.setDate(d.getDate() - 7)
                           setCalMonth(d)
                           calMonthRef.current = d
+                          setModalCache({})
                           fetchDashboardData(true, d)
                         }
                         onNext = () => { 
@@ -1921,6 +1931,7 @@ export default function FormClient() {
                           d.setDate(d.getDate() + 7)
                           setCalMonth(d)
                           calMonthRef.current = d
+                          setModalCache({})
                           fetchDashboardData(true, d)
                         }
                       } else {
@@ -1930,12 +1941,14 @@ export default function FormClient() {
                           const d = new Date(year, month - 1)
                           setCalMonth(d)
                           calMonthRef.current = d
+                          setModalCache({})
                           fetchDashboardData(true, d)
                         }
                         onNext = () => { 
                           const d = new Date(year, month + 1)
                           setCalMonth(d)
                           calMonthRef.current = d
+                          setModalCache({})
                           fetchDashboardData(true, d)
                         }
                       }
@@ -2012,27 +2025,34 @@ export default function FormClient() {
                                     <div
                                       key={i}
                                       onClick={async () => {
-                                        if (cell) {
-                                          setSelectedDay(fullDateKey)
-                                          setSelectedEmotion(emotion)
-                                          setCalModalOpen(true)
-                                          setModalLoading(true)
+                                      if (cell) {
+                                        const cacheKey = `${fullDateKey}__${emotion}`
+                                        setSelectedDay(fullDateKey)
+                                        setSelectedEmotion(emotion)
+                                        setCalModalOpen(true)
 
-                                          // 해당 셀의 entry id 목록 수집
-                                          const dateKey = `${d.getMonth() + 1}-${d.getDate()}`
-                                          const ids = dashboardData
-                                            .filter(e => {
-                                              const ed = new Date(e.created_at)
-                                              return `${ed.getMonth() + 1}-${ed.getDate()}` === dateKey && e.raw_emotion === emotion
-                                            })
-                                            .map(e => e.id)
-
-                                          const res = await fetch(`/api/entry?ids=${ids.join(',')}`)
-                                          const data = await res.json()
-                                          if (data.entries) setModalEntries(data.entries)
-                                          setModalLoading(false)
+                                        if (modalCache[cacheKey]) {
+                                          setModalEntries(modalCache[cacheKey])
+                                          return
                                         }
-                                      }}
+
+                                        setModalLoading(true)
+                                        const ids = dashboardData
+                                          .filter(e => {
+                                            const ed = new Date(e.created_at)
+                                            return `${ed.getMonth() + 1}-${ed.getDate()}` === dateKey && e.raw_emotion === emotion
+                                          })
+                                          .map(e => e.id)
+
+                                        const res = await fetch(`/api/entry?ids=${ids.join(',')}`)
+                                        const data = await res.json()
+                                        if (data.entries) {
+                                          setModalCache(prev => ({ ...prev, [cacheKey]: data.entries }))
+                                          setModalEntries(data.entries)
+                                        }
+                                        setModalLoading(false)
+                                      }
+                                    }}
                                       className={`heatmap-cell${cell ? ' heatmap-cell--clickable' : ' heatmap-cell--empty'}`}
                                       style={{
                                         background: `${color}${alphaHex}`,
