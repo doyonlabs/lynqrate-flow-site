@@ -177,6 +177,7 @@ export default function FormClient() {
   const [insightLoading, setInsightLoading] = useState(false)
 
   const calMonthRef = useRef(calMonth)
+  const isMobileRef = useRef(false)
 
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -201,6 +202,7 @@ export default function FormClient() {
     const checkViewport = () => {
       const mobile = window.innerWidth < 1024
       setIsMobile(mobile)
+      isMobileRef.current = mobile
       setSidebarOpen(!mobile)
       if (!mobile) setView(prev => prev === 'records' ? 'chat' : prev)
     }
