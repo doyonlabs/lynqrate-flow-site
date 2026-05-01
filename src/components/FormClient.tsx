@@ -278,15 +278,40 @@ export default function FormClient() {
       setDashboardLoading(false)
 
       if (initData.incompleteSessions?.length) {
-        initData.incompleteSessions.forEach((s: { id: string }) => {
-          fetch('/api/chat/extract', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: s.id }),
-          }).then(res => {
-            if (res.ok) refreshAll(true)
-          }).catch(() => {})
-        })
+        initData.incompleteSessions
+          .filter((s: { id: string }) => {
+            if (sessionStorage.getItem(`extracted_${s.id}`)) {
+              sessionStorage.removeItem(`extracted_${s.id}`)
+              const now = new Date()
+              const start = new Date(now.getFullYear(), now.getMonth(), 1)
+              const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+              fetch(`/api/dashboard?start=${start.toISOString()}&end=${end.toISOString()}`)
+                .then(r => r.json())
+                .then(data => {
+                  if (data.entries) setDashboardData(data.entries)
+                  if (data.recentEntries) setRecentEntries(data.recentEntries)
+                  if (data.thisWeekEntries) setThisWeekEntries(data.thisWeekEntries)
+                  if (data.lastWeekEntries) setLastWeekEntries(data.lastWeekEntries)
+                })
+              fetch('/api/today')
+                .then(r => r.json())
+                .then(data => {
+                  if (data.entries) setTodayEntries(data.entries)
+                  if (data.lastEntry) setLastEntry(data.lastEntry)
+                })
+              return false
+            }
+            return true
+          })
+          .forEach((s: { id: string }) => {
+            fetch('/api/chat/extract', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId: s.id }),
+            }).then(res => {
+              if (res.ok) refreshAll(true)
+            }).catch(() => {})
+          })
       }
     }
 
@@ -318,6 +343,7 @@ export default function FormClient() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && hasNewMessageRef.current && sessionIdRef.current) {
         const sid = sessionIdRef.current
+        sessionStorage.setItem(`extracted_${sid}`, 'true')  // fetch 전에 기록
         fetch('/api/chat/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -328,12 +354,17 @@ export default function FormClient() {
             setHasNewMessageWithRef(false)
             setMessagesSinceExtract(0)
             refreshAll(true)
+          } else {
+            sessionStorage.removeItem(`extracted_${sid}`)
           }
-        }).catch(() => {})
+        }).catch(() => {
+          sessionStorage.removeItem(`extracted_${sid}`)
+        })
       }
       if (document.visibilityState === 'visible') {
         fetchTodayEntries()
         fetchDashboardData(true)
+        fetchMonthlyCount()
       }
     }
 

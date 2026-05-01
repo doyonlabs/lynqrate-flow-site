@@ -108,6 +108,11 @@ export async function GET() {
     new Date(s.last_extracted_at!) < new Date(s.updated_at)
   ) ?? []
 
+  const allIncomplete = [...(nullSessions ?? []), ...newMessageSessions]
+  const uniqueIncomplete = allIncomplete.filter(
+    (s, index, self) => self.findIndex(t => t.id === s.id) === index
+  )
+
   return NextResponse.json({
     sessions: (sessions ?? []).map(s => ({
       ...s,
@@ -119,10 +124,7 @@ export async function GET() {
     subscription: subData ?? null,
     monthlyCount: monthlyCount ?? 0,
     isFirstSession: !totalEntryCount || totalEntryCount === 0,
-    incompleteSessions: [
-      ...(nullSessions ?? []),
-      ...newMessageSessions,
-    ],
+    incompleteSessions: uniqueIncomplete,
     thisWeekEntries: thisWeekData ?? [],
     lastWeekEntries: lastWeekData ?? [],
     recentEntries: (recentData ?? []).map(e => ({
