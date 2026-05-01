@@ -31,6 +31,7 @@ export async function GET() {
     { data: incompleteSessions },
     { data: thisWeekData },
     { data: lastWeekData },
+    { data: recentData },
   ] = await Promise.all([
     supabaseAdmin
       .from('chat_sessions')
@@ -95,6 +96,12 @@ export async function GET() {
       .gte('created_at', startOfLastWeek.toISOString())
       .lt('created_at', startOfThisWeek.toISOString())
       .order('created_at', { ascending: true }),
+    supabaseAdmin
+      .from('emotion_entries')
+      .select('id, raw_emotion, intensity, created_at, summary')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
   ])
 
   const newMessageSessions = incompleteSessions?.filter(s =>
@@ -118,5 +125,9 @@ export async function GET() {
     ],
     thisWeekEntries: thisWeekData ?? [],
     lastWeekEntries: lastWeekData ?? [],
+    recentEntries: (recentData ?? []).map(e => ({
+      ...e,
+      summary: e.summary ? safeDecrypt(e.summary) : null,
+    })),
   })
 }

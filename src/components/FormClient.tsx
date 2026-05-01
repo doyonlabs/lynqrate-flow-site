@@ -274,6 +274,7 @@ export default function FormClient() {
       if (initData.dashboardEntries) setDashboardData(initData.dashboardEntries)
       if (initData.thisWeekEntries) setThisWeekEntries(initData.thisWeekEntries)
       if (initData.lastWeekEntries) setLastWeekEntries(initData.lastWeekEntries)
+      if (initData.recentEntries) setRecentEntries(initData.recentEntries)
       setDashboardLoading(false)
 
       if (initData.incompleteSessions?.length) {
