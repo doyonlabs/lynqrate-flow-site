@@ -413,6 +413,7 @@ export default function FormClient() {
     }
   }
 
+  const holidayCache = useRef<Record<number, Record<string, string>>>({})
   const fetchDashboardData = async (silent = false, targetMonth = calMonthRef.current) => {
     if (!silent) setDashboardLoading(true)
     setInsightLoading(true)
@@ -435,9 +436,9 @@ export default function FormClient() {
 
     try {
       const year = targetMonth.getFullYear()
-      const [dashboardRes, holidayRes] = await Promise.all([
+      
+      const [dashboardRes] = await Promise.all([
         fetch(`/api/dashboard?start=${start.toISOString()}&end=${end.toISOString()}`),
-        fetch(`https://holidays.hyunbin.page/${year}.json`),
       ])
       const data = await dashboardRes.json()
       if (data.entries) setDashboardData(data.entries)
@@ -450,13 +451,17 @@ export default function FormClient() {
         setEmotionColors(map)
         setStandardEmotions(data.emotions.map((e: { name: string }) => e.name))
       }
-      const holidayData = await holidayRes.json()
-      const map: Record<string, string> = {}
-      Object.entries(holidayData).forEach(([date, names]) => {
-        const [, m, d] = date.split('-')
-        map[`${parseInt(m)}-${parseInt(d)}`] = (names as string[])[0]
-      })
-      setHolidays(map)
+      if (!holidayCache.current[year]) {
+        const holidayRes = await fetch(`https://holidays.hyunbin.page/${year}.json`)
+        const holidayData = await holidayRes.json()
+        const map: Record<string, string> = {}
+        Object.entries(holidayData).forEach(([date, names]) => {
+          const [, m, d] = date.split('-')
+          map[`${parseInt(m)}-${parseInt(d)}`] = (names as string[])[0]
+        })
+        holidayCache.current[year] = map
+      }
+      setHolidays(holidayCache.current[year])
     } catch {}
 
     setInsightLoading(false)
@@ -2165,8 +2170,8 @@ export default function FormClient() {
                       <div style={{ height: 1, background: t.border }} />
                       <div>
                         <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 기록 횟수</p>
-                        <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
-                        <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
+                        <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekEntries.length}회</p>
+                        <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekEntries.length}회</p>
                       </div>
                     </div>
                   </div>
