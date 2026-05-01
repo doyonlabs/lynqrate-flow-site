@@ -436,10 +436,13 @@ export default function FormClient() {
 
     try {
       const year = targetMonth.getFullYear()
-      
-      const [dashboardRes] = await Promise.all([
+      const needsHoliday = !holidayCache.current[year]
+
+      const [dashboardRes, holidayRes] = await Promise.all([
         fetch(`/api/dashboard?start=${start.toISOString()}&end=${end.toISOString()}`),
+        needsHoliday ? fetch(`https://holidays.hyunbin.page/${year}.json`) : Promise.resolve(null),
       ])
+
       const data = await dashboardRes.json()
       if (data.entries) setDashboardData(data.entries)
       if (data.recentEntries) setRecentEntries(data.recentEntries)
@@ -451,8 +454,8 @@ export default function FormClient() {
         setEmotionColors(map)
         setStandardEmotions(data.emotions.map((e: { name: string }) => e.name))
       }
-      if (!holidayCache.current[year]) {
-        const holidayRes = await fetch(`https://holidays.hyunbin.page/${year}.json`)
+
+      if (needsHoliday && holidayRes) {
         const holidayData = await holidayRes.json()
         const map: Record<string, string> = {}
         Object.entries(holidayData).forEach(([date, names]) => {
@@ -461,7 +464,7 @@ export default function FormClient() {
         })
         holidayCache.current[year] = map
       }
-      setHolidays(holidayCache.current[year])
+      setHolidays(holidayCache.current[year] ?? {})
     } catch {}
 
     setInsightLoading(false)
@@ -1658,6 +1661,9 @@ export default function FormClient() {
                 const thisWeekTop = isCurrentPeriod ? getTopEmotion(thisWeekEntries) : null
                 const lastWeekTop = isCurrentPeriod ? getTopEmotion(lastWeekEntries) : null
 
+                const weekTop = getTopEmotion(thisWeekEntries)
+                const prevWeekTop = getTopEmotion(lastWeekEntries)
+
                 const NEGATIVE_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움']
                 const POSITIVE_EMOTIONS = ['설렘', '기쁨', '감사', '평온']
 
@@ -2153,8 +2159,8 @@ export default function FormClient() {
                       <div>
                         <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 최다 감정</p>
                         <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
-                          {thisWeekTop
-                            ? <>{thisWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{thisWeekTop[1]}회</span></>
+                          {weekTop
+                            ? <>{weekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{weekTop[1]}회</span></>
                             : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
                         </p>
                       </div>
@@ -2162,8 +2168,8 @@ export default function FormClient() {
                       <div>
                         <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>지난 주 최다 감정</p>
                         <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
-                          {lastWeekTop
-                            ? <>{lastWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{lastWeekTop[1]}회</span></>
+                          {prevWeekTop
+                            ? <>{prevWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{prevWeekTop[1]}회</span></>
                             : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
                         </p>
                       </div>
