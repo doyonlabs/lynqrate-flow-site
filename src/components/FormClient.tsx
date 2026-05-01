@@ -129,6 +129,9 @@ export default function FormClient() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   // [FIX] dashboardLoading 초기값 true → 첫 렌더 empty state 플래시 방지
   const [dashboardData, setDashboardData] = useState<EmotionEntry[]>([])
+  const [thisWeekEntries, setThisWeekEntries] = useState<EmotionEntry[]>([])
+  const [lastWeekEntries, setLastWeekEntries] = useState<EmotionEntry[]>([])
+
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [emotionColors, setEmotionColors] = useState<Record<string, string>>({})
 
@@ -170,6 +173,8 @@ export default function FormClient() {
 
   const [modalEntries, setModalEntries] = useState<{id: string, trigger_text: string | null, summary: string | null}[]>([])
   const [modalLoading, setModalLoading] = useState(false)
+
+  const [insightLoading, setInsightLoading] = useState(false)
 
   const calMonthRef = useRef(calMonth)
 
@@ -266,8 +271,6 @@ export default function FormClient() {
       const initRes = await fetch('/api/init')
       const initData = await initRes.json()
       if (initData.sessions) setSessions(initData.sessions)
-      if (initData.todayEntries) setTodayEntries(initData.todayEntries)
-      if (initData.lastEntry) setLastEntry(initData.lastEntry)
       if (initData.emotions) {
         const map: Record<string, string> = {}
         initData.emotions.forEach((e: { name: string; color_code: string }) => {
@@ -277,6 +280,10 @@ export default function FormClient() {
         setStandardEmotions(initData.emotions.map((e: { name: string }) => e.name))
       }
       setDashboardLoading(false)
+
+      if (initData.dashboardEntries) {
+        setDashboardData(initData.dashboardEntries)
+      }
 
       const { data: nullSessions } = await supabase
         .from('chat_sessions')
@@ -437,8 +444,9 @@ export default function FormClient() {
     }
   }
 
-  const fetchDashboardData = async (silent = false, targetMonth = calMonth) => {
+  const fetchDashboardData = async (silent = false, targetMonth = calMonthRef.current) => {
     if (!silent) setDashboardLoading(true)
+    setInsightLoading(true)
 
     let start: Date
     let end: Date
@@ -465,6 +473,8 @@ export default function FormClient() {
       const data = await dashboardRes.json()
       if (data.entries) setDashboardData(data.entries)
       if (data.recentEntries) setRecentEntries(data.recentEntries)
+      if (data.thisWeekEntries) setThisWeekEntries(data.thisWeekEntries)
+      if (data.lastWeekEntries) setLastWeekEntries(data.lastWeekEntries)
       if (data.emotions) {
         const map: Record<string, string> = {}
         data.emotions.forEach((e: { name: string; color_code: string }) => { map[e.name] = e.color_code })
@@ -480,6 +490,7 @@ export default function FormClient() {
       setHolidays(map)
     } catch {}
 
+    setInsightLoading(false)
     setDashboardLoading(false)
   }
 
@@ -1641,11 +1652,27 @@ export default function FormClient() {
                   .sort((a, b) => b.count - a.count)
                   .filter(({ count }) => count > 0)
 
+                const thisWeekData = thisWeekEntries
+                const lastWeekData = lastWeekEntries
+                
+                // headerLabel 계산
+                const calYear = calMonth.getFullYear()
+                const calMonthNum = calMonth.getMonth()
+                let headerLabel: string
+                if (isMobile) {
+                  const weekStart = new Date(calMonth)
+                  weekStart.setDate(calMonth.getDate() - calMonth.getDay())
+                  const last = new Date(weekStart)
+                  last.setDate(weekStart.getDate() + 6)
+                  headerLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${last.getMonth() + 1}/${last.getDate()}`
+                } else {
+                  headerLabel = `${calYear}년 ${calMonthNum + 1}월`
+                }
+
                 const now = new Date()
-                const startOfThisWeek = new Date(now); startOfThisWeek.setDate(now.getDate() - now.getDay())
-                const startOfLastWeek = new Date(startOfThisWeek); startOfLastWeek.setDate(startOfThisWeek.getDate() - 7)
-                const thisWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfThisWeek)
-                const lastWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfLastWeek && new Date(e.created_at) < startOfThisWeek)
+                const isCurrentPeriod = isMobile
+                  ? calMonth >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
+                  : calMonth.getFullYear() === now.getFullYear() && calMonth.getMonth() === now.getMonth()
 
                 // 가장 많이 느낀 감정
                 const getTopEmotion = (data: typeof dashboardData) => {
@@ -1654,8 +1681,8 @@ export default function FormClient() {
                   data.forEach(e => { count[e.raw_emotion] = (count[e.raw_emotion] || 0) + 1 })
                   return Object.entries(count).sort((a, b) => b[1] - a[1])[0]
                 }
-                const thisWeekTop = getTopEmotion(thisWeekData)
-                const lastWeekTop = getTopEmotion(lastWeekData)
+                const thisWeekTop = isCurrentPeriod ? getTopEmotion(thisWeekEntries) : null
+                const lastWeekTop = isCurrentPeriod ? getTopEmotion(lastWeekEntries) : null
 
                 const NEGATIVE_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움']
                 const POSITIVE_EMOTIONS = ['설렘', '기쁨', '감사', '평온']
@@ -1670,6 +1697,9 @@ export default function FormClient() {
                 const euro = (s: string) => hasFinalConsonant(s) ? '으로' : '로'
 
                 const insightText = (() => {
+                  if (!isCurrentPeriod && total === 0) {
+                    return isMobile ? '이 기간엔 기록이 없어요.' : `${headerLabel}엔 기록이 없어요.`
+                  }
                   if (!topEmotion) return '대화하다 보면 감정이 자동으로 기록돼요. 매일 조금씩 쌓이면 내 패턴이 보이기 시작해요.'
                   const topEmotionName = topEmotion[0]
                   const topEmotionCount = topEmotion[1]
@@ -1726,19 +1756,21 @@ export default function FormClient() {
                       alignItems: isMobile ? 'flex-start' : 'center',
                       justifyContent: 'space-between', gap: 12,
                     }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0, minHeight: 50 }}>
                         <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>감정 인사이트</p>
-                        <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }} data-clarity-mask="True">{insightText}</p>
+                        <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }} data-clarity-mask="True">{insightLoading ? '' : insightText}</p>
                       </div>
-                      <button className="btn-action" onClick={() => { setView('chat'); handleNewChat() }} style={{
-                        flexShrink: 0, padding: '11px 22px', borderRadius: 20,
-                        background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-                        border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
-                        cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-                        alignSelf: isMobile ? 'flex-start' : 'center',
-                      }}>
-                        {total === 0 ? '첫 대화 시작하기' : '오늘 털어놓기'}
-                      </button>
+                      {isCurrentPeriod && (
+                        <button className="btn-action" onClick={() => { setView('chat'); handleNewChat() }} style={{
+                          flexShrink: 0, padding: '11px 22px', borderRadius: 20,
+                          background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                          border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
+                          cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                          alignSelf: isMobile ? 'flex-start' : 'center',
+                        }}>
+                          {total === 0 ? '첫 대화 시작하기' : '오늘 털어놓기'}
+                        </button>
+                      )}
                     </div>
 
                     {/* 구독 상태 카드 */}
@@ -1837,7 +1869,6 @@ export default function FormClient() {
                       const month = calMonth.getMonth()
 
                       let displayDays: Date[]
-                      let headerLabel: string
                       let onPrev: () => void
                       let onNext: () => void
 
@@ -1855,7 +1886,6 @@ export default function FormClient() {
                           return d
                         })
                         const last = displayDays[6]
-                        headerLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${last.getMonth() + 1}/${last.getDate()}`
                         onPrev = () => { 
                           const d = new Date(calMonth)
                           d.setDate(d.getDate() - 7)
@@ -1873,7 +1903,6 @@ export default function FormClient() {
                       } else {
                         const daysInMonth = new Date(year, month + 1, 0).getDate()
                         displayDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1))
-                        headerLabel = `${year}년 ${month + 1}월`
                         onPrev = () => { 
                           const d = new Date(year, month - 1)
                           setCalMonth(d)
@@ -2091,9 +2120,9 @@ export default function FormClient() {
 
                     {/* ③ 감정별 평균 강도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정별 평균 강도</p>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정별 평균 강도 · {headerLabel}</p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {dashboardData.length === 0 && <p style={{ fontSize: 13, color: t.muted }}>아직 기록이 없어요.</p>}
+                        {dashboardData.length === 0 && <p style={{ fontSize: 13, color: t.muted }}>{isCurrentPeriod ? '아직 기록이 없어요' : '이 기간엔 기록이 없어요'}</p>}
                         {standardEmotions
                           .map(emotion => {
                             const entries = dashboardData.filter(e => e.raw_emotion === emotion)
@@ -2116,9 +2145,9 @@ export default function FormClient() {
 
                     {/* ④ 감정 빈도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 8 }}>감정 빈도</p>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 8 }}>감정 빈도 · {headerLabel}</p>
                       {barData.length === 0 ? (
-                        <p style={{ fontSize: 13, color: t.muted }}>아직 기록이 없어요.</p>
+                        <p style={{ fontSize: 13, color: t.muted }}>{isCurrentPeriod ? '아직 기록이 없어요' : '이 기간엔 기록이 없어요'}</p>
                       ) : (
                         <ResponsiveContainer width="100%" height={Math.max(160, barData.length * 32)}>
                           <BarChart data={barData} barSize={20} layout="vertical">
@@ -2140,7 +2169,7 @@ export default function FormClient() {
                       background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
                       display: 'flex', flexDirection: 'column', gap: 16,
                     }}>
-                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>이번 주 vs 지난 주</p>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>이번 주 vs 지난 주 · 현재 기준</p>
                       <div>
                         <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 최다 감정</p>
                         <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
