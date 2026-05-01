@@ -12,13 +12,17 @@ export async function GET(req: Request) {
   const start = searchParams.get('start')
   const end = searchParams.get('end')
 
-  // 이번주/지난주 기간 계산 (항상 현재 기준)
+  // 이번주/지난주 기간 계산 (KST 기준)
   const now = new Date()
-  const startOfThisWeek = new Date(now)
-  startOfThisWeek.setDate(now.getDate() - now.getDay())
-  startOfThisWeek.setHours(0, 0, 0, 0)
+  const kstOffset = 9 * 60 * 60 * 1000
+  const kstNow = new Date(now.getTime() + kstOffset)
+  const kstDay = kstNow.getUTCDay()
+  const startOfThisWeekKST = new Date(kstNow.getTime() - kstDay * 24 * 60 * 60 * 1000)
+  startOfThisWeekKST.setUTCHours(0, 0, 0, 0)
+  const startOfThisWeek = new Date(startOfThisWeekKST.getTime() - kstOffset)
+
   const startOfLastWeek = new Date(startOfThisWeek)
-  startOfLastWeek.setDate(startOfThisWeek.getDate() - 7)
+  startOfLastWeek.setDate(startOfLastWeek.getDate() - 7)
 
   const [{ data: entries }, { data: recentData }, { data: thisWeekData }, { data: lastWeekData }, { data: emotions }] = await Promise.all([
     (() => {
@@ -27,8 +31,8 @@ export async function GET(req: Request) {
         .select('id, raw_emotion, intensity, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: true })
-      if (start) query = query.gte('created_at', new Date(start).toISOString())
-      if (end) query = query.lt('created_at', new Date(end).toISOString())
+      if (start) query = query.gte('created_at', new Date(`${start}T00:00:00+09:00`).toISOString())
+      if (end) query = query.lt('created_at', new Date(`${end}T00:00:00+09:00`).toISOString())
       return query
     })(),
     supabaseAdmin

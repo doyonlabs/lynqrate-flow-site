@@ -240,9 +240,9 @@ export default function FormClient() {
   // 초기 로드
   useEffect(() => {
     const load = async () => {
-      /* if (!localStorage.getItem('onboarding_done')) {
+      if (!localStorage.getItem('onboarding_done')) {
         setOnboardingOpen(true)
-      } */
+      }
 
       const initRes = await fetch('/api/init')
       if (!initRes.ok) {
@@ -473,8 +473,10 @@ export default function FormClient() {
       const year = targetMonth.getFullYear()
       const needsHoliday = !holidayCache.current[year]
 
+      const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
       const [dashboardRes, holidayRes] = await Promise.all([
-        fetch(`/api/dashboard?start=${start.toISOString()}&end=${end.toISOString()}`),
+        fetch(`/api/dashboard?start=${fmt(start)}&end=${fmt(end)}`),
         needsHoliday ? fetch(`https://holidays.hyunbin.page/${year}.json`) : Promise.resolve(null),
       ])
 
