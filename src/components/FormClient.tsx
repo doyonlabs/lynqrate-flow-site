@@ -238,38 +238,27 @@ export default function FormClient() {
   // 초기 로드
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
       /* if (!localStorage.getItem('onboarding_done')) {
         setOnboardingOpen(true)
       } */
 
-      const { data: userData } = await supabase
-        .from('users').select('display_name, email').eq('id', user.id).single()
-      if (userData) setUserInfo(userData)
-
-      const { data: subData } = await supabase
-        .from('subscriptions').select('plan, status, expires_at, creem_customer_id').eq('user_id', user.id).single()
-      if (subData) setSubscription(subData)
-
-      const now = new Date()
-      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      const { count } = await supabase
-        .from('emotion_entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', `${yearMonth}-01`)
-      if (count !== null) setMonthlyCount(count)
-
-      const { count: entryCount } = await supabase
-        .from('emotion_entries')
-        .select('*', { count: 'exact', head: true })
-      if (!entryCount || entryCount === 0) setIsFirstSession(true)
-
-      // fetchSessions + fetchTodayEntries + fetchDashboardData 한번에
       const initRes = await fetch('/api/init')
+      if (!initRes.ok) return
       const initData = await initRes.json()
+
+      if (initData.userInfo) setUserInfo(initData.userInfo)
+      if (initData.subscription) {
+        const sub = initData.subscription
+        const isExpired = (sub.status === 'canceled' || sub.status === 'scheduled_cancel')
+          && sub.expires_at
+          && new Date(sub.expires_at) < new Date()
+        setSubscription(isExpired
+          ? { plan: 'free', status: 'active', expires_at: null, creem_customer_id: null }
+          : sub
+        )
+      }
+      if (initData.monthlyCount !== undefined) setMonthlyCount(initData.monthlyCount)
+      if (initData.isFirstSession) setIsFirstSession(true)
       if (initData.sessions) setSessions(initData.sessions)
       if (initData.emotions) {
         const map: Record<string, string> = {}
@@ -279,34 +268,11 @@ export default function FormClient() {
         setEmotionColors(map)
         setStandardEmotions(initData.emotions.map((e: { name: string }) => e.name))
       }
+      if (initData.dashboardEntries) setDashboardData(initData.dashboardEntries)
       setDashboardLoading(false)
 
-      if (initData.dashboardEntries) {
-        setDashboardData(initData.dashboardEntries)
-      }
-
-      const { data: nullSessions } = await supabase
-        .from('chat_sessions')
-        .select('id')
-        .is('last_extracted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      const { data: allSessions } = await supabase
-        .from('chat_sessions')
-        .select('id, last_extracted_at, updated_at')
-        .not('last_extracted_at', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      const newMessageSessions = allSessions?.filter(s =>
-        new Date(s.last_extracted_at!) < new Date(s.updated_at)
-      ) ?? []
-
-      const incompleteSessions = [...(nullSessions ?? []), ...newMessageSessions]
-
-      if (incompleteSessions.length) {
-        incompleteSessions.forEach(s => {
+      if (initData.incompleteSessions?.length) {
+        initData.incompleteSessions.forEach((s: { id: string }) => {
           fetch('/api/chat/extract', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1700,7 +1666,13 @@ export default function FormClient() {
                   if (!isCurrentPeriod && total === 0) {
                     return isMobile ? '이 기간엔 기록이 없어요.' : `${headerLabel}엔 기록이 없어요.`
                   }
-                  if (!topEmotion) return '대화하다 보면 감정이 자동으로 기록돼요. 매일 조금씩 쌓이면 내 패턴이 보이기 시작해요.'
+                  if (!topEmotion) {
+                    return isFirstSession
+                      ? '대화하다 보면 감정이 자동으로 기록돼요. 매일 조금씩 쌓이면 내 패턴이 보이기 시작해요.'
+                      : isMobile
+                        ? '이번 주 기록이 없어요. 오늘 감정을 털어놓으면 패턴이 이어져요.'
+                        : '이번 달 기록이 없어요. 오늘 감정을 털어놓으면 패턴이 이어져요.'
+                  }
                   const topEmotionName = topEmotion[0]
                   const topEmotionCount = topEmotion[1]
                   const isNegative = NEGATIVE_EMOTIONS.includes(topEmotionName)
@@ -1768,7 +1740,7 @@ export default function FormClient() {
                           cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
                           alignSelf: isMobile ? 'flex-start' : 'center',
                         }}>
-                          {total === 0 ? '첫 대화 시작하기' : '오늘 털어놓기'}
+                          {total === 0 ? (isFirstSession ? '첫 대화 시작하기' : '오늘 털어놓기') : '오늘 털어놓기'}
                         </button>
                       )}
                     </div>
