@@ -129,6 +129,9 @@ export default function FormClient() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   // [FIX] dashboardLoading 초기값 true → 첫 렌더 empty state 플래시 방지
   const [dashboardData, setDashboardData] = useState<EmotionEntry[]>([])
+  const [thisWeekEntries, setThisWeekEntries] = useState<EmotionEntry[]>([])
+  const [lastWeekEntries, setLastWeekEntries] = useState<EmotionEntry[]>([])
+
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [emotionColors, setEmotionColors] = useState<Record<string, string>>({})
 
@@ -166,6 +169,18 @@ export default function FormClient() {
 
   const [isExtracting, setIsExtracting] = useState(false)
 
+  const [recentEntries, setRecentEntries] = useState<EmotionEntry[]>([])
+
+  const [modalEntries, setModalEntries] = useState<{id: string, trigger_text: string | null, summary: string | null}[]>([])
+  const [modalLoading, setModalLoading] = useState(false)
+  const [modalCache, setModalCache] = useState<Record<string, {id: string, trigger_text: string | null, summary: string | null}[]>>({})
+  const [currentPeriod, setCurrentPeriod] = useState(true)
+
+  const [insightLoading, setInsightLoading] = useState(false)
+
+  const calMonthRef = useRef(calMonth)
+  const isMobileRef = useRef(false)
+
   const settingsRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -189,6 +204,7 @@ export default function FormClient() {
     const checkViewport = () => {
       const mobile = window.innerWidth < 1024
       setIsMobile(mobile)
+      isMobileRef.current = mobile
       setSidebarOpen(!mobile)
       if (!mobile) setView(prev => prev === 'records' ? 'chat' : prev)
     }
@@ -226,41 +242,31 @@ export default function FormClient() {
   // 초기 로드
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
       if (!localStorage.getItem('onboarding_done')) {
         setOnboardingOpen(true)
       }
 
-      const { data: userData } = await supabase
-        .from('users').select('display_name, email').eq('id', user.id).single()
-      if (userData) setUserInfo(userData)
-
-      const { data: subData } = await supabase
-        .from('subscriptions').select('plan, status, expires_at, creem_customer_id').eq('user_id', user.id).single()
-      if (subData) setSubscription(subData)
-
-      const now = new Date()
-      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      const { count } = await supabase
-        .from('emotion_entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', `${yearMonth}-01`)
-      if (count !== null) setMonthlyCount(count)
-
-      const { count: entryCount } = await supabase
-        .from('emotion_entries')
-        .select('*', { count: 'exact', head: true })
-      if (!entryCount || entryCount === 0) setIsFirstSession(true)
-
-      // fetchSessions + fetchTodayEntries + fetchDashboardData 한번에
       const initRes = await fetch('/api/init')
+      if (!initRes.ok) {
+        setDashboardLoading(false)
+        return
+      }
       const initData = await initRes.json()
+
+      if (initData.userInfo) setUserInfo(initData.userInfo)
+      if (initData.subscription) {
+        const sub = initData.subscription
+        const isExpired = (sub.status === 'canceled' || sub.status === 'scheduled_cancel')
+          && sub.expires_at
+          && new Date(sub.expires_at) < new Date()
+        setSubscription(isExpired
+          ? { plan: 'free', status: 'active', expires_at: null, creem_customer_id: null }
+          : sub
+        )
+      }
+      if (initData.monthlyCount !== undefined) setMonthlyCount(initData.monthlyCount)
+      if (initData.isFirstSession) setIsFirstSession(true)
       if (initData.sessions) setSessions(initData.sessions)
-      if (initData.todayEntries) setTodayEntries(initData.todayEntries)
-      if (initData.lastEntry) setLastEntry(initData.lastEntry)
       if (initData.emotions) {
         const map: Record<string, string> = {}
         initData.emotions.forEach((e: { name: string; color_code: string }) => {
@@ -270,38 +276,46 @@ export default function FormClient() {
         setStandardEmotions(initData.emotions.map((e: { name: string }) => e.name))
       }
       if (initData.dashboardEntries) setDashboardData(initData.dashboardEntries)
+      if (initData.thisWeekEntries) setThisWeekEntries(initData.thisWeekEntries)
+      if (initData.lastWeekEntries) setLastWeekEntries(initData.lastWeekEntries)
+      if (initData.recentEntries) setRecentEntries(initData.recentEntries)
       setDashboardLoading(false)
 
-      const { data: nullSessions } = await supabase
-        .from('chat_sessions')
-        .select('id')
-        .is('last_extracted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      const { data: allSessions } = await supabase
-        .from('chat_sessions')
-        .select('id, last_extracted_at, updated_at')
-        .not('last_extracted_at', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      const newMessageSessions = allSessions?.filter(s =>
-        new Date(s.last_extracted_at!) < new Date(s.updated_at)
-      ) ?? []
-
-      const incompleteSessions = [...(nullSessions ?? []), ...newMessageSessions]
-
-      if (incompleteSessions.length) {
-        incompleteSessions.forEach(s => {
-          fetch('/api/chat/extract', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: s.id }),
-          }).then(res => {
-            if (res.ok) refreshAll(true)
-          }).catch(() => {})
-        })
+      if (initData.incompleteSessions?.length) {
+        initData.incompleteSessions
+          .filter((s: { id: string }) => {
+            if (sessionStorage.getItem(`extracted_${s.id}`)) {
+              sessionStorage.removeItem(`extracted_${s.id}`)
+              const now = new Date()
+              const start = new Date(now.getFullYear(), now.getMonth(), 1)
+              const end = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+              fetch(`/api/dashboard?start=${start.toISOString()}&end=${end.toISOString()}`)
+                .then(r => r.json())
+                .then(data => {
+                  if (data.entries) setDashboardData(data.entries)
+                  if (data.recentEntries) setRecentEntries(data.recentEntries)
+                  if (data.thisWeekEntries) setThisWeekEntries(data.thisWeekEntries)
+                  if (data.lastWeekEntries) setLastWeekEntries(data.lastWeekEntries)
+                })
+              fetch('/api/today')
+                .then(r => r.json())
+                .then(data => {
+                  if (data.entries) setTodayEntries(data.entries)
+                  if (data.lastEntry) setLastEntry(data.lastEntry)
+                })
+              return false
+            }
+            return true
+          })
+          .forEach((s: { id: string }) => {
+            fetch('/api/chat/extract', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId: s.id }),
+            }).then(res => {
+              if (res.ok) refreshAll(true)
+            }).catch(() => {})
+          })
       }
     }
 
@@ -317,10 +331,7 @@ export default function FormClient() {
   }, [])
 
   useEffect(() => {
-    if (view === 'dashboard') {
-      fetchDashboardData(true)  // silent=true로 변경
-      refreshAll()
-    }
+    if (view === 'chat') fetchTodayEntries()
     if (view === 'records') fetchSessions()
     if (view === 'settings') fetchSubscription()
   }, [view])
@@ -336,6 +347,7 @@ export default function FormClient() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && hasNewMessageRef.current && sessionIdRef.current) {
         const sid = sessionIdRef.current
+        sessionStorage.setItem(`extracted_${sid}`, 'true')  // fetch 전에 기록
         fetch('/api/chat/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -346,18 +358,22 @@ export default function FormClient() {
             setHasNewMessageWithRef(false)
             setMessagesSinceExtract(0)
             refreshAll(true)
+          } else {
+            sessionStorage.removeItem(`extracted_${sid}`)
           }
-        }).catch(() => {})
+        }).catch(() => {
+          sessionStorage.removeItem(`extracted_${sid}`)
+        })
       }
       if (document.visibilityState === 'visible') {
-        refreshAll(true)
+        fetchTodayEntries()
+        fetchDashboardData(true)
+        fetchMonthlyCount()
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   // 모바일 텍스트 입력시 하단 탭바 가리기
@@ -434,38 +450,76 @@ export default function FormClient() {
     }
   }
 
-  const fetchDashboardData = async (silent = false) => {
+  const holidayCache = useRef<Record<number, Record<string, string>>>({})
+  const fetchDashboardData = async (silent = false, targetMonth = calMonthRef.current) => {
     if (!silent) setDashboardLoading(true)
-    const res = await fetch('/api/dashboard')
-    const data = await res.json()
-    if (data.entries) setDashboardData(data.entries)
-    if (data.emotions) {
-      const map: Record<string, string> = {}
-      data.emotions.forEach((e: { name: string; color_code: string }) => { map[e.name] = e.color_code })
-      setEmotionColors(map)
-      setStandardEmotions(data.emotions.map((e: { name: string }) => e.name))
+    setInsightLoading(true)
+
+    let start: Date
+    let end: Date
+
+    if (isMobileRef.current) {
+      const weekStart = new Date(targetMonth)
+      weekStart.setDate(targetMonth.getDate() - targetMonth.getDay())
+      weekStart.setHours(0, 0, 0, 0)
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 7)
+      start = weekStart
+      end = weekEnd
+    } else {
+      start = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1)
+      end = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 1)
     }
+
     try {
-      const res = await fetch('https://holidays.hyunbin.page/2026.json')
-      const holidayData = await res.json()
-      const map: Record<string, string> = {}
-      Object.entries(holidayData).forEach(([date, names]) => {
-        const [, m, d] = date.split('-')
-        map[`${parseInt(m)}-${parseInt(d)}`] = (names as string[])[0]
-      })
-      setHolidays(map)
+      const year = targetMonth.getFullYear()
+      const needsHoliday = !holidayCache.current[year]
+
+      const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+
+      const [dashboardRes, holidayRes] = await Promise.all([
+        fetch(`/api/dashboard?start=${fmt(start)}&end=${fmt(end)}`),
+        needsHoliday ? fetch(`https://holidays.hyunbin.page/${year}.json`) : Promise.resolve(null),
+      ])
+
+      const data = await dashboardRes.json()
+      if (data.entries) setDashboardData(data.entries)
+      if (data.recentEntries) setRecentEntries(data.recentEntries)
+      if (data.thisWeekEntries) setThisWeekEntries(data.thisWeekEntries)
+      if (data.lastWeekEntries) setLastWeekEntries(data.lastWeekEntries)
+      if (data.emotions) {
+        const map: Record<string, string> = {}
+        data.emotions.forEach((e: { name: string; color_code: string }) => { map[e.name] = e.color_code })
+        setEmotionColors(map)
+        setStandardEmotions(data.emotions.map((e: { name: string }) => e.name))
+      }
+
+      if (needsHoliday && holidayRes) {
+        const holidayData = await holidayRes.json()
+        const map: Record<string, string> = {}
+        Object.entries(holidayData).forEach(([date, names]) => {
+          const [, m, d] = date.split('-')
+          map[`${parseInt(m)}-${parseInt(d)}`] = (names as string[])[0]
+        })
+        holidayCache.current[year] = map
+      }
+      setHolidays(holidayCache.current[year] ?? {})
     } catch {}
+
+    const now = new Date()
+    setCurrentPeriod(isMobileRef.current
+      ? targetMonth >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
+      : targetMonth.getFullYear() === now.getFullYear() && targetMonth.getMonth() === now.getMonth()
+    )
+    setInsightLoading(false)
     setDashboardLoading(false)
   }
 
   const refreshAll = useCallback(async (withDashboard = false) => {
-    await Promise.all([
-      fetchSessions(),
-      fetchTodayEntries(),
-      fetchMonthlyCount(),
-      fetchSubscription(),
-    ])
-    if (withDashboard) fetchDashboardData(true)
+    setModalCache({})
+    const tasks = [fetchTodayEntries(), fetchMonthlyCount()]
+    if (withDashboard) tasks.push(fetchDashboardData(true))
+    await Promise.all(tasks)
   }, [])
 
   // ─── 헬퍼 ────────────────────────────────────────────────────────────────
@@ -520,7 +574,7 @@ export default function FormClient() {
             if (res.ok && !result.skipped) {
               setHasNewMessageWithRef(false)
               setMessagesSinceExtract(0)
-              await refreshAll()
+              await refreshAll(true)
               setToast('첫 감정이 기록됐어요. 대화가 쌓이면 패턴이 보여요.')
               setTimeout(() => setToast(null), 4000)
             }
@@ -1620,11 +1674,27 @@ export default function FormClient() {
                   .sort((a, b) => b.count - a.count)
                   .filter(({ count }) => count > 0)
 
+                const thisWeekData = thisWeekEntries
+                const lastWeekData = lastWeekEntries
+                
+                // headerLabel 계산
+                const calYear = calMonth.getFullYear()
+                const calMonthNum = calMonth.getMonth()
+                let headerLabel: string
+                if (isMobile) {
+                  const weekStart = new Date(calMonth)
+                  weekStart.setDate(calMonth.getDate() - calMonth.getDay())
+                  const last = new Date(weekStart)
+                  last.setDate(weekStart.getDate() + 6)
+                  headerLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${last.getMonth() + 1}/${last.getDate()}`
+                } else {
+                  headerLabel = `${calYear}년 ${calMonthNum + 1}월`
+                }
+
                 const now = new Date()
-                const startOfThisWeek = new Date(now); startOfThisWeek.setDate(now.getDate() - now.getDay())
-                const startOfLastWeek = new Date(startOfThisWeek); startOfLastWeek.setDate(startOfThisWeek.getDate() - 7)
-                const thisWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfThisWeek)
-                const lastWeekData = dashboardData.filter(e => new Date(e.created_at) >= startOfLastWeek && new Date(e.created_at) < startOfThisWeek)
+                const isCurrentPeriod = isMobile
+                  ? calMonth >= new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
+                  : calMonth.getFullYear() === now.getFullYear() && calMonth.getMonth() === now.getMonth()
 
                 // 가장 많이 느낀 감정
                 const getTopEmotion = (data: typeof dashboardData) => {
@@ -1633,8 +1703,11 @@ export default function FormClient() {
                   data.forEach(e => { count[e.raw_emotion] = (count[e.raw_emotion] || 0) + 1 })
                   return Object.entries(count).sort((a, b) => b[1] - a[1])[0]
                 }
-                const thisWeekTop = getTopEmotion(thisWeekData)
-                const lastWeekTop = getTopEmotion(lastWeekData)
+                const thisWeekTop = isCurrentPeriod ? getTopEmotion(thisWeekEntries) : null
+                const lastWeekTop = isCurrentPeriod ? getTopEmotion(lastWeekEntries) : null
+
+                const weekTop = getTopEmotion(thisWeekEntries)
+                const prevWeekTop = getTopEmotion(lastWeekEntries)
 
                 const NEGATIVE_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움']
                 const POSITIVE_EMOTIONS = ['설렘', '기쁨', '감사', '평온']
@@ -1649,7 +1722,16 @@ export default function FormClient() {
                 const euro = (s: string) => hasFinalConsonant(s) ? '으로' : '로'
 
                 const insightText = (() => {
-                  if (!topEmotion) return '대화하다 보면 감정이 자동으로 기록돼요. 매일 조금씩 쌓이면 내 패턴이 보이기 시작해요.'
+                  if (!isCurrentPeriod && total === 0) {
+                    return isMobile ? '이 기간엔 기록이 없어요.' : `${headerLabel}엔 기록이 없어요.`
+                  }
+                  if (!topEmotion) {
+                    return isFirstSession
+                      ? '대화하다 보면 감정이 자동으로 기록돼요. 매일 조금씩 쌓이면 내 패턴이 보이기 시작해요.'
+                      : isMobile
+                        ? '이번 주 기록이 없어요. 오늘 감정을 털어놓으면 패턴이 이어져요.'
+                        : '이번 달 기록이 없어요. 오늘 감정을 털어놓으면 패턴이 이어져요.'
+                  }
                   const topEmotionName = topEmotion[0]
                   const topEmotionCount = topEmotion[1]
                   const isNegative = NEGATIVE_EMOTIONS.includes(topEmotionName)
@@ -1705,19 +1787,21 @@ export default function FormClient() {
                       alignItems: isMobile ? 'flex-start' : 'center',
                       justifyContent: 'space-between', gap: 12,
                     }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0, minHeight: 50 }}>
                         <p style={{ fontSize: 11, color: '#a78bfa', letterSpacing: '0.08em', marginBottom: 8 }}>감정 인사이트</p>
-                        <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }} data-clarity-mask="True">{insightText}</p>
+                        <p style={{ fontSize: isMobile ? 14 : 17, color: t.text, fontWeight: 600, lineHeight: 1.5, wordBreak: 'keep-all' }} data-clarity-mask="True">{insightLoading ? '' : insightText}</p>
                       </div>
-                      <button className="btn-action" onClick={() => { setView('chat'); handleNewChat() }} style={{
-                        flexShrink: 0, padding: '11px 22px', borderRadius: 20,
-                        background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
-                        border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
-                        cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-                        alignSelf: isMobile ? 'flex-start' : 'center',
-                      }}>
-                        {total === 0 ? '첫 대화 시작하기' : '오늘 털어놓기'}
-                      </button>
+                      {isCurrentPeriod && (
+                        <button className="btn-action" onClick={() => { setView('chat'); handleNewChat() }} style={{
+                          flexShrink: 0, padding: '11px 22px', borderRadius: 20,
+                          background: 'linear-gradient(135deg, #a78bfa, #60a5fa)',
+                          border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
+                          cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                          alignSelf: isMobile ? 'flex-start' : 'center',
+                        }}>
+                          {total === 0 ? (isFirstSession ? '첫 대화 시작하기' : '오늘 털어놓기') : '오늘 털어놓기'}
+                        </button>
+                      )}
                     </div>
 
                     {/* 구독 상태 카드 */}
@@ -1816,7 +1900,6 @@ export default function FormClient() {
                       const month = calMonth.getMonth()
 
                       let displayDays: Date[]
-                      let headerLabel: string
                       let onPrev: () => void
                       let onNext: () => void
 
@@ -1834,15 +1917,39 @@ export default function FormClient() {
                           return d
                         })
                         const last = displayDays[6]
-                        headerLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${last.getMonth() + 1}/${last.getDate()}`
-                        onPrev = () => { const d = new Date(calMonth); d.setDate(d.getDate() - 7); setCalMonth(d) }
-                        onNext = () => { const d = new Date(calMonth); d.setDate(d.getDate() + 7); setCalMonth(d) }
+                        onPrev = () => { 
+                          const d = new Date(calMonth)
+                          d.setDate(d.getDate() - 7)
+                          setCalMonth(d)
+                          calMonthRef.current = d
+                          setModalCache({})
+                          fetchDashboardData(true, d)
+                        }
+                        onNext = () => { 
+                          const d = new Date(calMonth)
+                          d.setDate(d.getDate() + 7)
+                          setCalMonth(d)
+                          calMonthRef.current = d
+                          setModalCache({})
+                          fetchDashboardData(true, d)
+                        }
                       } else {
                         const daysInMonth = new Date(year, month + 1, 0).getDate()
                         displayDays = Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1))
-                        headerLabel = `${year}년 ${month + 1}월`
-                        onPrev = () => setCalMonth(new Date(year, month - 1))
-                        onNext = () => setCalMonth(new Date(year, month + 1))
+                        onPrev = () => { 
+                          const d = new Date(year, month - 1)
+                          setCalMonth(d)
+                          calMonthRef.current = d
+                          setModalCache({})
+                          fetchDashboardData(true, d)
+                        }
+                        onNext = () => { 
+                          const d = new Date(year, month + 1)
+                          setCalMonth(d)
+                          calMonthRef.current = d
+                          setModalCache({})
+                          fetchDashboardData(true, d)
+                        }
                       }
 
                       const emotionList = standardEmotions
@@ -1916,13 +2023,35 @@ export default function FormClient() {
                                   return (
                                     <div
                                       key={i}
-                                      onClick={() => {
-                                        if (cell) {
-                                          setSelectedDay(fullDateKey)
-                                          setSelectedEmotion(emotion)
-                                          setCalModalOpen(true)
+                                      onClick={async () => {
+                                      if (cell) {
+                                        const cacheKey = `${fullDateKey}__${emotion}`
+                                        setSelectedDay(fullDateKey)
+                                        setSelectedEmotion(emotion)
+                                        setCalModalOpen(true)
+
+                                        if (modalCache[cacheKey]) {
+                                          setModalEntries(modalCache[cacheKey])
+                                          return
                                         }
-                                      }}
+
+                                        setModalLoading(true)
+                                        const ids = dashboardData
+                                          .filter(e => {
+                                            const ed = new Date(e.created_at)
+                                            return `${ed.getMonth() + 1}-${ed.getDate()}` === dateKey && e.raw_emotion === emotion
+                                          })
+                                          .map(e => e.id)
+
+                                        const res = await fetch(`/api/entry?ids=${ids.join(',')}`)
+                                        const data = await res.json()
+                                        if (data.entries) {
+                                          setModalCache(prev => ({ ...prev, [cacheKey]: data.entries }))
+                                          setModalEntries(data.entries)
+                                        }
+                                        setModalLoading(false)
+                                      }
+                                    }}
                                       className={`heatmap-cell${cell ? ' heatmap-cell--clickable' : ' heatmap-cell--empty'}`}
                                       style={{
                                         background: `${color}${alphaHex}`,
@@ -1939,15 +2068,11 @@ export default function FormClient() {
                           </div>
                           {/* 모달 */}
                           {calModalOpen && selectedDay && selectedEmotion && (() => {
-                            const allEntries = dashboardData.filter(e =>
-                              new Date(e.created_at).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }) === selectedDay
-                              && e.raw_emotion === selectedEmotion
-                            )
                             const parts = selectedDay.split('. ')
                             const dateLabel = `${parts[1]}월 ${parts[2]?.replace('.', '')}일`
                             return (
                               <div
-                                onClick={() => setCalModalOpen(false)}
+                                onClick={() => { setCalModalOpen(false); setModalEntries([]) }}
                                 style={{
                                   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
                                   zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
@@ -1967,16 +2092,21 @@ export default function FormClient() {
                                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: emotionColors[selectedEmotion] ?? '#a78bfa' }} />
                                       <span style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{dateLabel} · {selectedEmotion}</span>
                                     </div>
-                                    <button onClick={() => setCalModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
+                                    <button onClick={() => { setCalModalOpen(false); setModalEntries([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
-                                    {allEntries.map(e => (
-                                      <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }} data-clarity-mask="True">
-                                        <span style={{ fontSize: 12, color: '#a78bfa' }}>강도 {e.intensity}</span>
-                                        {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, opacity: 0.7 }}>{e.trigger_text}</p>}
-                                        {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{e.summary}</p>}
-                                      </div>
-                                    ))}
+                                    {modalLoading ? (
+                                      <p style={{ fontSize: 13, color: t.muted, textAlign: 'center', padding: '12px 0' }}>불러오는 중...</p>
+                                    ) : modalEntries.map(e => {
+                                      const dashEntry = dashboardData.find(d => d.id === e.id)
+                                      return (
+                                        <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }} data-clarity-mask="True">
+                                          {dashEntry && <span style={{ fontSize: 12, color: '#a78bfa' }}>강도 {dashEntry.intensity}</span>}
+                                          {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, opacity: 0.7 }}>{e.trigger_text}</p>}
+                                          {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{e.summary}</p>}
+                                        </div>
+                                      )
+                                    })}
                                   </div>
                                 </div>
                               </div>
@@ -1988,11 +2118,8 @@ export default function FormClient() {
 
                     {/* ② 최근 기록 */}
                     {(() => {
-                      const recentEntries = [...dashboardData]
-                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                        .slice(0, 5)
-                        .filter(e => e.summary)
-                      if (recentEntries.length === 0) return null
+                      const recentEntriesFiltered = recentEntries.filter(e => e.summary)
+                      if (recentEntriesFiltered.length === 0) return null
                       return (
                         <div style={{
                           gridColumn: fullSpan,
@@ -2000,7 +2127,7 @@ export default function FormClient() {
                         }}>
                           <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>최근 기록</p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {recentEntries.map((e) => {
+                            {recentEntriesFiltered.map((e) => {
                               const createdDate = new Date(e.created_at)
                               const timeLabel = createdDate.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit', hour12: true })
                               const today = new Date()
@@ -2035,9 +2162,9 @@ export default function FormClient() {
 
                     {/* ③ 감정별 평균 강도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정별 평균 강도</p>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 16 }}>감정별 평균 강도 · {headerLabel}</p>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {dashboardData.length === 0 && <p style={{ fontSize: 13, color: t.muted }}>아직 기록이 없어요.</p>}
+                        {dashboardData.length === 0 && <p style={{ fontSize: 13, color: t.muted }}>{isCurrentPeriod ? '아직 기록이 없어요' : '이 기간엔 기록이 없어요'}</p>}
                         {standardEmotions
                           .map(emotion => {
                             const entries = dashboardData.filter(e => e.raw_emotion === emotion)
@@ -2060,9 +2187,9 @@ export default function FormClient() {
 
                     {/* ④ 감정 빈도 */}
                     <div style={{ background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px' }}>
-                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 8 }}>감정 빈도</p>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500, marginBottom: 8 }}>감정 빈도 · {headerLabel}</p>
                       {barData.length === 0 ? (
-                        <p style={{ fontSize: 13, color: t.muted }}>아직 기록이 없어요.</p>
+                        <p style={{ fontSize: 13, color: t.muted }}>{isCurrentPeriod ? '아직 기록이 없어요' : '이 기간엔 기록이 없어요'}</p>
                       ) : (
                         <ResponsiveContainer width="100%" height={Math.max(160, barData.length * 32)}>
                           <BarChart data={barData} barSize={20} layout="vertical">
@@ -2084,12 +2211,12 @@ export default function FormClient() {
                       background: t.sidebar, border: `1px solid ${t.border}`, borderRadius: 20, padding: '24px 28px',
                       display: 'flex', flexDirection: 'column', gap: 16,
                     }}>
-                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>이번 주 vs 지난 주</p>
+                      <p style={{ fontSize: 14, color: t.text, fontWeight: 500 }}>이번 주 vs 지난 주 · 현재 기준</p>
                       <div>
                         <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 최다 감정</p>
                         <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
-                          {thisWeekTop
-                            ? <>{thisWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{thisWeekTop[1]}회</span></>
+                          {weekTop
+                            ? <>{weekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{weekTop[1]}회</span></>
                             : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
                         </p>
                       </div>
@@ -2097,16 +2224,16 @@ export default function FormClient() {
                       <div>
                         <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>지난 주 최다 감정</p>
                         <p style={{ fontSize: 22, fontWeight: 700, color: t.text }}>
-                          {lastWeekTop
-                            ? <>{lastWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{lastWeekTop[1]}회</span></>
+                          {prevWeekTop
+                            ? <>{prevWeekTop[0]}<span style={{ fontSize: 13, color: t.muted, marginLeft: 4 }}>{prevWeekTop[1]}회</span></>
                             : <span style={{ fontSize: 14, color: t.muted }}>기록 없음</span>}
                         </p>
                       </div>
                       <div style={{ height: 1, background: t.border }} />
                       <div>
                         <p style={{ fontSize: 11, color: t.muted, marginBottom: 6 }}>이번 주 기록 횟수</p>
-                        <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekData.length}회</p>
-                        <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekData.length}회</p>
+                        <p style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{thisWeekEntries.length}회</p>
+                        <p style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>지난 주 {lastWeekEntries.length}회</p>
                       </div>
                     </div>
                   </div>
