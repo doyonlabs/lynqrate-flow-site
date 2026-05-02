@@ -516,7 +516,6 @@ export default function FormClient() {
   }
 
   const refreshAll = useCallback(async (withDashboard = false) => {
-    console.log('refreshAll 호출')
     setModalCache({})
     const tasks = [fetchTodayEntries(), fetchMonthlyCount()]
     if (withDashboard) tasks.push(fetchDashboardData(true))
