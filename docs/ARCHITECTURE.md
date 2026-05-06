@@ -1,6 +1,6 @@
 # Mind-Echo 아키텍처 문서
 
-> 마지막 업데이트: 2026-05-02
+> 마지막 업데이트: 2026-05-06
 > 작업 이력은 주요 기능/구조 변경만 기록. UI·디자인·텍스트 변경은 git 커밋 메시지로 관리.
 
 ---
@@ -94,7 +94,6 @@ Google 로그인 클릭
 | `src/app/api/dashboard/route.ts` | 대시보드 데이터 조회 + 복호화 |
 | `src/app/api/today/route.ts` | 오늘 감정 데이터 조회 + 복호화 |
 | `src/app/api/init/route.ts` | 초기 로드 데이터 통합 조회 (sessions, emotions, dashboardEntries, userInfo, subscription, monthlyCount, isFirstSession, incompleteSessions, thisWeekEntries, lastWeekEntries, recentEntries) |
-| `src/app/api/entry/route.ts` | 히트맵 셀 클릭 시 trigger_text/summary 단건 조회 + 복호화 |
 | `src/middleware.ts` | 비로그인 접근 차단 + 로그인 상태에서 /login, / 접근 시 /form 리다이렉트 |
 | `src/lib/crypto.ts` | AES-256-GCM 암호화/복호화 유틸 (encrypt, safeDecrypt) |
 
@@ -171,7 +170,8 @@ iOS 확대 방지: textarea fontSize 16px 이상 유지
 ```json
 {
   "messages": [{ "role": "user", "content": "..." }],
-  "sessionId": "uuid (없으면 신규 세션 생성)"
+  "sessionId": "uuid (없으면 신규 세션 생성)",
+  "messagesSinceExtract": "number (추출 후 누적 메시지 수, 프롬프트 솔루션 제안 타이밍 제어)"
 }
 ```
 
@@ -254,7 +254,7 @@ chat_sessions (대화 세션)
     ↓
 chat_messages (메시지 원문)
 emotion_entries (감정 추출 데이터 — 대시보드 원천, 세션당 N개 가능)
-standard_emotions (표준 감정 분류 10개)
+standard_emotions (표준 감정 분류 9개)
 ```
 
 ### 주요 테이블 설명
@@ -267,7 +267,7 @@ standard_emotions (표준 감정 분류 10개)
 | `chat_sessions` | 대화 세션 단위 (사이드바/기록 탭 목록), last_extracted_at 컬럼으로 추출 시점 관리 |
 | `chat_messages` | 세션별 메시지 원문 (role: user/assistant) |
 | `emotion_entries` | 자동 추출 감정 데이터 (대시보드 분석 원천, 세션:엔트리 = N:M) |
-| `standard_emotions` | 표준 감정 10개: 불안/무기력/분노/슬픔/외로움/두려움/설렘/기쁨/감사/평온 |
+| `standard_emotions` | 표준 감정 9개: 불안/걱정, 지침/번아웃, 분노/억울, 슬픔/상실, 외로움, 두려움, 기쁨/설렘, 감사/평온, 복합/일상 |
 
 ### 스키마 파일
 
@@ -385,6 +385,10 @@ supabase/
 - [x] 대시보드 이번주/지난주 카드 현재 기준 고정 (히트맵 기간 이동과 무관)
 - [x] 히트맵 기간별 인사이트/빈도/강도 카드 연동
 - [x] /api/init 주간/월경계 모바일 데이터 누락 수정
+- [x] /api/init 쿼리 12개 → 6개 최적화 (emotion_entries/chat_sessions JS 파생으로 통합)
+- [x] /api/entry 제거 → dashboardEntries에 trigger_text/summary 포함으로 대체
+- [x] 채팅 프롬프트 개선 (톤 완화, 새 주제 던지기, messagesSinceExtract 기반 솔루션 제안)
+- [x] 감정 카테고리 10개 → 9개 개편 (복합/일상 추가, 슬래시 복합 라벨 도입)
 - [ ] 대화 내용 개별 삭제 기능
 - [ ] 모든 기기 일괄 로그아웃 기능
 - [ ] iOS Safari 탭/앱 전환 추출 개선 (sendBeacon)
