@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   const startOfLastWeek = new Date(startOfThisWeek)
   startOfLastWeek.setDate(startOfLastWeek.getDate() - 7)
 
-  const [{ data: entries }, { data: currentData }, { data: emotions }] = await Promise.all([
+  const [{ data: entries }, { data: currentData }, { data: emotions }, { data: recentData }] = await Promise.all([
     // 히트맵용 — start/end 기간
     (() => {
       let query = supabaseAdmin
@@ -45,6 +45,12 @@ export async function GET(req: Request) {
       .from('standard_emotions')
       .select('name, color_code')
       .order('soft_order'),
+    supabaseAdmin
+        .from('emotion_entries')
+        .select('id, raw_emotion, intensity, trigger_text, summary, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5),
   ])
 
   // JS에서 파생
@@ -54,7 +60,6 @@ export async function GET(req: Request) {
     new Date(e.created_at) >= startOfLastWeek &&
     new Date(e.created_at) < startOfThisWeek
   )
-  const recentEntries = [...current].reverse().slice(0, 5)
 
   const decryptEntry = (e: typeof current[0]) => ({
     ...e,
@@ -64,7 +69,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     entries: (entries ?? []).map(decryptEntry),
-    recentEntries: recentEntries.map(decryptEntry),
+    recentEntries: (recentData ?? []).map(decryptEntry),
     thisWeekEntries: thisWeekEntries.map(decryptEntry),
     lastWeekEntries: lastWeekEntries.map(decryptEntry),
     emotions: emotions ?? [],

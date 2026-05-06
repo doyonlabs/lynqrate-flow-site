@@ -28,6 +28,7 @@ export async function GET() {
     { data: userData },
     { data: subData },
     { count: totalEntryCount },
+    { data: recentData },
   ] = await Promise.all([
     // chat_sessions 3개 → 1개
     supabaseAdmin
@@ -63,6 +64,12 @@ export async function GET() {
       .from('emotion_entries')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id),
+    supabaseAdmin
+      .from('emotion_entries')
+      .select('id, raw_emotion, intensity, trigger_text, summary, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
   ])
 
   // JS에서 파생
@@ -74,7 +81,6 @@ export async function GET() {
     new Date(e.created_at) < startOfThisWeek
   )
   const monthlyCount = entries.filter(e => e.created_at.startsWith(yearMonth)).length
-  const recentEntries = [...entries].reverse().slice(0, 5)
 
   // chat_sessions JS 파생
   const allSessions = sessions ?? []
@@ -106,6 +112,6 @@ export async function GET() {
     incompleteSessions: uniqueIncomplete,
     thisWeekEntries: thisWeekEntries.map(decryptEntry),
     lastWeekEntries: lastWeekEntries.map(decryptEntry),
-    recentEntries: recentEntries.map(decryptEntry),
+    recentEntries: (recentData ?? []).map(decryptEntry),
   })
 }

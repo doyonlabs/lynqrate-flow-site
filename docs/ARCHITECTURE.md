@@ -385,7 +385,7 @@ supabase/
 - [x] 대시보드 이번주/지난주 카드 현재 기준 고정 (히트맵 기간 이동과 무관)
 - [x] 히트맵 기간별 인사이트/빈도/강도 카드 연동
 - [x] /api/init 주간/월경계 모바일 데이터 누락 수정
-- [x] /api/init 쿼리 12개 → 6개 최적화 (emotion_entries/chat_sessions JS 파생으로 통합)
+- [x] /api/init 쿼리 12개 → 7개 최적화 (emotion_entries/chat_sessions JS 파생으로 통합)
 - [x] /api/entry 제거 → dashboardEntries에 trigger_text/summary 포함으로 대체
 - [x] 채팅 프롬프트 개선 (톤 완화, 새 주제 던지기, messagesSinceExtract 기반 솔루션 제안)
 - [x] 감정 카테고리 10개 → 9개 개편 (복합/일상 추가, 슬래시 복합 라벨 도입)
