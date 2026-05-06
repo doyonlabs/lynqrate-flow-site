@@ -1764,6 +1764,10 @@ export default function FormClient() {
                     return `${topEmotionName}${i(topEmotionName)} 자주 찾아온 시간이었어요. 꺼낼수록 조금씩 비워져요.`
                   }
 
+                  if (topEmotionName === '복합/일상') {
+                    return `${topEmotionCount}번의 기록 중 복합적인 감정이 가장 많았어요. 다양한 감정이 오가는 시간이었네요.`
+                  }
+
                   if (isPositive) {
                     if (topEmotionName === '감사/평온')
                       return `${topEmotionCount}번의 기록 중 감사/평온이 가장 많았어요. 잔잔한 시간이 이어지고 있어요.`
