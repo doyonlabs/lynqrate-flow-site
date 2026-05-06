@@ -545,6 +545,7 @@ export default function FormClient() {
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })),
           sessionId,
+          messagesSinceExtract,
         }),
       })
       const data = await res.json()
