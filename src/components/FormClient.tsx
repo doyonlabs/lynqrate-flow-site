@@ -19,6 +19,8 @@ interface ChatSession {
   title: string | null
   started_at: string
   ended_at: string | null
+  last_extracted_at: string | null
+  updated_at: string
 }
 
 interface UserInfo {
@@ -39,7 +41,7 @@ interface EmotionEntry {
   intensity: number
   created_at: string
   summary: string | null
-  trigger_text?: string
+  trigger_text: string | null
 }
 
 type View = 'chat' | 'settings' | 'dashboard' | 'records'
@@ -171,9 +173,8 @@ export default function FormClient() {
 
   const [recentEntries, setRecentEntries] = useState<EmotionEntry[]>([])
 
-  const [modalEntries, setModalEntries] = useState<{id: string, trigger_text: string | null, summary: string | null}[]>([])
-  const [modalLoading, setModalLoading] = useState(false)
-  const [modalCache, setModalCache] = useState<Record<string, {id: string, trigger_text: string | null, summary: string | null}[]>>({})
+  const [modalEntries, setModalEntries] = useState<{id: string, raw_emotion: string, intensity: number, trigger_text: string | null, summary: string | null, created_at: string}[]>([])
+  const [modalCache, setModalCache] = useState<Record<string, {id: string, raw_emotion: string, intensity: number, trigger_text: string | null, summary: string | null, created_at: string}[]>>({})
   const [currentPeriod, setCurrentPeriod] = useState(true)
 
   const [insightLoading, setInsightLoading] = useState(false)
@@ -2036,21 +2037,12 @@ export default function FormClient() {
                                           return
                                         }
 
-                                        setModalLoading(true)
-                                        const ids = dashboardData
-                                          .filter(e => {
-                                            const ed = new Date(e.created_at)
-                                            return `${ed.getMonth() + 1}-${ed.getDate()}` === dateKey && e.raw_emotion === emotion
-                                          })
-                                          .map(e => e.id)
-
-                                        const res = await fetch(`/api/entry?ids=${ids.join(',')}`)
-                                        const data = await res.json()
-                                        if (data.entries) {
-                                          setModalCache(prev => ({ ...prev, [cacheKey]: data.entries }))
-                                          setModalEntries(data.entries)
-                                        }
-                                        setModalLoading(false)
+                                        const entries = dashboardData.filter(e => {
+                                        const ed = new Date(e.created_at)
+                                          return `${ed.getMonth() + 1}-${ed.getDate()}` === dateKey && e.raw_emotion === emotion
+                                        })
+                                        setModalCache(prev => ({ ...prev, [cacheKey]: entries }))
+                                        setModalEntries(entries)
                                       }
                                     }}
                                       className={`heatmap-cell${cell ? ' heatmap-cell--clickable' : ' heatmap-cell--empty'}`}
@@ -2096,18 +2088,13 @@ export default function FormClient() {
                                     <button onClick={() => { setCalModalOpen(false); setModalEntries([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: t.muted, fontSize: 20, lineHeight: 1, padding: 4 }}>×</button>
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '60vh', overflowY: 'auto' }}>
-                                    {modalLoading ? (
-                                      <p style={{ fontSize: 13, color: t.muted, textAlign: 'center', padding: '12px 0' }}>불러오는 중...</p>
-                                    ) : modalEntries.map(e => {
-                                      const dashEntry = dashboardData.find(d => d.id === e.id)
-                                      return (
-                                        <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }} data-clarity-mask="True">
-                                          {dashEntry && <span style={{ fontSize: 12, color: '#a78bfa' }}>강도 {dashEntry.intensity}</span>}
-                                          {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, opacity: 0.7 }}>{e.trigger_text}</p>}
-                                          {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{e.summary}</p>}
-                                        </div>
-                                      )
-                                    })}
+                                    {modalEntries.map(e => (
+                                      <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 16px', borderRadius: 12, background: t.hover }} data-clarity-mask="True">
+                                        <span style={{ fontSize: 12, color: '#a78bfa' }}>강도 {e.intensity}</span>
+                                        {e.trigger_text && <p style={{ fontSize: 12, color: t.muted, lineHeight: 1.5, opacity: 0.7 }}>{e.trigger_text}</p>}
+                                        {e.summary && <p style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{e.summary}</p>}
+                                      </div>
+                                    ))}
                                   </div>
                                 </div>
                               </div>

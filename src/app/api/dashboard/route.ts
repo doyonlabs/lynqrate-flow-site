@@ -12,7 +12,6 @@ export async function GET(req: Request) {
   const start = searchParams.get('start')
   const end = searchParams.get('end')
 
-  // 이번주/지난주 기간 계산 (KST 기준)
   const now = new Date()
   const kstOffset = 9 * 60 * 60 * 1000
   const kstNow = new Date(now.getTime() + kstOffset)
@@ -20,39 +19,27 @@ export async function GET(req: Request) {
   const startOfThisWeekKST = new Date(kstNow.getTime() - kstDay * 24 * 60 * 60 * 1000)
   startOfThisWeekKST.setUTCHours(0, 0, 0, 0)
   const startOfThisWeek = new Date(startOfThisWeekKST.getTime() - kstOffset)
-
   const startOfLastWeek = new Date(startOfThisWeek)
   startOfLastWeek.setDate(startOfLastWeek.getDate() - 7)
 
-  const [{ data: entries }, { data: recentData }, { data: thisWeekData }, { data: lastWeekData }, { data: emotions }] = await Promise.all([
+  const [{ data: entries }, { data: currentData }, { data: emotions }] = await Promise.all([
+    // 히트맵용 — start/end 기간
     (() => {
       let query = supabaseAdmin
         .from('emotion_entries')
-        .select('id, raw_emotion, intensity, created_at')
+        .select('id, raw_emotion, intensity, trigger_text, summary, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: true })
       if (start) query = query.gte('created_at', new Date(`${start}T00:00:00+09:00`).toISOString())
       if (end) query = query.lt('created_at', new Date(`${end}T00:00:00+09:00`).toISOString())
       return query
     })(),
+    // thisWeek/lastWeek/recent 통합 — 지난주부터 현재까지
     supabaseAdmin
       .from('emotion_entries')
-      .select('id, raw_emotion, intensity, created_at, summary')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5),
-    supabaseAdmin
-      .from('emotion_entries')
-      .select('id, raw_emotion, intensity, created_at')
-      .eq('user_id', user.id)
-      .gte('created_at', startOfThisWeek.toISOString())
-      .order('created_at', { ascending: true }),
-    supabaseAdmin
-      .from('emotion_entries')
-      .select('id, raw_emotion, intensity, created_at')
+      .select('id, raw_emotion, intensity, trigger_text, summary, created_at')
       .eq('user_id', user.id)
       .gte('created_at', startOfLastWeek.toISOString())
-      .lt('created_at', startOfThisWeek.toISOString())
       .order('created_at', { ascending: true }),
     supabaseAdmin
       .from('standard_emotions')
@@ -60,14 +47,26 @@ export async function GET(req: Request) {
       .order('soft_order'),
   ])
 
+  // JS에서 파생
+  const current = currentData ?? []
+  const thisWeekEntries = current.filter(e => new Date(e.created_at) >= startOfThisWeek)
+  const lastWeekEntries = current.filter(e =>
+    new Date(e.created_at) >= startOfLastWeek &&
+    new Date(e.created_at) < startOfThisWeek
+  )
+  const recentEntries = [...current].reverse().slice(0, 5)
+
+  const decryptEntry = (e: typeof current[0]) => ({
+    ...e,
+    trigger_text: e.trigger_text ? safeDecrypt(e.trigger_text) : null,
+    summary: e.summary ? safeDecrypt(e.summary) : null,
+  })
+
   return NextResponse.json({
-    entries: entries ?? [],
-    recentEntries: (recentData ?? []).map(e => ({
-      ...e,
-      summary: e.summary ? safeDecrypt(e.summary) : null,
-    })),
-    thisWeekEntries: thisWeekData ?? [],
-    lastWeekEntries: lastWeekData ?? [],
+    entries: (entries ?? []).map(decryptEntry),
+    recentEntries: recentEntries.map(decryptEntry),
+    thisWeekEntries: thisWeekEntries.map(decryptEntry),
+    lastWeekEntries: lastWeekEntries.map(decryptEntry),
     emotions: emotions ?? [],
   })
 }
