@@ -24,20 +24,15 @@ export async function GET() {
   const [
     { data: sessions },
     { data: emotions },
-    { data: dashboardData },
+    { data: allEntries },
     { data: userData },
     { data: subData },
-    { count: monthlyCount },
     { count: totalEntryCount },
-    { data: nullSessions },
-    { data: incompleteSessions },
-    { data: thisWeekData },
-    { data: lastWeekData },
-    { data: recentData },
   ] = await Promise.all([
+    // chat_sessions 3개 → 1개
     supabaseAdmin
       .from('chat_sessions')
-      .select('id, title, started_at, ended_at')
+      .select('id, title, started_at, ended_at, last_extracted_at, updated_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(30),
@@ -45,11 +40,12 @@ export async function GET() {
       .from('standard_emotions')
       .select('name, color_code')
       .order('soft_order'),
+    // emotion_entries 6개 → 1개
     supabaseAdmin
       .from('emotion_entries')
-      .select('id, raw_emotion, intensity, created_at')
+      .select('id, raw_emotion, intensity, trigger_text, summary, created_at')
       .eq('user_id', user.id)
-      .gte('created_at', startOfData.toISOString())
+      .gte('created_at', startOfLastWeek.toISOString())
       .lt('created_at', startOfNextMonth.toISOString())
       .order('created_at', { ascending: true }),
     supabaseAdmin
@@ -62,76 +58,54 @@ export async function GET() {
       .select('plan, status, expires_at, creem_customer_id')
       .eq('user_id', user.id)
       .single(),
-    supabaseAdmin
-      .from('emotion_entries')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .gte('created_at', `${yearMonth}-01`),
+    // isFirstSession 판단용 — 데이터 없이 카운트만
     supabaseAdmin
       .from('emotion_entries')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id),
-    supabaseAdmin
-      .from('chat_sessions')
-      .select('id')
-      .eq('user_id', user.id)
-      .is('last_extracted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(5),
-    supabaseAdmin
-      .from('chat_sessions')
-      .select('id, last_extracted_at, updated_at')
-      .eq('user_id', user.id)
-      .not('last_extracted_at', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(5),
-    supabaseAdmin
-      .from('emotion_entries')
-      .select('id, raw_emotion, intensity, created_at')
-      .eq('user_id', user.id)
-      .gte('created_at', startOfThisWeek.toISOString())
-      .order('created_at', { ascending: true }),
-    supabaseAdmin
-      .from('emotion_entries')
-      .select('id, raw_emotion, intensity, created_at')
-      .eq('user_id', user.id)
-      .gte('created_at', startOfLastWeek.toISOString())
-      .lt('created_at', startOfThisWeek.toISOString())
-      .order('created_at', { ascending: true }),
-    supabaseAdmin
-      .from('emotion_entries')
-      .select('id, raw_emotion, intensity, created_at, summary')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5),
   ])
 
-  const newMessageSessions = incompleteSessions?.filter(s =>
-    new Date(s.last_extracted_at!) < new Date(s.updated_at)
-  ) ?? []
+  // JS에서 파생
+  const entries = allEntries ?? []
+  const dashboardEntries = entries.filter(e => new Date(e.created_at) >= startOfData)
+  const thisWeekEntries = entries.filter(e => new Date(e.created_at) >= startOfThisWeek)
+  const lastWeekEntries = entries.filter(e =>
+    new Date(e.created_at) >= startOfLastWeek &&
+    new Date(e.created_at) < startOfThisWeek
+  )
+  const monthlyCount = entries.filter(e => e.created_at.startsWith(yearMonth)).length
+  const recentEntries = [...entries].reverse().slice(0, 5)
 
-  const allIncomplete = [...(nullSessions ?? []), ...newMessageSessions]
-  const uniqueIncomplete = allIncomplete.filter(
+  // chat_sessions JS 파생
+  const allSessions = sessions ?? []
+  const nullSessions = allSessions.filter(s => !s.last_extracted_at)
+  const newMessageSessions = allSessions.filter(s =>
+    s.last_extracted_at && new Date(s.last_extracted_at) < new Date(s.updated_at)
+  )
+  const uniqueIncomplete = [...nullSessions, ...newMessageSessions].filter(
     (s, index, self) => self.findIndex(t => t.id === s.id) === index
   )
 
+  const decryptEntry = (e: typeof entries[0]) => ({
+    ...e,
+    trigger_text: e.trigger_text ? safeDecrypt(e.trigger_text) : null,
+    summary: e.summary ? safeDecrypt(e.summary) : null,
+  })
+
   return NextResponse.json({
-    sessions: (sessions ?? []).map(s => ({
+    sessions: allSessions.map(s => ({
       ...s,
       title: s.title ? safeDecrypt(s.title) : null,
     })),
     emotions: emotions ?? [],
-    dashboardEntries: dashboardData ?? [],
+    dashboardEntries: dashboardEntries.map(decryptEntry),
     userInfo: userData ?? null,
     subscription: subData ?? null,
-    monthlyCount: monthlyCount ?? 0,
+    monthlyCount,
     isFirstSession: !totalEntryCount || totalEntryCount === 0,
     incompleteSessions: uniqueIncomplete,
-    thisWeekEntries: thisWeekData ?? [],
-    lastWeekEntries: lastWeekData ?? [],
-    recentEntries: (recentData ?? []).map(e => ({
-      ...e,
-      summary: e.summary ? safeDecrypt(e.summary) : null,
-    })),
+    thisWeekEntries: thisWeekEntries.map(decryptEntry),
+    lastWeekEntries: lastWeekEntries.map(decryptEntry),
+    recentEntries: recentEntries.map(decryptEntry),
   })
 }
