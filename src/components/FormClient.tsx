@@ -797,6 +797,7 @@ export default function FormClient() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {[
                 { icon: '💬', text: '지금 마음을 털어놓아요' },
+                { icon: '✍️', text: '자세히 털어놓을수록 대화가 풍부해져요' },
                 { icon: '✦', text: '한 대화에서 5번 이상 말하면 감정 담기 버튼이 나타나요' },
                 { icon: '🔄', text: '버튼을 누르지 않아도 다음에 돌아오면 자동으로 기록돼요' },
                 { icon: '📊', text: '기록이 쌓이면 대시보드에서 패턴이 보여요' },
@@ -2038,9 +2039,9 @@ export default function FormClient() {
                                         }
 
                                         const entries = dashboardData.filter(e => {
-                                        const ed = new Date(e.created_at)
+                                          const ed = new Date(e.created_at)
                                           return `${ed.getMonth() + 1}-${ed.getDate()}` === dateKey && e.raw_emotion === emotion
-                                        })
+                                        }).reverse()
                                         setModalCache(prev => ({ ...prev, [cacheKey]: entries }))
                                         setModalEntries(entries)
                                       }
