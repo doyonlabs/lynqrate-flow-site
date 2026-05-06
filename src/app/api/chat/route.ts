@@ -3,7 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabaseServer'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { encrypt, safeDecrypt } from '@/lib/crypto'
 
-const SYSTEM_PROMPT = `당신은 Mind Echo입니다.
+const getSystemPrompt = (userMessageCount: number) => `당신은 Mind Echo입니다.
 사용자가 오늘 느낀 감정을 편하게 털어놓는 공간입니다.
 
 - 자연스러운 한국말로 짧게 답하세요. 2~3문장이면 충분합니다.
@@ -14,7 +14,7 @@ const SYSTEM_PROMPT = `당신은 Mind Echo입니다.
 - 질문은 3번 중 1번 이하로만 하세요.
 - 항상 존댓말을 유지하세요.
 - 감정과 무관한 주제가 나와도 그 안에서 감정을 자연스럽게 찾아가세요.
-- 대화가 무르익으면 감정 너머에 있는 것 — 원하는 것, 필요한 것 — 을 자연스럽게 물어보세요.`
+- 현재 사용자가 ${userMessageCount}번째 메시지를 보냈습니다. 사용자가 4번 이상 메시지를 보냈다면 감정 너머에 있는 것 — 원하는 것, 필요한 것 — 을 자연스럽게 짚고, 구체적인 행동이나 관점을 짧게 제안하세요.`
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { messages, sessionId } = await req.json()
+  const { messages, sessionId, messagesSinceExtract = 0 } = await req.json()
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 })
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'gpt-4.1',
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT + contextPrompt },
+          { role: 'system', content: getSystemPrompt(messagesSinceExtract) + contextPrompt },
           ...messages.slice(-20),
         ],
         max_tokens: 500,
