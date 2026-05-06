@@ -9,6 +9,7 @@
 -- 2026-04-02: subscriptions.status canceled 스펠링 통일, canceled_at 컬럼 추가
 -- 2026-04-04: subscriptions.creem_customer_id, creem_subscription_id 컬럼 추가
 -- 2026-04-06: subscriptions.status scheduled_cancel 추가
+-- 2026-05-06: standard_emotions 10개 → 9개 개편 (복합/일상 추가, 복합 라벨 도입)
 -- ────────────────────────────────────────────────────────────
 
 -- ── 1. users ──────────────────────────────────────────────────
@@ -176,13 +177,12 @@ create policy "누구나 조회 가능" on public.standard_emotions
   for select using (true);
 
 insert into public.standard_emotions (name, color_code, soft_order) values
-  ('불안',   '#a78bfa', 1),
-  ('무기력', '#60a5fa', 2),
-  ('분노',   '#f87171', 3),
-  ('슬픔',   '#93c5fd', 4),
-  ('외로움', '#c4b5fd', 5),
-  ('두려움', '#fca5a5', 6),
-  ('설렘',   '#fde68a', 7),
-  ('기쁨',   '#6ee7b7', 8),
-  ('감사',   '#86efac', 9),
-  ('평온',   '#bfdbfe', 10);
+  ('불안/걱정',   '#a78bfa', 1),
+  ('지침/번아웃', '#60a5fa', 2),
+  ('분노/억울',   '#f87171', 3),
+  ('슬픔/상실',   '#93c5fd', 4),
+  ('외로움',      '#c4b5fd', 5),
+  ('두려움',      '#fca5a5', 6),
+  ('기쁨/설렘',   '#fde68a', 7),
+  ('감사/평온',   '#86efac', 8),
+  ('복합/일상',   '#6ee7b7', 9);

@@ -1712,8 +1712,8 @@ export default function FormClient() {
                 const weekTop = getTopEmotion(thisWeekEntries)
                 const prevWeekTop = getTopEmotion(lastWeekEntries)
 
-                const NEGATIVE_EMOTIONS = ['불안', '무기력', '분노', '슬픔', '외로움', '두려움']
-                const POSITIVE_EMOTIONS = ['설렘', '기쁨', '감사', '평온']
+                const NEGATIVE_EMOTIONS = ['불안/걱정', '지침/번아웃', '분노/억울', '슬픔/상실', '외로움', '두려움']
+                const POSITIVE_EMOTIONS = ['기쁨/설렘', '감사/평온']
 
                 const hasFinalConsonant = (str: string) => {
                   const code = str.charCodeAt(str.length - 1) - 0xAC00
@@ -1764,9 +1764,13 @@ export default function FormClient() {
                     return `${topEmotionName}${i(topEmotionName)} 자주 찾아온 시간이었어요. 꺼낼수록 조금씩 비워져요.`
                   }
 
+                  if (topEmotionName === '복합/일상') {
+                    return `${topEmotionCount}번의 기록 중 복합적인 감정이 가장 많았어요. 다양한 감정이 오가는 시간이었네요.`
+                  }
+
                   if (isPositive) {
-                    if (topEmotionName === '평온')
-                      return `${topEmotionCount}번의 기록 중 평온이 가장 많았어요. 잔잔한 시간이 이어지고 있어요.`
+                    if (topEmotionName === '감사/평온')
+                      return `${topEmotionCount}번의 기록 중 감사/평온이 가장 많았어요. 잔잔한 시간이 이어지고 있어요.`
                     return `${topEmotionCount}번의 기록 중 ${topEmotionName}${i(topEmotionName)} 가장 많았어요. 좋은 감정이 차곡차곡 쌓이고 있어요.`
                   }
 
@@ -1980,7 +1984,7 @@ export default function FormClient() {
 
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: `40px repeat(${displayDays.length}, 1fr)`,
+                            gridTemplateColumns: `${isMobile ? 56 : 80}px repeat(${displayDays.length}, 1fr)`,
                             gap: 3,
                           }}>
                             {/* 날짜 헤더 */}
@@ -2011,7 +2015,7 @@ export default function FormClient() {
                               return [
                                 <div key={`label-${emotion}`} style={{ display: 'flex', alignItems: 'center', gap: 4, height: 32 }}>
                                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                                  <span style={{ fontSize: 11, color: t.text }}>{emotion}</span>
+                                  <span style={{ fontSize: isMobile ? 9 : 10, color: t.text, whiteSpace: 'nowrap' }}>{emotion}</span>
                                 </div>,
                                 ...displayDays.map((d, i) => {
                                   const isFuture = d > new Date()
@@ -2164,7 +2168,7 @@ export default function FormClient() {
                           .map(({ emotion, avg }) => (
                             <div key={emotion} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: emotionColors[emotion] ?? '#a78bfa' }} />
-                              <span style={{ fontSize: 13, color: t.text, width: 36, flexShrink: 0 }}>{emotion}</span>
+                              <span style={{ fontSize: isMobile ? 10 : 11, color: t.text, width: isMobile ? 56 : 64, flexShrink: 0, whiteSpace: 'nowrap' }}>{emotion}</span>
                               <div style={{ flex: 1, height: 6, borderRadius: 3, background: t.border }}>
                                 <div style={{ width: `${(avg / 5) * 100}%`, height: '100%', borderRadius: 3, background: emotionColors[emotion] ?? '#a78bfa' }} />
                               </div>
@@ -2183,7 +2187,7 @@ export default function FormClient() {
                         <ResponsiveContainer width="100%" height={Math.max(160, barData.length * 32)}>
                           <BarChart data={barData} barSize={20} layout="vertical">
                             <XAxis type="number" tick={{ fontSize: 10, fill: t.muted }} axisLine={false} tickLine={false} allowDecimals={false} />
-                            <YAxis type="category" dataKey="name" tick={{ fontSize: 13, fill: t.text }} axisLine={false} tickLine={false} width={44} />
+                            <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 10 : 11, fill: t.text }} axisLine={false} tickLine={false} width={isMobile ? 72 : 80} />
                             <Bar dataKey="count"
                               shape={(props: any) => {
                                 const { x, y, width, height, payload } = props
