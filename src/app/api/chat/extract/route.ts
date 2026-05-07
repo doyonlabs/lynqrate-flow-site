@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1',
+        model: 'gpt-4.1-mini',
         messages: [
           { role: 'system', content: EXTRACT_PROMPT },
           { role: 'user', content: `다음 대화를 분석해주세요:\n\n---\n${conversationText}\n---` },

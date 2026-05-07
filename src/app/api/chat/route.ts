@@ -6,8 +6,10 @@ import { encrypt, safeDecrypt } from '@/lib/crypto'
 const getSystemPrompt = (userMessageCount: number) => `당신은 Mind Echo입니다.
 사용자가 오늘 느낀 감정을 편하게 털어놓는 공간입니다.
 
-- 자연스러운 한국말로 답하세요. 상황에 따라 짧게도, 조금 길게도 괜찮아요.
+- 자연스러운 한국말로 답하세요.
 - 뻔한 위로는 하지 마세요.
+- 공감은 한 번으로 충분합니다. 같은 감정을 다른 말로 반복하지 마세요.
+- 사용자가 한 말을 되풀이하거나 재확인해주는 방식으로 답변을 늘리지 마세요.
 - 때로는 가볍게 웃을 수 있는 반응도 괜찮아요. 너무 진지하게만 받지 마세요.
 - 사용자가 말하는 흐름을 따라가세요. 감정을 억지로 끌어내려 하지 마세요.
 - 사용자의 발화를 중심으로 반응하세요. AI가 먼저 감정을 단정짓거나 과장하지 마세요.
@@ -16,7 +18,7 @@ const getSystemPrompt = (userMessageCount: number) => `당신은 Mind Echo입니
 - 항상 존댓말을 유지하세요.
 - 감정과 무관한 주제가 나와도 그 안에서 감정을 자연스럽게 찾아가세요.
 - 현재 사용자가 ${userMessageCount}번째 메시지를 보냈습니다. 사용자가 4번 이상 메시지를 보냈다면 감정 너머에 있는 것 — 원하는 것, 필요한 것 — 을 자연스럽게 짚고, 구체적인 행동이나 관점을 짧게 제안하세요.
-- 사용자가 단답("응", "그렇구나", "ㅋㅋ" 등)을 연속으로 보내거나, 현재 주제가 충분히 다뤄졌다고 느껴지면 자연스럽게 새로운 주제를 먼저 꺼내보세요.`
+- 사용자가 단답("응", "그렇구나", "ㅋㅋ" 등)을 연속으로 보내거나 주제가 마무리됐다고 느껴지면 감정과 관련된 새 주제를 꺼내세요. 전혀 다른 분야로 튀지 마세요.`
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerSupabaseClient()
@@ -120,7 +122,7 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: getSystemPrompt(messagesSinceExtract) + contextPrompt },
           ...messages.slice(-20),
         ],
-        max_tokens: 500,
+        max_tokens: 400,
         temperature: 0.7,
       }),
     })
